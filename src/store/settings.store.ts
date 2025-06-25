@@ -89,6 +89,10 @@ export interface SettingsState {
   autoRuleSelectionEnabled: boolean;
   autoRuleSelectionModelId: string | null;
   autoRuleSelectionPrompt: string | null;
+  runnableBlocksEnabled: boolean;
+  runnableBlocksSecurityCheckEnabled: boolean;
+  runnableBlocksSecurityModelId: string | null;
+  runnableBlocksSecurityPrompt: string | null;
 }
 
 interface SettingsActions {
@@ -135,6 +139,10 @@ interface SettingsActions {
   setAutoRuleSelectionEnabled: (enabled: boolean) => void;
   setAutoRuleSelectionModelId: (modelId: string | null) => void;
   setAutoRuleSelectionPrompt: (prompt: string | null) => void;
+  setRunnableBlocksEnabled: (enabled: boolean) => void;
+  setRunnableBlocksSecurityCheckEnabled: (enabled: boolean) => void;
+  setRunnableBlocksSecurityModelId: (modelId: string | null) => void;
+  setRunnableBlocksSecurityPrompt: (prompt: string | null) => void;
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
@@ -183,6 +191,11 @@ const DEFAULT_AUTO_RULE_SELECTION_ENABLED = false;
 const DEFAULT_AUTO_RULE_SELECTION_MODEL_ID = null;
 const DEFAULT_AUTO_RULE_SELECTION_PROMPT =
   "Given the following user prompt and the list of available rules, select the most relevant rules for this conversation. Return a JSON array of rule IDs.\n\nUser Prompt: {{prompt}}\n\nAvailable Rules:\n{{rules}}\n\nReturn only a JSON array of rule IDs.";
+const DEFAULT_RUNNABLE_BLOCKS_ENABLED = true;
+const DEFAULT_RUNNABLE_BLOCKS_SECURITY_CHECK_ENABLED = true;
+const DEFAULT_RUNNABLE_BLOCKS_SECURITY_MODEL_ID = null;
+const DEFAULT_RUNNABLE_BLOCKS_SECURITY_PROMPT =
+  "Analyze the following code for potential security risks or malicious behavior. Respond with ONLY a number from 0 to 100 where:\n- 0-30: Safe code (reading data, basic calculations, simple DOM manipulation)\n- 31-60: Moderate risk (file operations, network requests, eval usage)\n- 61-90: High risk (system commands, dangerous APIs, potential privacy violations)\n- 91-100: Extremely dangerous (malware, destructive operations, clear security threats)\n\nCode to analyze:\n{{code}}\n\nReturn only the numeric risk score (0-100).";
 
 export const useSettingsStore = create(
   immer<SettingsState & SettingsActions>((set, get) => ({
@@ -226,6 +239,10 @@ export const useSettingsStore = create(
     autoRuleSelectionEnabled: DEFAULT_AUTO_RULE_SELECTION_ENABLED,
     autoRuleSelectionModelId: DEFAULT_AUTO_RULE_SELECTION_MODEL_ID,
     autoRuleSelectionPrompt: DEFAULT_AUTO_RULE_SELECTION_PROMPT,
+    runnableBlocksEnabled: DEFAULT_RUNNABLE_BLOCKS_ENABLED,
+    runnableBlocksSecurityCheckEnabled: DEFAULT_RUNNABLE_BLOCKS_SECURITY_CHECK_ENABLED,
+    runnableBlocksSecurityModelId: DEFAULT_RUNNABLE_BLOCKS_SECURITY_MODEL_ID,
+    runnableBlocksSecurityPrompt: DEFAULT_RUNNABLE_BLOCKS_SECURITY_PROMPT,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -503,6 +520,26 @@ export const useSettingsStore = create(
       PersistenceService.saveSetting("autoRuleSelectionPrompt", prompt);
       emitter.emit(settingsEvent.autoRuleSelectionPromptChanged, { prompt });
     },
+    setRunnableBlocksEnabled: (enabled) => {
+      set({ runnableBlocksEnabled: enabled });
+      PersistenceService.saveSetting("runnableBlocksEnabled", enabled);
+      emitter.emit(settingsEvent.runnableBlocksEnabledChanged, { enabled });
+    },
+    setRunnableBlocksSecurityCheckEnabled: (enabled) => {
+      set({ runnableBlocksSecurityCheckEnabled: enabled });
+      PersistenceService.saveSetting("runnableBlocksSecurityCheckEnabled", enabled);
+      emitter.emit(settingsEvent.runnableBlocksSecurityCheckEnabledChanged, { enabled });
+    },
+    setRunnableBlocksSecurityModelId: (modelId) => {
+      set({ runnableBlocksSecurityModelId: modelId });
+      PersistenceService.saveSetting("runnableBlocksSecurityModelId", modelId);
+      emitter.emit(settingsEvent.runnableBlocksSecurityModelIdChanged, { modelId });
+    },
+    setRunnableBlocksSecurityPrompt: (prompt) => {
+      set({ runnableBlocksSecurityPrompt: prompt });
+      PersistenceService.saveSetting("runnableBlocksSecurityPrompt", prompt);
+      emitter.emit(settingsEvent.runnableBlocksSecurityPromptChanged, { prompt });
+    },
 
     loadSettings: async () => {
       try {
@@ -546,6 +583,10 @@ export const useSettingsStore = create(
           autoRuleSelectionEnabled,
           autoRuleSelectionModelId,
           autoRuleSelectionPrompt,
+          runnableBlocksEnabled,
+          runnableBlocksSecurityCheckEnabled,
+          runnableBlocksSecurityModelId,
+          runnableBlocksSecurityPrompt,
         ] = await Promise.all([
           PersistenceService.loadSetting<SettingsState["theme"]>(
             "theme",
@@ -697,6 +738,22 @@ export const useSettingsStore = create(
             "autoRuleSelectionPrompt",
             DEFAULT_AUTO_RULE_SELECTION_PROMPT
           ),
+          PersistenceService.loadSetting<boolean>(
+            "runnableBlocksEnabled",
+            DEFAULT_RUNNABLE_BLOCKS_ENABLED
+          ),
+          PersistenceService.loadSetting<boolean>(
+            "runnableBlocksSecurityCheckEnabled",
+            DEFAULT_RUNNABLE_BLOCKS_SECURITY_CHECK_ENABLED
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "runnableBlocksSecurityModelId",
+            DEFAULT_RUNNABLE_BLOCKS_SECURITY_MODEL_ID
+          ),
+          PersistenceService.loadSetting<string | null>(
+            "runnableBlocksSecurityPrompt",
+            DEFAULT_RUNNABLE_BLOCKS_SECURITY_PROMPT
+          ),
         ]);
 
         const loadedSettings = {
@@ -739,6 +796,10 @@ export const useSettingsStore = create(
           autoRuleSelectionEnabled,
           autoRuleSelectionModelId,
           autoRuleSelectionPrompt,
+          runnableBlocksEnabled,
+          runnableBlocksSecurityCheckEnabled,
+          runnableBlocksSecurityModelId,
+          runnableBlocksSecurityPrompt,
         };
         set(loadedSettings);
         emitter.emit(settingsEvent.loaded, { settings: loadedSettings });
@@ -1066,6 +1127,34 @@ export const useSettingsStore = create(
           handler: (
             p: SettingsEventPayloads[typeof settingsEvent.setAutoRuleSelectionPromptRequest]
           ) => actions.setAutoRuleSelectionPrompt(p.prompt),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setRunnableBlocksEnabledRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setRunnableBlocksEnabledRequest]
+          ) => actions.setRunnableBlocksEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setRunnableBlocksSecurityCheckEnabledRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setRunnableBlocksSecurityCheckEnabledRequest]
+          ) => actions.setRunnableBlocksSecurityCheckEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setRunnableBlocksSecurityModelIdRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setRunnableBlocksSecurityModelIdRequest]
+          ) => actions.setRunnableBlocksSecurityModelId(p.modelId),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setRunnableBlocksSecurityPromptRequest,
+          handler: (
+            p: SettingsEventPayloads[typeof settingsEvent.setRunnableBlocksSecurityPromptRequest]
+          ) => actions.setRunnableBlocksSecurityPrompt(p.prompt),
           storeId,
         },
         {

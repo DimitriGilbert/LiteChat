@@ -15,7 +15,8 @@ export type InteractionType =
   | "system.info"
   | "system.error"
   | "workflow.run"
-  | "rules.auto_selection";
+  | "rules.auto_selection"
+  | "code.security_check";
 
 export type InteractionStatus =
   | "PENDING"

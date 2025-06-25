@@ -30,6 +30,7 @@ import { CodeBlockRenderer } from "./CodeBlockRenderer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getTreeLayout } from '@/lib/litechat/tree-layout';
+import { toPng } from 'html-to-image';
 
 import '@xyflow/react/dist/style.css';
 
@@ -353,9 +354,6 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
     }
 
     try {
-      // Use html-to-image like ReactFlow documentation recommends
-      const { toPng } = await import('html-to-image');
-      
       // Wait for the flow viewport to be ready with better retry logic
       const waitForFlowViewport = async (maxAttempts = 15, delay = 200): Promise<Element | null> => {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {

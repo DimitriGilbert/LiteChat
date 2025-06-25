@@ -98,6 +98,12 @@ export const settingsEvent = {
   setAutoRuleSelectionEnabledRequest: "settings.set.auto.rule.selection.enabled.request",
   setAutoRuleSelectionModelIdRequest: "settings.set.auto.rule.selection.model.id.request",
   setAutoRuleSelectionPromptRequest: "settings.set.auto.rule.selection.prompt.request",
+  
+  // Runnable Blocks Events - Following control rule pattern for granular settings
+  setRunnableBlocksSecurityCheckEnabledRequest: "settings.set.runnable.blocks.security.check.enabled.request",
+  setRunnableBlocksSecurityModelIdRequest: "settings.set.runnable.blocks.security.model.id.request",
+  setRunnableBlocksSecurityPromptRequest: "settings.set.runnable.blocks.security.prompt.request",
+  
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
   resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
@@ -105,6 +111,13 @@ export const settingsEvent = {
   autoRuleSelectionEnabledChanged: "settings.auto.rule.selection.enabled.changed",
   autoRuleSelectionModelIdChanged: "settings.auto.rule.selection.model.id.changed",
   autoRuleSelectionPromptChanged: "settings.auto.rule.selection.prompt.changed",
+  
+  // Runnable Blocks Changed Events
+  runnableBlocksSecurityCheckEnabledChanged: "settings.runnable.blocks.security.check.enabled.changed",
+  runnableBlocksSecurityModelIdChanged: "settings.runnable.blocks.security.model.id.changed",
+  runnableBlocksSecurityPromptChanged: "settings.runnable.blocks.security.prompt.changed",
+  setRunnableBlocksEnabledRequest: "settings.set.runnable.blocks.enabled.request",
+  runnableBlocksEnabledChanged: "settings.runnable.blocks.enabled.changed",
 } as const;
 
 export interface SettingsEventPayloads {
@@ -295,6 +308,12 @@ export interface SettingsEventPayloads {
   [settingsEvent.setAutoRuleSelectionEnabledRequest]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
   [settingsEvent.setAutoRuleSelectionModelIdRequest]: { modelId: SettingsState["autoRuleSelectionModelId"] };
   [settingsEvent.setAutoRuleSelectionPromptRequest]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
+  [settingsEvent.setRunnableBlocksSecurityCheckEnabledRequest]: { enabled: boolean };
+  [settingsEvent.setRunnableBlocksSecurityModelIdRequest]: { modelId: string | null };
+  [settingsEvent.setRunnableBlocksSecurityPromptRequest]: { prompt: string | null };
+  [settingsEvent.runnableBlocksSecurityCheckEnabledChanged]: { enabled: boolean };
+  [settingsEvent.runnableBlocksSecurityModelIdChanged]: { modelId: string | null };
+  [settingsEvent.runnableBlocksSecurityPromptChanged]: { prompt: string | null };
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;
   [settingsEvent.resetAssistantSettingsRequest]: undefined;
@@ -302,4 +321,6 @@ export interface SettingsEventPayloads {
   [settingsEvent.autoRuleSelectionEnabledChanged]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
   [settingsEvent.autoRuleSelectionModelIdChanged]: { modelId: SettingsState["autoRuleSelectionModelId"] };
   [settingsEvent.autoRuleSelectionPromptChanged]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
+  [settingsEvent.setRunnableBlocksEnabledRequest]: { enabled: boolean };
+  [settingsEvent.runnableBlocksEnabledChanged]: { enabled: boolean };
 }

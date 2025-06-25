@@ -43,6 +43,7 @@ import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule"
 import { ThemeSettingsControlModule } from "@/controls/modules/ThemeSettingsControlModule";
 import { ProviderSettingsModule } from "@/controls/modules/ProviderSettingsModule";
 import { AssistantSettingsModule } from "@/controls/modules/AssistantSettingsModule";
+import { RunnableBlocksSettingsModule } from "@/controls/modules/RunnableBlocksSettingsModule";
 import { DataSettingsModule } from "@/controls/modules/DataSettingsModule";
 import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
 
@@ -72,8 +73,8 @@ import { MermaidBlockRendererModule } from "@/controls/modules/MermaidBlockRende
 import { FlowBlockRendererModule } from "@/controls/modules/FlowBlockRendererModule";
 import { FormedibleBlockRendererModule } from "@/controls/modules/FormedibleBlockRendererModule";
 import { ChartBlockRendererModule } from "@/controls/modules/ChartBlockRendererModule";
-import { JsRunnableBlockRendererModule } from "@/controls/modules/JsRunnableBlockRendererModule";
-import { PythonRunnableBlockRendererModule } from "@/controls/modules/PythonRunnableBlockRendererModule";
+import { JsRunnableBlockModule } from "@/controls/modules/canvas/JsRunnableBlockModule";
+import { PythonRunnableBlockModule } from "@/controls/modules/canvas/PythonRunnableBlockModule";
 
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
@@ -82,6 +83,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ThemeSettingsControlModule,
   ProviderSettingsModule,
   AssistantSettingsModule,
+  RunnableBlocksSettingsModule,
   DataSettingsModule,
   ModSettingsModule,
   ConversationListControlModule,
@@ -118,8 +120,8 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   FlowBlockRendererModule,
   FormedibleBlockRendererModule,
   ChartBlockRendererModule,
-  JsRunnableBlockRendererModule,
-  PythonRunnableBlockRendererModule,
+  JsRunnableBlockModule,
+  PythonRunnableBlockModule,
   // Canvas Action Controls
   CopyActionControlModule, // For InteractionCard header
   FoldInteractionControlModule, // For InteractionCard header

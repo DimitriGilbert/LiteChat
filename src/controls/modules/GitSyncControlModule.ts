@@ -15,6 +15,7 @@ import { useInteractionStore } from "@/store/interaction.store";
 import { useSettingsStore } from "@/store/settings.store";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { SidebarItemType } from "@/types/litechat/chat";
+import { BulkSyncService } from "@/services/bulk-sync.service";
 
 export class GitSyncControlModule implements ControlModule {
   readonly id = "core-git-sync";
@@ -249,7 +250,6 @@ export class GitSyncControlModule implements ControlModule {
   };
 
   public abortBulkSync = async () => {
-    const { BulkSyncService } = await import("@/services/bulk-sync.service");
     BulkSyncService.abort();
   };
 

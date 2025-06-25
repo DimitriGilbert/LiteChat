@@ -23,6 +23,8 @@ import { CodeBlockRenderer } from "./CodeBlockRenderer";
 import type { CanvasControl } from "@/types/litechat/canvas/control";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
+import { toPng } from "html-to-image";
+
 
 interface ChartBlockProps {
   code: string;
@@ -120,7 +122,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
       return;
     }
     try {
-      const { toPng } = await import('html-to-image');
+      
       
       const rechartWrapper = containerRef.current.querySelector('.recharts-wrapper');
       if (!rechartWrapper) {

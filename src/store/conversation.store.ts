@@ -30,6 +30,7 @@ import type {
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
 import { useVfsStore } from "./vfs.store";
+import { BulkSyncService } from "@/services/bulk-sync.service";
 
 export type SidebarItem =
   | (Conversation & { itemType: "conversation" })
@@ -871,7 +872,6 @@ export const useConversationStore = create(
     },
 
     syncAllConversations: async () => {
-      const { BulkSyncService } = await import("@/services/bulk-sync.service");
       await BulkSyncService.syncAll({
         syncRepos: false,
         syncConversations: true,
@@ -881,12 +881,10 @@ export const useConversationStore = create(
     },
 
     syncPendingConversations: async () => {
-      const { BulkSyncService } = await import("@/services/bulk-sync.service");
       await BulkSyncService.syncPendingConversations();
     },
 
     initializeAllRepositories: async () => {
-      const { BulkSyncService } = await import("@/services/bulk-sync.service");
       await BulkSyncService.initializeAllRepositories();
     },
 

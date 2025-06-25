@@ -46,6 +46,8 @@ import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import { canvasEvent,} from "@/types/litechat/events/canvas.events";
 import { providerEvent } from "@/types/litechat/events/provider.events";
 import { ConversationService } from "@/services/conversation.service";
+import { PromptEnhancementService } from "@/services/prompt-enhancement.service";
+
 
 interface AIServiceCallOptions {
   model: LanguageModelV1;
@@ -1167,7 +1169,6 @@ export const InteractionService = {
       const enhancedPrompt = finalUpdates.response.trim();
       if (enhancedPrompt) {
         // Import PromptEnhancementService to handle completion
-        const { PromptEnhancementService } = await import("@/services/prompt-enhancement.service");
         await PromptEnhancementService.handleEnhancementCompletion(
           interactionId,
           enhancedPrompt

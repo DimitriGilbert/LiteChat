@@ -16,9 +16,10 @@ import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { InlineCodeEditor } from "@/controls/components/canvas/codeblock/EditCodeBlockControl";
 import { Button } from "@/components/ui/button";
-import { PlayIcon, Loader2Icon, EyeIcon, CodeIcon, DownloadIcon } from "lucide-react";
+import { PlayIcon, Loader2Icon, EyeIcon, CodeIcon, DownloadIcon, ShieldIcon, ShieldCheckIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PYODIDE_VERSION_URL } from "@/lib/litechat/constants";
+import { CodeSecurityService, type CodeSecurityResult } from "@/services/code-security.service";
 
 // Pyodide types declaration
 declare global {
@@ -33,6 +34,7 @@ interface PythonRunnableBlockRendererProps {
   isStreaming?: boolean;
   interactionId?: string;
   blockId?: string;
+  module?: any; // Optional module for enhanced context access
 }
 
 const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRendererProps> = ({
@@ -40,12 +42,17 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   isStreaming = false,
   interactionId,
   blockId,
+  module,
 }) => {
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
     }))
   );
+  
+  // For now, enable runnable blocks as this is an advanced feature
+  // TODO: Implement granular control using runnableBlockConfig when store is fixed
+  const runnableBlocksEnabled = true;
 
   const [isFolded, setIsFolded] = useState(
     isStreaming ? foldStreamingCodeBlocks : false
@@ -59,12 +66,24 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   const [hasRun, setHasRun] = useState(false);
   const [pyodideReady, setPyodideReady] = useState(false);
 
+  // Security validation state
+  const [securityResult, setSecurityResult] = useState<CodeSecurityResult | null>(null);
+  const [isCheckingSecurity, setIsCheckingSecurity] = useState(false);
+  const [clickCount, setClickCount] = useState(0);
+  const [lastClickTime, setLastClickTime] = useState(0);
+
   // Update edited code when original code changes
   useEffect(() => {
     if (!isEditing) {
       setEditedCode(code);
     }
   }, [code, isEditing]);
+
+  // Reset security state when code changes
+  useEffect(() => {
+    setSecurityResult(null);
+    setClickCount(0);
+  }, [editedCode]);
 
   const codeRef = useRef<HTMLElement>(null);
 
@@ -195,6 +214,80 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
     }
   };
 
+  const checkSecurity = useCallback(async () => {
+    setIsCheckingSecurity(true);
+    try {
+      const codeToCheck = isEditing ? editedCode : code;
+      const result = await CodeSecurityService.validateCodeSecurity(codeToCheck, 'python');
+      setSecurityResult(result);
+      
+      if (result.score > 90) {
+        toast.error(`High-risk code detected (Score: ${result.score}/100). Please review carefully before running.`);
+      } else if (result.score > 60) {
+        toast.warning(`Potentially risky code detected (Score: ${result.score}/100). Use caution when running.`);
+      } else if (result.score > 30) {
+        toast.info(`Moderate-risk code detected (Score: ${result.score}/100). Review before running.`);
+      } else {
+        toast.success(`Code security check passed (Score: ${result.score}/100).`);
+      }
+    } catch (error) {
+      console.error("Security check failed:", error);
+      toast.error("Security check failed. Please try again.");
+    } finally {
+      setIsCheckingSecurity(false);
+    }
+  }, [code, editedCode, isEditing]);
+
+  const handleRunClick = useCallback(async () => {
+    if (!runnableBlocksEnabled) {
+      toast.error("Runnable blocks are disabled in settings.");
+      return;
+    }
+
+    // If Pyodide isn't ready, load it first
+    if (!pyodideReady) {
+      await loadPyodide();
+      return;
+    }
+
+    // If no security result, run security check first
+    if (!securityResult) {
+      await checkSecurity();
+      return;
+    }
+
+    const now = Date.now();
+    const timeSinceLastClick = now - lastClickTime;
+    
+    // Reset click count if more than 3 seconds have passed
+    if (timeSinceLastClick > 3000) {
+      setClickCount(0);
+    }
+    
+    setLastClickTime(now);
+    const newClickCount = clickCount + 1;
+    setClickCount(newClickCount);
+
+    // Check if we need more clicks
+    if (newClickCount < securityResult.clicksRequired) {
+      const remaining = securityResult.clicksRequired - newClickCount;
+      toast.info(`Click ${remaining} more time${remaining > 1 ? 's' : ''} to confirm execution (Risk: ${securityResult.riskLevel})`);
+      return;
+    }
+
+    // Show additional warning for high-risk code
+    if (securityResult.score > 90) {
+      if (!confirm(`This code has a very high security risk score (${securityResult.score}/100). Are you absolutely sure you want to run it?`)) {
+        setClickCount(0);
+        return;
+      }
+    }
+
+    // Reset click count and execute
+    setClickCount(0);
+    executeCode();
+  }, [securityResult, clickCount, lastClickTime, checkSecurity, runnableBlocksEnabled, pyodideReady, loadPyodide]);
+
   const executeCode = useCallback(async () => {
     if (!pyodideReady) {
       await loadPyodide();
@@ -212,6 +305,17 @@ from io import StringIO
 sys.stdout = StringIO()
 sys.stderr = StringIO()
 `);
+
+      // Get enhanced context if module is provided
+      if (module && module.getEnhancedContext) {
+        try {
+          const litechatContext = module.getEnhancedContext();
+          // Make LiteChat context available in Python global namespace
+          window.pyodide.globals.set("litechat", litechatContext);
+        } catch (error) {
+          console.warn("Failed to get enhanced context:", error);
+        }
+      }
 
       // Execute the Python code
       const codeToRun = isEditing ? editedCode : code;
@@ -257,7 +361,7 @@ sys.stderr = StringIO()
         toast.success("Python code executed successfully");
       }
     }
-  }, [code, editedCode, isEditing, pyodideReady, loadPyodide]);
+  }, [code, editedCode, isEditing, pyodideReady, loadPyodide, module]);
 
   const toggleView = () => {
     setShowOutput(!showOutput);
@@ -280,6 +384,28 @@ sys.stderr = StringIO()
     toggleFold
   );
 
+  // Determine run button style based on security result
+  const getRunButtonStyle = () => {
+    if (!securityResult) return {};
+    
+    return {
+      backgroundColor: securityResult.color,
+      borderColor: securityResult.color,
+      color: securityResult.score > 50 ? '#ffffff' : '#000000',
+    };
+  };
+
+  const getRunButtonText = () => {
+    if (isRunning) return "Running...";
+    if (isLoading) return "Loading...";
+    if (!pyodideReady) return "Load Python";
+    if (!securityResult) return "Check & Run";
+    if (clickCount > 0 && clickCount < securityResult.clicksRequired) {
+      return `Click ${securityResult.clicksRequired - clickCount} more`;
+    }
+    return "Run";
+  };
+
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
@@ -288,11 +414,33 @@ sys.stderr = StringIO()
           {!pyodideReady && (
             <div className="text-xs text-muted-foreground">(Pyodide)</div>
           )}
+          {securityResult && (
+            <div className="flex items-center gap-1 text-xs" style={{ color: securityResult.color }}>
+              <ShieldIcon className="h-3 w-3" />
+              <span>{securityResult.score}/100 ({securityResult.riskLevel})</span>
+            </div>
+          )}
           <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
             {codeBlockHeaderActions}
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {securityResult && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={checkSecurity}
+              disabled={isCheckingSecurity}
+              className="text-xs h-7"
+            >
+              {isCheckingSecurity ? (
+                <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <ShieldCheckIcon className="h-3 w-3 mr-1" />
+              )}
+              Recheck
+            </Button>
+          )}
           {hasRun && (
             <Button
               size="sm"
@@ -315,18 +463,21 @@ sys.stderr = StringIO()
           )}
           <Button
             size="sm"
-            onClick={executeCode}
-            disabled={isRunning || isLoading}
+            onClick={handleRunClick}
+            disabled={isRunning || isLoading || isCheckingSecurity || !runnableBlocksEnabled}
             className="text-xs h-7"
+            style={getRunButtonStyle()}
           >
             {isRunning || isLoading ? (
+              <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+            ) : isCheckingSecurity ? (
               <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
             ) : !pyodideReady ? (
               <DownloadIcon className="h-3 w-3 mr-1" />
             ) : (
               <PlayIcon className="h-3 w-3 mr-1" />
             )}
-            {isLoading ? "Loading..." : !pyodideReady ? "Load Python" : "Run"}
+            {getRunButtonText()}
           </Button>
         </div>
       </div>

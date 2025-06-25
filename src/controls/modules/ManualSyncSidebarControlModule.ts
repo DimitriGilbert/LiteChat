@@ -6,6 +6,7 @@ import { syncEvent } from "@/types/litechat/events/sync.events";
 import { ManualSyncSidebarControl } from "@/controls/components/git-sync/ManualSyncSidebarControl";
 import { useConversationStore } from "@/store/conversation.store";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
+import { BulkSyncService } from "@/services/bulk-sync.service";
 
 export class ManualSyncSidebarControlModule implements ControlModule {
   readonly id = "core-manual-git-sync-sidebar";
@@ -78,7 +79,6 @@ export class ManualSyncSidebarControlModule implements ControlModule {
       console.log("[ManualSyncSidebarControlModule] Starting bulk sync for all repositories and conversations");
       
       // Use the bulk sync service for comprehensive sync (repos + conversations)
-      const { BulkSyncService } = await import("@/services/bulk-sync.service");
       await BulkSyncService.syncAll({
         syncRepos: true,
         syncConversations: true,

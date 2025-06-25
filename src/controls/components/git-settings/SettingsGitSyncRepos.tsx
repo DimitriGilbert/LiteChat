@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { FieldMetaMessages } from "@/components/LiteChat/common/form-fields/FieldMetaMessages";
 import { BulkSyncControl } from "@/controls/components/git-sync/BulkSyncControl";
+import { BulkSyncService } from "@/services/bulk-sync.service";
 
 const syncRepoFormSchema = z.object({
   name: z.string().min(1, "Repository Name is required."),
@@ -422,7 +423,6 @@ const SettingsGitSyncReposComponent: React.FC = () => {
               await conversationStore.initializeAllRepositories();
             }}
             onAbortSync={async () => {
-              const { BulkSyncService } = await import("@/services/bulk-sync.service");
               BulkSyncService.abort();
             }}
             totalRepos={syncRepos.length}
