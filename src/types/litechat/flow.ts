@@ -1,6 +1,6 @@
 export type StepStatus = 'pending' | 'running' | 'success' | 'error';
 
-export type NodeType = 'trigger' | 'prompt' | 'agent-task' | 'human-in-the-loop' | 'transform' | 'custom' | 'input' | 'output' | 'default' | 'group';
+export type NodeType = 'trigger' | 'prompt' | 'agent-task' | 'human-in-the-loop' | 'transform' | 'custom' | 'input' | 'output' | 'default' | 'group' | 'tool-call' | 'custom-prompt' | 'function';
 export type EdgeType = 'default' | 'straight' | 'step' | 'smoothstep' | 'bezier' | 'custom';
 export type MarkerType = 'Arrow' | 'ArrowClosed';
 

@@ -71,7 +71,7 @@ export interface WorkflowTemplate {
   updatedAt: string; // ISO 8601
 }
 
-export type WorkflowRunStatus = "idle" | "running" | "completed" | "failed" | "paused" | "streaming" | "cancelled";
+export type WorkflowRunStatus = "idle" | "running" | "completed" | "failed" | "paused" | "streaming" | "cancelled" | "error";
 
 export interface WorkflowRun {
   runId: string; // Unique ID for this specific run
