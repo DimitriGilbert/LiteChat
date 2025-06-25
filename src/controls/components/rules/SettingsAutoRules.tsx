@@ -37,6 +37,7 @@ export const SettingsAutoRules: React.FC = () => {
       setAutoRuleSelectionModelId: state.setAutoRuleSelectionModelId,
       autoRuleSelectionPrompt: state.autoRuleSelectionPrompt,
       setAutoRuleSelectionPrompt: state.setAutoRuleSelectionPrompt,
+      enableAdvancedSettings: state.enableAdvancedSettings,
     }))
   );
 
@@ -122,25 +123,27 @@ export const SettingsAutoRules: React.FC = () => {
               </div>
             )}
           />
-          <form.Field
-            name="autoRuleSelectionPrompt"
-            children={(field) => (
-              <div className="space-y-1.5">
-                <Label htmlFor={field.name}>Prompt Template for Rule Selection</Label>
-                <p className="text-xs text-muted-foreground">
-                  The prompt template used to instruct the AI to select rules. Use <code>{`{{prompt}}`}</code> for the user prompt and <code>{`{{rules}}`}</code> for the rules list.
-                </p>
-                <Textarea
-                  id={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className={`w-full min-h-[100px] font-mono ${field.state.meta.errors.length ? "border-destructive" : ""}`}
-                />
-                <FieldMetaMessages field={field} />
-              </div>
-            )}
-          />
+          {storeAccess.enableAdvancedSettings && (
+            <form.Field
+              name="autoRuleSelectionPrompt"
+              children={(field) => (
+                <div className="space-y-1.5">
+                  <Label htmlFor={field.name}>Prompt Template for Rule Selection</Label>
+                  <p className="text-xs text-muted-foreground">
+                    The prompt template used to instruct the AI to select rules. Use <code>{`{{prompt}}`}</code> for the user prompt and <code>{`{{rules}}`}</code> for the rules list.
+                  </p>
+                  <Textarea
+                    id={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className={`w-full min-h-[100px] font-mono ${field.state.meta.errors.length ? "border-destructive" : ""}`}
+                  />
+                  <FieldMetaMessages field={field} />
+                </div>
+              )}
+            />
+          )}
         </div>
       )}
       <div className="flex justify-end pt-2">

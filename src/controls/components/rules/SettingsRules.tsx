@@ -145,7 +145,6 @@ export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
 
   return (
     <div className="space-y-6">
-      <SettingsAutoRules />
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Rules</h3>
         <Button onClick={handleAddNew} size="sm">
@@ -168,6 +167,7 @@ export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
           }
         }}
       />
+      <SettingsAutoRules />
     </div>
   );
 };

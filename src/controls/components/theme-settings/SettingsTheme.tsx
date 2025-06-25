@@ -247,6 +247,7 @@ const SettingsThemeComponent: React.FC = () => {
       customFontSize: state.customFontSize,
       chatMaxWidth: state.chatMaxWidth,
       _rawCustomThemeColors: state.customThemeColors,
+      enableAdvancedSettings: state.enableAdvancedSettings,
     }))
   );
 
@@ -443,31 +444,33 @@ const SettingsThemeComponent: React.FC = () => {
       </SettingsSection>
 
       {/* Code Block Theme */}
-      <SettingsSection
-        title="Code Block Theme"
-        description="Customize syntax highlighting appearance."
-        contentClassName="rounded-lg border p-3 shadow-sm bg-card space-y-3"
-      >
-        <SelectField
-          form={form}
-          name="prismThemeUrl"
-          label="Code Block Theme"
-          options={PRISM_THEMES}
-          triggerClassName="w-full"
-        />
-        <TextField
-          form={form}
-          name="prismThemeUrl"
-          label="Or paste custom theme URL here..."
-          placeholder="Or paste custom theme URL here..."
-          type="url"
-          className="mt-1"
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Select a preset theme or paste a URL to a PrismJS CSS file. Leave
-          blank or select 'Default' to use themes matching light/dark mode.
-        </p>
-      </SettingsSection>
+      {storeValues.enableAdvancedSettings && (
+        <SettingsSection
+          title="Code Block Theme"
+          description="Customize syntax highlighting appearance."
+          contentClassName="rounded-lg border p-3 shadow-sm bg-card space-y-3"
+        >
+          <SelectField
+            form={form}
+            name="prismThemeUrl"
+            label="Code Block Theme"
+            options={PRISM_THEMES}
+            triggerClassName="w-full"
+          />
+          <TextField
+            form={form}
+            name="prismThemeUrl"
+            label="Or paste custom theme URL here..."
+            placeholder="Or paste custom theme URL here..."
+            type="url"
+            className="mt-1"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Select a preset theme or paste a URL to a PrismJS CSS file. Leave
+            blank or select 'Default' to use themes matching light/dark mode.
+          </p>
+        </SettingsSection>
+      )}
 
       {/* Custom Theme Colors, only display if selected theme is custom */}
       {form.getFieldValue("theme") === "custom" && (
