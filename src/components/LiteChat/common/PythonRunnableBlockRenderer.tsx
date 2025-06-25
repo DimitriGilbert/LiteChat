@@ -37,6 +37,9 @@ interface PythonRunnableBlockRendererProps {
   module?: any; // Optional module for enhanced context access
 }
 
+// Add a constant for the directory
+const PYODIDE_INDEX_URL = PYODIDE_VERSION_URL.replace(/\/pyodide\.js$/, '/');
+
 const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRendererProps> = ({
   code,
   isStreaming = false,
@@ -102,7 +105,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
       setIsLoading(true);
       try {
         window.pyodide = await window.loadPyodide({
-          indexURL: PYODIDE_VERSION_URL,
+          indexURL: PYODIDE_INDEX_URL,
         });
         setPyodideReady(true);
         toast.success("Python environment ready");
@@ -120,7 +123,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
       script.onload = async () => {
         try {
           window.pyodide = await window.loadPyodide({
-            indexURL: PYODIDE_VERSION_URL,
+            indexURL: PYODIDE_INDEX_URL,
           });
           setPyodideReady(true);
           toast.success("Python environment ready");

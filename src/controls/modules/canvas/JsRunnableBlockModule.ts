@@ -28,19 +28,17 @@ export class JsRunnableBlockModule implements ControlModule {
 
       // VFS access for file operations
       vfs: {
-        vfs: {
-          getInstance: (vfsKey: string) => {
-            if (!this.modApiRef) throw new Error("modApi not available");
-            return this.modApiRef.getVfsInstance(vfsKey);
-          },
-          getCurrentVfsKey: () => {
-            if (!this.modApiRef) throw new Error("modApi not available");
-            const context = this.modApiRef.getContextSnapshot();
-            // Use selected conversation's project if available, otherwise 'orphan'
-            return context.selectedConversationId
-              ? `project-${context.selectedConversationId}`
-              : "orphan";
-          },
+        getInstance: (vfsKey: string) => {
+          if (!this.modApiRef) throw new Error("modApi not available");
+          return this.modApiRef.getVfsInstance(vfsKey);
+        },
+        getCurrentVfsKey: () => {
+          if (!this.modApiRef) throw new Error("modApi not available");
+          const context = this.modApiRef.getContextSnapshot();
+          // Use selected conversation's project if available, otherwise 'orphan'
+          return context.selectedConversationId
+            ? `project-${context.selectedConversationId}`
+            : "orphan";
         },
       },
 

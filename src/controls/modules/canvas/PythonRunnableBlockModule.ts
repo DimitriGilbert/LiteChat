@@ -28,7 +28,6 @@ export class PythonRunnableBlockModule implements ControlModule {
       
       // VFS access for file operations
       vfs: {
-      vfs: {
         getInstance: (vfsKey: string) => {
           if (!this.modApiRef) throw new Error("modApi not available");
           return this.modApiRef.getVfsInstance(vfsKey);
@@ -41,7 +40,6 @@ export class PythonRunnableBlockModule implements ControlModule {
             ? `project-${context.selectedConversationId}`
             : 'orphan';
         }
-      },
       },
       
       // Utilities for common operations
