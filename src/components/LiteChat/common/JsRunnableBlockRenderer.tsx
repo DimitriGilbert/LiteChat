@@ -265,26 +265,49 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 
     try {
       // Get enhanced context if module is provided
-      let litechat = {};
+      let contextObj: any = {};
       if (module && module.getEnhancedContext) {
         try {
-          litechat = module.getEnhancedContext();
+          contextObj = module.getEnhancedContext(capturedLogs, previewRef.current);
         } catch (error) {
           console.warn("Failed to get enhanced context:", error);
         }
       }
 
-      // Enhance litechat object with the simple target element reference
-      const enhancedLitechat = {
-        ...litechat,
-        target: previewRef.current // Simple! Just pass the DOM element reference
-      };
+             // Fallback context if module is not available
+       if (!contextObj.litechat) {
+         contextObj = {
+           litechat: {
+             utils: {
+               log: (level: string, ...args: any[]) => {
+                 const formatted = args.map(arg => {
+                   if (typeof arg === 'object') {
+                     try {
+                       return JSON.stringify(arg, null, 2);
+                     } catch {
+                       return String(arg);
+                     }
+                   }
+                   return String(arg);
+                 }).join(' ');
+                 
+                 const logEntry = level === 'info' ? formatted : `${level.charAt(0).toUpperCase() + level.slice(1)}: ${formatted}`;
+                 capturedLogs.push(logEntry);
+               },
+               toast: (_type: string, message: string) => {
+                 toast(message);
+               }
+             }
+           },
+           target: previewRef.current
+         };
+       }
 
       // Execute the code in an isolated context with LiteChat access
       const codeToRun = isEditing ? editedCode : code;
       // Wrap in async function and provide 'litechat' global
       const asyncFunc = new Function('litechat', `return (async () => { ${codeToRun} })();`);
-      const result = asyncFunc(enhancedLitechat);
+      const result = asyncFunc(contextObj.litechat);
       // Only await if it's a promise
       if (result && typeof result.then === 'function') {
         await result;
@@ -306,7 +329,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       setIsRunning(false);
       
       // Auto-show preview if target has content, otherwise show console
-      if (previewRef.current && previewRef.current.children.length > 0) {
+      if (previewRef.current && (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim())) {
         setShowPreview(true);
         setShowOutput(false);
       } else {
@@ -373,8 +396,11 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     return "Run";
   };
 
-  // Check if preview has content
-  const hasPreviewContent = hasRun && previewRef.current && previewRef.current.children.length > 0;
+  // Check if preview has content (either DOM children or innerHTML content)
+  const hasPreviewContent = hasRun && previewRef.current && (
+    previewRef.current.children.length > 0 || 
+    previewRef.current.innerHTML.trim().length > 0
+  );
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
@@ -426,17 +452,15 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
                 <MonitorSpeakerIcon className="h-3 w-3 mr-1" />
                 Console
               </Button>
-              {hasPreviewContent && (
-                <Button
-                  size="sm"
-                  variant={showPreview ? "default" : "outline"}
-                  onClick={togglePreview}
-                  className="text-xs h-7"
-                >
-                  <EyeIcon className="h-3 w-3 mr-1" />
-                  Preview
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant={showPreview ? "default" : "outline"}
+                onClick={togglePreview}
+                className="text-xs h-7"
+              >
+                <EyeIcon className="h-3 w-3 mr-1" />
+                Preview
+              </Button>
             </>
           )}
           <Button
@@ -502,15 +526,23 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         </div>
       )}
 
-      {!isFolded && showPreview && hasPreviewContent && (
-        <div className="preview-container border border-border rounded-b-lg bg-background p-4">
-          <div className="preview-header text-muted-foreground mb-2 text-xs font-semibold">
-            PREVIEW:
-          </div>
-          {/* Simple! The target element that the assistant can manipulate directly */}
-          <div ref={previewRef} className="preview-content" />
-        </div>
-      )}
+      {/* ALWAYS render preview element (hidden when not shown) so ref is always available */}
+      <div ref={previewRef} className={!isFolded && showPreview ? "preview-container border border-border rounded-b-lg bg-background p-4" : "hidden"}>
+        {!isFolded && showPreview && (
+          <>
+            <div className="preview-header text-muted-foreground mb-2 text-xs font-semibold">
+              PREVIEW:
+            </div>
+            <div className="preview-content min-h-[100px] border border-dashed border-muted-foreground/20 rounded p-2">
+              {!hasPreviewContent && (
+                <div className="text-muted-foreground text-sm italic">
+                  No preview content. Use <code>litechat.target.appendChild(element)</code> to add DOM elements here.
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       {isFolded && (
         <div
