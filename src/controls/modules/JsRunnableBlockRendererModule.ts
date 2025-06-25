@@ -130,7 +130,7 @@ chart.className = 'flex items-end gap-1 h-52 p-5';
 data.forEach((value, index) => {
   const bar = document.createElement('div');
   const height = (value / maxVal) * 150;
-  bar.className = \`w-10 h-[\${height}] bg-gradient-to-t from-purple-400 to-purple-600 rounded-t-md relative transition-all duration-300 ease-in-out\`;
+  bar.className = \`w-10 h-[\${height}px] bg-gradient-to-t from-purple-400 to-purple-600 rounded-t-md relative transition-all duration-300 ease-in-out\`;
   
   // Add value label
   const label = document.createElement('span');

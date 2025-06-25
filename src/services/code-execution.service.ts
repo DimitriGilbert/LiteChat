@@ -103,10 +103,7 @@ export const CodeExecutionService = {
 
     try {
       const pyodide = await this.getPyodide();
-      
-      // Clear any previous return value
-      pyodide.globals.clear();
-      
+      pyodide.globals.set("_workflow_result", null);
       // Set context variables in Python global scope
       for (const [key, value] of Object.entries(context)) {
         pyodide.globals.set(key, value);
