@@ -5,34 +5,47 @@ import { JsRunnableBlockRenderer } from "@/components/LiteChat/common/JsRunnable
 import React from "react";
 
 // Control rule prompt for JavaScript runnable blocks
-const JS_RUNNABLE_CONTROL_PROMPT = `LiteChat supports runnable JavaScript code blocks. Use 'runjs' language identifier for JavaScript code that users can execute multiple times on demand.
+const JS_RUNNABLE_CONTROL_PROMPT = `# JavaScript Runnable Block Environment
 
-For example:
-\`\`\`runjs
-console.log("Hello from JavaScript!");
-const numbers = [1, 2, 3, 4, 5];
-const sum = numbers.reduce((a, b) => a + b, 0);
-console.log("Sum:", sum);
+You have access to a full JavaScript execution environment with the following context:
 
-// Example with DOM manipulation
-const div = document.createElement('div');
-div.textContent = 'Dynamic content created!';
-console.log("Created element:", div.textContent);
+## Available Context
+- \`litechat\` — The full LiteChat API object (modApi) for VFS, project, event, and utility operations.
+- \`target\` — A DOM element you can manipulate directly for visualizations or UI output.
+
+## LiteChat API (modApi) Reference
+You can use the following methods on \`litechat\` (the modApi object):
+
+### Event System
+- emit(eventName, payload)
+
+### Context and Utilities
+- showToast(type, message)
+- log(level, ...args)
+
+### VFS (File System)
+- getVfsInstance(vfsKey) # 'orphan' is the default, nodejs api compatible fs object. always use async interaction when using.
+
+## Example: Reading a File
+\`\`\`js
+const vfs = await litechat.getVfsInstance('project-123');
+const content = await vfs.promises.readFile('/data.txt', 'utf8');
+console.log(content);
 \`\`\`
 
-Runnable JavaScript blocks provide:
-- Multiple execution capability with Run button
-- Console output capture and display  
-- Error handling and display
-- Code editing while preserving results
-- Safe execution environment
+## Example: Emitting an Event
+\`\`\`js
+litechat.emit('myCustomEvent', { foo: 42 });
+\`\`\`
 
-Use 'runjs' for interactive JavaScript examples, calculations, demonstrations, and educational content.`;
+You are encouraged to use the full browser environment (DOM, Canvas, WebGL, etc.) and the LiteChat API for simple chat interactions, data processing, and interactive visualizations. Focus on workflows that leverage these capabilities.
+`;
 
 export class JsRunnableBlockRendererModule implements ControlModule {
   readonly id = "core-block-renderer-runnable-js";
   private unregisterCallback?: () => void;
   private unregisterRuleCallback?: () => void;
+  private modApiRef?: LiteChatModApi;
 
   async initialize(): Promise<void> {
     // No initialization needed
@@ -54,6 +67,7 @@ export class JsRunnableBlockRendererModule implements ControlModule {
           isStreaming: context.isStreaming,
           interactionId: context.interactionId,
           blockId: context.blockId,
+          module: this, // Pass module reference for enhanced context
         });
       },
     };
@@ -68,6 +82,8 @@ export class JsRunnableBlockRendererModule implements ControlModule {
       alwaysOn: true,
       moduleId: this.id,
     });
+
+    this.modApiRef = modApi;
   }
 
   destroy(): void {
@@ -79,5 +95,17 @@ export class JsRunnableBlockRendererModule implements ControlModule {
       this.unregisterRuleCallback();
       this.unregisterRuleCallback = undefined;
     }
+  }
+
+  // Public method to get enhanced context for runnable functions
+  public getEnhancedContext() {
+    if (!this.modApiRef) {
+      throw new Error("Module not initialized with modApi");
+    }
+    // Expose the real modApi as the litechat API object
+    return {
+      litechat: this.modApiRef,
+      // The renderer will add the 'target' property (DOM element) at runtime
+    };
   }
 } 

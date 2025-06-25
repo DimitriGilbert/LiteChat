@@ -16,7 +16,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { InlineCodeEditor } from "@/controls/components/canvas/codeblock/EditCodeBlockControl";
 import { Button } from "@/components/ui/button";
-import { PlayIcon, Loader2Icon, EyeIcon, CodeIcon, DownloadIcon, ShieldIcon, ShieldCheckIcon } from "lucide-react";
+import { PlayIcon, Loader2Icon, EyeIcon, CodeIcon, DownloadIcon, ShieldIcon, ShieldCheckIcon, MonitorSpeakerIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PYODIDE_VERSION_URL } from "@/lib/litechat/constants";
 import { CodeSecurityService, type CodeSecurityResult } from "@/services/code-security.service";
@@ -66,6 +66,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   const [isLoading, setIsLoading] = useState(false);
   const [output, setOutput] = useState<string[]>([]);
   const [showOutput, setShowOutput] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [hasRun, setHasRun] = useState(false);
   const [pyodideReady, setPyodideReady] = useState(false);
 
@@ -89,6 +90,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   }, [editedCode]);
 
   const codeRef = useRef<HTMLElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null); // Simple target element reference
 
   const canvasControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.canvasControls))
@@ -204,10 +206,10 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   }, [code, editedCode, isEditing]);
 
   useEffect(() => {
-    if (!isFolded && !showOutput) {
+    if (!isFolded && !showOutput && !showPreview) {
       highlightCode();
     }
-  }, [code, editedCode, isEditing, isFolded, showOutput, highlightCode]);
+  }, [code, editedCode, isEditing, isFolded, showOutput, showPreview, highlightCode]);
 
   const toggleFold = () => {
     const unfolding = isFolded;
@@ -247,61 +249,60 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
       return;
     }
 
-    // If Pyodide isn't ready, load it first
     if (!pyodideReady) {
       await loadPyodide();
       return;
     }
 
-    // If no security result, run security check first
-    if (!securityResult) {
-      await checkSecurity();
-      return;
-    }
-
-    const now = Date.now();
-    const timeSinceLastClick = now - lastClickTime;
-    
-    // Reset click count if more than 3 seconds have passed
-    if (timeSinceLastClick > 3000) {
-      setClickCount(0);
-    }
-    
-    setLastClickTime(now);
-    const newClickCount = clickCount + 1;
-    setClickCount(newClickCount);
-
-    // Check if we need more clicks
-    if (newClickCount < securityResult.clicksRequired) {
-      const remaining = securityResult.clicksRequired - newClickCount;
-      toast.info(`Click ${remaining} more time${remaining > 1 ? 's' : ''} to confirm execution (Risk: ${securityResult.riskLevel})`);
-      return;
-    }
-
-    // Show additional warning for high-risk code
-    if (securityResult.score > 90) {
-      if (!confirm(`This code has a very high security risk score (${securityResult.score}/100). Are you absolutely sure you want to run it?`)) {
+    // If security result exists and requires multiple clicks
+    if (securityResult) {
+      const now = Date.now();
+      const timeSinceLastClick = now - lastClickTime;
+      
+      // Reset click count if more than 3 seconds have passed
+      if (timeSinceLastClick > 3000) {
         setClickCount(0);
+      }
+      
+      setLastClickTime(now);
+      const newClickCount = clickCount + 1;
+      setClickCount(newClickCount);
+
+      // Check if we need more clicks
+      if (newClickCount < securityResult.clicksRequired) {
+        const remaining = securityResult.clicksRequired - newClickCount;
+        toast.info(`Click ${remaining} more time${remaining > 1 ? 's' : ''} to confirm execution (Risk: ${securityResult.riskLevel})`);
         return;
       }
+
+      // Show additional warning for high-risk code
+      if (securityResult.score > 90) {
+        if (!confirm(`This code has a very high security risk score (${securityResult.score}/100). Are you absolutely sure you want to run it?`)) {
+          setClickCount(0);
+          return;
+        }
+      }
+
+      // Reset click count and execute
+      setClickCount(0);
     }
 
-    // Reset click count and execute
-    setClickCount(0);
     executeCode();
-  }, [securityResult, clickCount, lastClickTime, checkSecurity, runnableBlocksEnabled, pyodideReady, loadPyodide]);
+  }, [securityResult, clickCount, lastClickTime, runnableBlocksEnabled, pyodideReady, loadPyodide]);
 
   const executeCode = useCallback(async () => {
-    if (!pyodideReady) {
-      await loadPyodide();
-      return;
-    }
+    if (!window.pyodide) return;
 
     setIsRunning(true);
     const capturedLogs: string[] = [];
 
+    // Clear the preview target
+    if (previewRef.current) {
+      previewRef.current.innerHTML = '';
+    }
+
     try {
-      // Redirect Python stdout to capture print statements
+      // Setup stdout/stderr capture
       window.pyodide.runPython(`
 import sys
 from io import StringIO
@@ -310,14 +311,25 @@ sys.stderr = StringIO()
 `);
 
       // Get enhanced context if module is provided
+      let enhancedLitechat = {};
       if (module && module.getEnhancedContext) {
         try {
-          const litechatContext = module.getEnhancedContext();
-          // Make LiteChat context available in Python global namespace
-          window.pyodide.globals.set("litechat", litechatContext);
+          const baseContext = module.getEnhancedContext();
+          enhancedLitechat = {
+            ...baseContext,
+            target: previewRef.current // Simple! Just pass the DOM element reference
+          };
+          // Make enhanced LiteChat context available in Python global namespace
+          window.pyodide.globals.set("litechat", enhancedLitechat);
         } catch (error) {
           console.warn("Failed to get enhanced context:", error);
         }
+      } else {
+        // Basic context with just the target element
+        enhancedLitechat = {
+          target: previewRef.current
+        };
+        window.pyodide.globals.set("litechat", enhancedLitechat);
       }
 
       // Execute the Python code
@@ -354,9 +366,17 @@ sys.stderr = StringIO()
       capturedLogs.push(`Execution Error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setOutput(capturedLogs);
-      setShowOutput(true);
       setHasRun(true);
       setIsRunning(false);
+
+      // Auto-show preview if target has content, otherwise show console
+      if (previewRef.current && previewRef.current.children.length > 0) {
+        setShowPreview(true);
+        setShowOutput(false);
+      } else {
+        setShowOutput(true);
+        setShowPreview(false);
+      }
 
       if (capturedLogs.some(log => log.startsWith('Execution Error:') || log.startsWith('Error:'))) {
         toast.error("Python execution failed - check output for details");
@@ -366,8 +386,19 @@ sys.stderr = StringIO()
     }
   }, [code, editedCode, isEditing, pyodideReady, loadPyodide, module]);
 
-  const toggleView = () => {
-    setShowOutput(!showOutput);
+  const toggleConsole = () => {
+    setShowOutput(true);
+    setShowPreview(false);
+  };
+
+  const togglePreview = () => {
+    setShowPreview(true);
+    setShowOutput(false);
+  };
+
+  const toggleCode = () => {
+    setShowOutput(false);
+    setShowPreview(false);
   };
 
   const foldedPreviewText = useMemo(() => {
@@ -402,12 +433,14 @@ sys.stderr = StringIO()
     if (isRunning) return "Running...";
     if (isLoading) return "Loading...";
     if (!pyodideReady) return "Load Python";
-    if (!securityResult) return "Check & Run";
-    if (clickCount > 0 && clickCount < securityResult.clicksRequired) {
+    if (securityResult && clickCount > 0 && clickCount < securityResult.clicksRequired) {
       return `Click ${securityResult.clicksRequired - clickCount} more`;
     }
     return "Run";
   };
+
+  // Check if preview has content
+  const hasPreviewContent = hasRun && previewRef.current && previewRef.current.children.length > 0;
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
@@ -428,52 +461,61 @@ sys.stderr = StringIO()
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {securityResult && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={checkSecurity}
-              disabled={isCheckingSecurity}
-              className="text-xs h-7"
-            >
-              {isCheckingSecurity ? (
-                <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-              ) : (
-                <ShieldCheckIcon className="h-3 w-3 mr-1" />
-              )}
-              Recheck
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={checkSecurity}
+            disabled={isCheckingSecurity}
+            className="text-xs h-7"
+          >
+            {isCheckingSecurity ? (
+              <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <ShieldCheckIcon className="h-3 w-3 mr-1" />
+            )}
+            {securityResult ? 'Recheck' : 'Check'}
+          </Button>
           {hasRun && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={toggleView}
-              className="text-xs h-7"
-            >
-              {showOutput ? (
-                <>
-                  <CodeIcon className="h-3 w-3 mr-1" />
-                  Code
-                </>
-              ) : (
-                <>
+            <>
+              <Button
+                size="sm"
+                variant={!showOutput && !showPreview ? "default" : "outline"}
+                onClick={toggleCode}
+                className="text-xs h-7"
+              >
+                <CodeIcon className="h-3 w-3 mr-1" />
+                Code
+              </Button>
+              <Button
+                size="sm"
+                variant={showOutput ? "default" : "outline"}
+                onClick={toggleConsole}
+                className="text-xs h-7"
+              >
+                <MonitorSpeakerIcon className="h-3 w-3 mr-1" />
+                Console
+              </Button>
+              {hasPreviewContent && (
+                <Button
+                  size="sm"
+                  variant={showPreview ? "default" : "outline"}
+                  onClick={togglePreview}
+                  className="text-xs h-7"
+                >
                   <EyeIcon className="h-3 w-3 mr-1" />
-                  Output
-                </>
+                  Preview
+                </Button>
               )}
-            </Button>
+            </>
           )}
           <Button
             size="sm"
             onClick={handleRunClick}
-            disabled={isRunning || isLoading || isCheckingSecurity || !runnableBlocksEnabled}
+            disabled={isRunning || isLoading || !runnableBlocksEnabled}
             className="text-xs h-7"
             style={getRunButtonStyle()}
           >
             {isRunning || isLoading ? (
-              <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-            ) : isCheckingSecurity ? (
               <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
             ) : !pyodideReady ? (
               <DownloadIcon className="h-3 w-3 mr-1" />
@@ -485,7 +527,7 @@ sys.stderr = StringIO()
         </div>
       </div>
 
-      {!isFolded && !showOutput && !isEditing && (
+      {!isFolded && !showOutput && !showPreview && !isEditing && (
         <div className="overflow-hidden w-full">
           <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere border border-border rounded-b-lg bg-muted/20">
             <code 
@@ -496,7 +538,7 @@ sys.stderr = StringIO()
         </div>
       )}
       
-      {!isFolded && !showOutput && isEditing && (
+      {!isFolded && !showOutput && !showPreview && isEditing && (
         <div className="overflow-hidden w-full border border-border rounded-b-lg bg-muted/20">
           <InlineCodeEditor
             code={editedCode}
@@ -528,6 +570,16 @@ sys.stderr = StringIO()
           ) : (
             <div className="text-muted-foreground">No output</div>
           )}
+        </div>
+      )}
+
+      {!isFolded && showPreview && hasPreviewContent && (
+        <div className="preview-container border border-border rounded-b-lg bg-background p-4">
+          <div className="preview-header text-muted-foreground mb-2 text-xs font-semibold">
+            PREVIEW:
+          </div>
+          {/* Simple! The target element that the assistant can manipulate directly */}
+          <div ref={previewRef} className="preview-content" />
         </div>
       )}
 

@@ -16,7 +16,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { InlineCodeEditor } from "@/controls/components/canvas/codeblock/EditCodeBlockControl";
 import { Button } from "@/components/ui/button";
-import { PlayIcon, Loader2Icon, EyeIcon, CodeIcon, ShieldIcon, ShieldCheckIcon } from "lucide-react";
+import { PlayIcon, Loader2Icon, EyeIcon, CodeIcon, ShieldIcon, ShieldCheckIcon, MonitorSpeakerIcon } from "lucide-react";
 import { toast } from "sonner";
 import { CodeSecurityService, type CodeSecurityResult } from "@/services/code-security.service";
 
@@ -53,6 +53,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState<string[]>([]);
   const [showOutput, setShowOutput] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [hasRun, setHasRun] = useState(false);
   
   // Security validation state
@@ -75,6 +76,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   }, [editedCode]);
 
   const codeRef = useRef<HTMLElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null); // Simple target element reference
 
   const canvasControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.canvasControls))
@@ -141,10 +143,10 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   }, [code, editedCode, isEditing]);
 
   useEffect(() => {
-    if (!isFolded && !showOutput) {
+    if (!isFolded && !showOutput && !showPreview) {
       highlightCode();
     }
-  }, [code, editedCode, isEditing, isFolded, showOutput, highlightCode]);
+  }, [code, editedCode, isEditing, isFolded, showOutput, showPreview, highlightCode]);
 
   const toggleFold = () => {
     const unfolding = isFolded;
@@ -184,47 +186,50 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       return;
     }
 
-    // If no security result, run security check first
-    if (!securityResult) {
-      await checkSecurity();
-      return;
-    }
-
-    const now = Date.now();
-    const timeSinceLastClick = now - lastClickTime;
-    
-    // Reset click count if more than 3 seconds have passed
-    if (timeSinceLastClick > 3000) {
-      setClickCount(0);
-    }
-    
-    setLastClickTime(now);
-    const newClickCount = clickCount + 1;
-    setClickCount(newClickCount);
-
-    // Check if we need more clicks
-    if (newClickCount < securityResult.clicksRequired) {
-      const remaining = securityResult.clicksRequired - newClickCount;
-      toast.info(`Click ${remaining} more time${remaining > 1 ? 's' : ''} to confirm execution (Risk: ${securityResult.riskLevel})`);
-      return;
-    }
-
-    // Show additional warning for high-risk code
-    if (securityResult.score > 90) {
-      if (!confirm(`This code has a very high security risk score (${securityResult.score}/100). Are you absolutely sure you want to run it?`)) {
+    // If security result exists and requires multiple clicks
+    if (securityResult) {
+      const now = Date.now();
+      const timeSinceLastClick = now - lastClickTime;
+      
+      // Reset click count if more than 3 seconds have passed
+      if (timeSinceLastClick > 3000) {
         setClickCount(0);
+      }
+      
+      setLastClickTime(now);
+      const newClickCount = clickCount + 1;
+      setClickCount(newClickCount);
+
+      // Check if we need more clicks
+      if (newClickCount < securityResult.clicksRequired) {
+        const remaining = securityResult.clicksRequired - newClickCount;
+        toast.info(`Click ${remaining} more time${remaining > 1 ? 's' : ''} to confirm execution (Risk: ${securityResult.riskLevel})`);
         return;
       }
+
+      // Show additional warning for high-risk code
+      if (securityResult.score > 90) {
+        if (!confirm(`This code has a very high security risk score (${securityResult.score}/100). Are you absolutely sure you want to run it?`)) {
+          setClickCount(0);
+          return;
+        }
+      }
+
+      // Reset click count and execute
+      setClickCount(0);
     }
 
-    // Reset click count and execute
-    setClickCount(0);
     executeCode();
-  }, [securityResult, clickCount, lastClickTime, checkSecurity, runnableBlocksEnabled]);
+  }, [securityResult, clickCount, lastClickTime, runnableBlocksEnabled]);
 
   const executeCode = useCallback(async () => {
     setIsRunning(true);
     const capturedLogs: string[] = [];
+    
+    // Clear the preview target
+    if (previewRef.current) {
+      previewRef.current.innerHTML = '';
+    }
     
     // Capture console output
     const originalLog = console.log;
@@ -246,6 +251,18 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       originalLog(...args);
     };
 
+    console.error = (...args) => {
+      const formatted = args.map(arg => String(arg)).join(' ');
+      capturedLogs.push(`Error: ${formatted}`);
+      originalError(...args);
+    };
+
+    console.warn = (...args) => {
+      const formatted = args.map(arg => String(arg)).join(' ');
+      capturedLogs.push(`Warning: ${formatted}`);
+      originalWarn(...args);
+    };
+
     try {
       // Get enhanced context if module is provided
       let litechat = {};
@@ -257,11 +274,17 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         }
       }
 
+      // Enhance litechat object with the simple target element reference
+      const enhancedLitechat = {
+        ...litechat,
+        target: previewRef.current // Simple! Just pass the DOM element reference
+      };
+
       // Execute the code in an isolated context with LiteChat access
       const codeToRun = isEditing ? editedCode : code;
       // Wrap in async function and provide 'litechat' global
       const asyncFunc = new Function('litechat', `return (async () => { ${codeToRun} })();`);
-      const result = asyncFunc(litechat);
+      const result = asyncFunc(enhancedLitechat);
       // Only await if it's a promise
       if (result && typeof result.then === 'function') {
         await result;
@@ -279,9 +302,17 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       console.warn = originalWarn;
       
       setOutput(capturedLogs);
-      setShowOutput(true);
       setHasRun(true);
       setIsRunning(false);
+      
+      // Auto-show preview if target has content, otherwise show console
+      if (previewRef.current && previewRef.current.children.length > 0) {
+        setShowPreview(true);
+        setShowOutput(false);
+      } else {
+        setShowOutput(true);
+        setShowPreview(false);
+      }
       
       if (capturedLogs.some(log => log.startsWith('Execution Error:'))) {
         toast.error("Code execution failed - check output for details");
@@ -291,8 +322,19 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     }
   }, [code, editedCode, isEditing, module]);
 
-  const toggleView = () => {
-    setShowOutput(!showOutput);
+  const toggleConsole = () => {
+    setShowOutput(true);
+    setShowPreview(false);
+  };
+
+  const togglePreview = () => {
+    setShowPreview(true);
+    setShowOutput(false);
+  };
+
+  const toggleCode = () => {
+    setShowOutput(false);
+    setShowPreview(false);
   };
 
   const foldedPreviewText = useMemo(() => {
@@ -325,12 +367,14 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 
   const getRunButtonText = () => {
     if (isRunning) return "Running...";
-    if (!securityResult) return "Check & Run";
-    if (clickCount > 0 && clickCount < securityResult.clicksRequired) {
+    if (securityResult && clickCount > 0 && clickCount < securityResult.clicksRequired) {
       return `Click ${securityResult.clicksRequired - clickCount} more`;
     }
     return "Run";
   };
+
+  // Check if preview has content
+  const hasPreviewContent = hasRun && previewRef.current && previewRef.current.children.length > 0;
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
@@ -348,52 +392,61 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {securityResult && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={checkSecurity}
-              disabled={isCheckingSecurity}
-              className="text-xs h-7"
-            >
-              {isCheckingSecurity ? (
-                <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-              ) : (
-                <ShieldCheckIcon className="h-3 w-3 mr-1" />
-              )}
-              Recheck
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={checkSecurity}
+            disabled={isCheckingSecurity}
+            className="text-xs h-7"
+          >
+            {isCheckingSecurity ? (
+              <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <ShieldCheckIcon className="h-3 w-3 mr-1" />
+            )}
+            {securityResult ? 'Recheck' : 'Check'}
+          </Button>
           {hasRun && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={toggleView}
-              className="text-xs h-7"
-            >
-              {showOutput ? (
-                <>
-                  <CodeIcon className="h-3 w-3 mr-1" />
-                  Code
-                </>
-              ) : (
-                <>
+            <>
+              <Button
+                size="sm"
+                variant={!showOutput && !showPreview ? "default" : "outline"}
+                onClick={toggleCode}
+                className="text-xs h-7"
+              >
+                <CodeIcon className="h-3 w-3 mr-1" />
+                Code
+              </Button>
+              <Button
+                size="sm"
+                variant={showOutput ? "default" : "outline"}
+                onClick={toggleConsole}
+                className="text-xs h-7"
+              >
+                <MonitorSpeakerIcon className="h-3 w-3 mr-1" />
+                Console
+              </Button>
+              {hasPreviewContent && (
+                <Button
+                  size="sm"
+                  variant={showPreview ? "default" : "outline"}
+                  onClick={togglePreview}
+                  className="text-xs h-7"
+                >
                   <EyeIcon className="h-3 w-3 mr-1" />
-                  Output
-                </>
+                  Preview
+                </Button>
               )}
-            </Button>
+            </>
           )}
           <Button
             size="sm"
             onClick={handleRunClick}
-            disabled={isRunning || isCheckingSecurity || !runnableBlocksEnabled}
+            disabled={isRunning || !runnableBlocksEnabled}
             className="text-xs h-7"
             style={getRunButtonStyle()}
           >
             {isRunning ? (
-              <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-            ) : isCheckingSecurity ? (
               <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
             ) : (
               <PlayIcon className="h-3 w-3 mr-1" />
@@ -403,7 +456,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         </div>
       </div>
 
-      {!isFolded && !showOutput && !isEditing && (
+      {!isFolded && !showOutput && !showPreview && !isEditing && (
         <div className="overflow-hidden w-full">
           <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere border border-border rounded-b-lg bg-muted/20">
             <code 
@@ -414,7 +467,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         </div>
       )}
       
-      {!isFolded && !showOutput && isEditing && (
+      {!isFolded && !showOutput && !showPreview && isEditing && (
         <div className="overflow-hidden w-full border border-border rounded-b-lg bg-muted/20">
           <InlineCodeEditor
             code={editedCode}
@@ -427,7 +480,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       {!isFolded && showOutput && (
         <div className="output-container border border-border rounded-b-lg bg-black/90 text-green-400 p-4 font-mono text-sm">
           <div className="output-header text-green-300 mb-2 text-xs font-semibold">
-            OUTPUT:
+            CONSOLE OUTPUT:
           </div>
           {output.length > 0 ? (
             output.map((line, i) => (
@@ -446,6 +499,16 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           ) : (
             <div className="text-muted-foreground">No output</div>
           )}
+        </div>
+      )}
+
+      {!isFolded && showPreview && hasPreviewContent && (
+        <div className="preview-container border border-border rounded-b-lg bg-background p-4">
+          <div className="preview-header text-muted-foreground mb-2 text-xs font-semibold">
+            PREVIEW:
+          </div>
+          {/* Simple! The target element that the assistant can manipulate directly */}
+          <div ref={previewRef} className="preview-content" />
         </div>
       )}
 

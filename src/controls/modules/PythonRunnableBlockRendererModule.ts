@@ -5,39 +5,49 @@ import { PythonRunnableBlockRenderer } from "@/components/LiteChat/common/Python
 import React from "react";
 
 // Control rule prompt for Python runnable blocks
-const PYTHON_RUNNABLE_CONTROL_PROMPT = `LiteChat supports runnable Python code blocks using Pyodide. Use 'runpy' language identifier for Python code that users can execute multiple times on demand.
+const PYTHON_RUNNABLE_CONTROL_PROMPT = `# Python Scientific Computing Environment
 
-For example:
-\`\`\`runpy
-print("Hello from Python!")
-numbers = [1, 2, 3, 4, 5]
-total = sum(numbers)
-print(f"Sum: {total}")
+You have access to an enhanced Pyodide environment with numpy, pandas, matplotlib, and the full LiteChat API.
 
-# Example with data processing
-import math
-result = math.sqrt(16)
-print(f"Square root of 16: {result}")
+## Available Context
+- \`litechat\` — The full LiteChat API object (modApi) for VFS, project, event, and utility operations.
+- \`target\` — A DOM element for direct manipulation (for visualizations, UI output, etc.).
+- Scientific Python stack: numpy, pandas, matplotlib, scipy, sklearn, etc.
+- \`js\` module — For DOM and browser interop (e.g., \`from js import document\`).
 
-# Example with list comprehension
-squares = [x**2 for x in range(1, 6)]
-print("Squares:", squares)
+## LiteChat API (modApi) Reference
+You can use the following methods on \`litechat\` (the modApi object):
+
+### Context and Utilities
+- showToast(type, message)
+- log(level, ...args)
+
+### Event System
+- emit(eventName, payload)
+
+### VFS (File System)
+- getVfsInstance(vfsKey) # 'orphan' is the default, nodejs api compatible fs object. always use async interaction when using.
+
+## Example: Reading a File
+\`\`\`python
+vfs = await litechat.getVfsInstance('project-123')
+content = await vfs.promises.readFile('/data.txt', 'utf8')
+print(content)
 \`\`\`
 
-Runnable Python blocks provide:
-- Multiple execution capability with Run button
-- Full Python standard library via Pyodide
-- Console output capture and display
-- Error handling and display  
-- Code editing while preserving results
-- Safe execution environment in browser
+## Example: Emitting an Event
+\`\`\`python
+litechat.emit('myCustomEvent', { 'foo': 42 })
+\`\`\`
 
-Use 'runpy' for interactive Python examples, data analysis, calculations, demonstrations, and educational content.`;
+You are encouraged to use the full scientific Python stack, the LiteChat API for simple chat interactions, and DOM interop for visualizations. Focus on workflows that leverage these capabilities.
+`;
 
 export class PythonRunnableBlockRendererModule implements ControlModule {
   readonly id = "core-block-renderer-runnable-python";
   private unregisterCallback?: () => void;
   private unregisterRuleCallback?: () => void;
+  private modApiRef?: LiteChatModApi;
 
   async initialize(): Promise<void> {
     // No initialization needed
@@ -59,6 +69,7 @@ export class PythonRunnableBlockRendererModule implements ControlModule {
           isStreaming: context.isStreaming,
           interactionId: context.interactionId,
           blockId: context.blockId,
+          module: this, // Pass module reference for enhanced context
         });
       },
     };
@@ -73,6 +84,8 @@ export class PythonRunnableBlockRendererModule implements ControlModule {
       alwaysOn: true,
       moduleId: this.id,
     });
+
+    this.modApiRef = modApi;
   }
 
   destroy(): void {
@@ -84,5 +97,17 @@ export class PythonRunnableBlockRendererModule implements ControlModule {
       this.unregisterRuleCallback();
       this.unregisterRuleCallback = undefined;
     }
+  }
+
+  // Public method to get enhanced context for runnable functions
+  public getEnhancedContext() {
+    if (!this.modApiRef) {
+      throw new Error("Module not initialized with modApi");
+    }
+    // Expose the real modApi as the litechat API object
+    return {
+      litechat: this.modApiRef,
+      // The renderer will add the 'target' property (DOM element) at runtime
+    };
   }
 } 
