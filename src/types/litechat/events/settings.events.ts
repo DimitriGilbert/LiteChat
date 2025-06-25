@@ -46,6 +46,14 @@ export const settingsEvent = {
     "settings.auto.sync.on.stream.complete.changed",
   autoInitializeReposOnStartupChanged:
     "settings.auto.initialize.repos.on.startup.changed",
+  autoRuleSelectionEnabledChanged: "settings.auto.rule.selection.enabled.changed",
+  autoRuleSelectionModelIdChanged: "settings.auto.rule.selection.model.id.changed",
+  autoRuleSelectionPromptChanged: "settings.auto.rule.selection.prompt.changed",
+  runnableBlocksEnabledChanged: "settings.runnable.blocks.enabled.changed",
+  runnableBlocksSecurityCheckEnabledChanged: "settings.runnable.blocks.security.check.enabled.changed",
+  runnableBlocksSecurityModelIdChanged: "settings.runnable.blocks.security.model.id.changed",
+  runnableBlocksSecurityPromptChanged: "settings.runnable.blocks.security.prompt.changed",
+  controlRuleAlwaysOnChanged: "settings.control.rule.always.on.changed",
 
   // Action Request Events
   setThemeRequest: "settings.set.theme.request",
@@ -98,34 +106,20 @@ export const settingsEvent = {
   setAutoRuleSelectionEnabledRequest: "settings.set.auto.rule.selection.enabled.request",
   setAutoRuleSelectionModelIdRequest: "settings.set.auto.rule.selection.model.id.request",
   setAutoRuleSelectionPromptRequest: "settings.set.auto.rule.selection.prompt.request",
-  
-  // Runnable Blocks Events - Following control rule pattern for granular settings
+  setRunnableBlocksEnabledRequest: "settings.set.runnable.blocks.enabled.request",
   setRunnableBlocksSecurityCheckEnabledRequest: "settings.set.runnable.blocks.security.check.enabled.request",
   setRunnableBlocksSecurityModelIdRequest: "settings.set.runnable.blocks.security.model.id.request",
   setRunnableBlocksSecurityPromptRequest: "settings.set.runnable.blocks.security.prompt.request",
-  
-  // Control Rule event
   setControlRuleAlwaysOnRequest: "settings.set.control.rule.always.on.request",
 
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
   resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
   resetThemeSettingsRequest: "settings.reset.theme.settings.request",
-  autoRuleSelectionEnabledChanged: "settings.auto.rule.selection.enabled.changed",
-  autoRuleSelectionModelIdChanged: "settings.auto.rule.selection.model.id.changed",
-  autoRuleSelectionPromptChanged: "settings.auto.rule.selection.prompt.changed",
-  
-  // Runnable Blocks Changed Events
-  runnableBlocksSecurityCheckEnabledChanged: "settings.runnable.blocks.security.check.enabled.changed",
-  runnableBlocksSecurityModelIdChanged: "settings.runnable.blocks.security.model.id.changed",
-  runnableBlocksSecurityPromptChanged: "settings.runnable.blocks.security.prompt.changed",
-  
-  // Control Rule changed event
-  controlRuleAlwaysOnChanged: "settings.control.rule.always.on.changed",
-
-  setRunnableBlocksEnabledRequest: "settings.set.runnable.blocks.enabled.request",
-  runnableBlocksEnabledChanged: "settings.runnable.blocks.enabled.changed",
+  settingsChanged: "settings.changed",
 } as const;
+
+export type SettingsEvent = (typeof settingsEvent)[keyof typeof settingsEvent];
 
 export interface SettingsEventPayloads {
   [settingsEvent.loaded]: { settings: SettingsState };
@@ -214,6 +208,14 @@ export interface SettingsEventPayloads {
   [settingsEvent.autoInitializeReposOnStartupChanged]: {
     enabled: SettingsState["autoInitializeReposOnStartup"];
   };
+  [settingsEvent.autoRuleSelectionEnabledChanged]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
+  [settingsEvent.autoRuleSelectionModelIdChanged]: { modelId: SettingsState["autoRuleSelectionModelId"] };
+  [settingsEvent.autoRuleSelectionPromptChanged]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
+  [settingsEvent.runnableBlocksEnabledChanged]: { enabled: SettingsState["runnableBlocksEnabled"] };
+  [settingsEvent.runnableBlocksSecurityCheckEnabledChanged]: { enabled: SettingsState["runnableBlocksSecurityCheckEnabled"] };
+  [settingsEvent.runnableBlocksSecurityModelIdChanged]: { modelId: SettingsState["runnableBlocksSecurityModelId"] };
+  [settingsEvent.runnableBlocksSecurityPromptChanged]: { prompt: SettingsState["runnableBlocksSecurityPrompt"] };
+  [settingsEvent.controlRuleAlwaysOnChanged]: { ruleId: string, alwaysOn: boolean };
 
   [settingsEvent.setThemeRequest]: { theme: SettingsState["theme"] };
   [settingsEvent.setGlobalSystemPromptRequest]: {
@@ -315,21 +317,15 @@ export interface SettingsEventPayloads {
   [settingsEvent.setAutoRuleSelectionEnabledRequest]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
   [settingsEvent.setAutoRuleSelectionModelIdRequest]: { modelId: SettingsState["autoRuleSelectionModelId"] };
   [settingsEvent.setAutoRuleSelectionPromptRequest]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
-  [settingsEvent.setRunnableBlocksSecurityCheckEnabledRequest]: { enabled: boolean };
-  [settingsEvent.setRunnableBlocksSecurityModelIdRequest]: { modelId: string | null };
-  [settingsEvent.setRunnableBlocksSecurityPromptRequest]: { prompt: string | null };
-  [settingsEvent.runnableBlocksSecurityCheckEnabledChanged]: { enabled: boolean };
-  [settingsEvent.runnableBlocksSecurityModelIdChanged]: { modelId: string | null };
-  [settingsEvent.runnableBlocksSecurityPromptChanged]: { prompt: string | null };
+  [settingsEvent.setRunnableBlocksEnabledRequest]: { enabled: SettingsState["runnableBlocksEnabled"] };
+  [settingsEvent.setRunnableBlocksSecurityCheckEnabledRequest]: { enabled: SettingsState["runnableBlocksSecurityCheckEnabled"] };
+  [settingsEvent.setRunnableBlocksSecurityModelIdRequest]: { modelId: SettingsState["runnableBlocksSecurityModelId"] };
+  [settingsEvent.setRunnableBlocksSecurityPromptRequest]: { prompt: SettingsState["runnableBlocksSecurityPrompt"] };
   [settingsEvent.setControlRuleAlwaysOnRequest]: { ruleId: string, alwaysOn: boolean };
-  [settingsEvent.controlRuleAlwaysOnChanged]: { ruleId: string, alwaysOn: boolean };
+
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;
   [settingsEvent.resetAssistantSettingsRequest]: undefined;
   [settingsEvent.resetThemeSettingsRequest]: undefined;
-  [settingsEvent.autoRuleSelectionEnabledChanged]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
-  [settingsEvent.autoRuleSelectionModelIdChanged]: { modelId: SettingsState["autoRuleSelectionModelId"] };
-  [settingsEvent.autoRuleSelectionPromptChanged]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
-  [settingsEvent.setRunnableBlocksEnabledRequest]: { enabled: boolean };
-  [settingsEvent.runnableBlocksEnabledChanged]: { enabled: boolean };
+  [settingsEvent.settingsChanged]: Partial<SettingsState>;
 }

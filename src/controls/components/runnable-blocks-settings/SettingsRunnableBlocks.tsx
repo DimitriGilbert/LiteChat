@@ -32,16 +32,15 @@ const SettingsRunnableBlocksComponent: React.FC = () => {
     }))
   );
 
+  const getSetting = (ruleId: string, defaultValue: boolean): boolean => {
+    const value = settings.controlRuleAlwaysOn?.[ruleId];
+    return typeof value === 'boolean' ? value : defaultValue;
+  }
+
   const form = useForm({
     defaultValues: {
-      jsEnabled:
-        settings.controlRuleAlwaysOn?.[
-          "core-js-runnable-block-renderer-control-rule"
-        ] ?? false,
-      pythonEnabled:
-        settings.controlRuleAlwaysOn?.[
-          "core-python-runnable-block-renderer-control-rule"
-        ] ?? false,
+      jsEnabled: getSetting("core-js-runnable-block-renderer-control-rule", false),
+      pythonEnabled: getSetting("core-python-runnable-block-renderer-control-rule", false),
       runnableBlocksSecurityCheckEnabled:
         settings.runnableBlocksSecurityCheckEnabled ?? true,
       runnableBlocksSecurityModelId:
@@ -85,14 +84,8 @@ const SettingsRunnableBlocksComponent: React.FC = () => {
 
   useEffect(() => {
     form.reset({
-      jsEnabled:
-        settings.controlRuleAlwaysOn?.[
-          "core-js-runnable-block-renderer-control-rule"
-        ] ?? false,
-      pythonEnabled:
-        settings.controlRuleAlwaysOn?.[
-          "core-python-runnable-block-renderer-control-rule"
-        ] ?? false,
+      jsEnabled: getSetting("core-js-runnable-block-renderer-control-rule", false),
+      pythonEnabled: getSetting("core-python-runnable-block-renderer-control-rule", false),
       runnableBlocksSecurityCheckEnabled:
         settings.runnableBlocksSecurityCheckEnabled ?? true,
       runnableBlocksSecurityModelId:
@@ -205,17 +198,9 @@ const SettingsRunnableBlocksComponent: React.FC = () => {
       <Separator />
       <div className="flex items-center justify-end pt-3">
         <form.Subscribe
-          selector={(state) => [
-            state.canSubmit,
-            state.isSubmitting,
-            state.isDirty,
-          ]}
-          children={([canSubmit, isSubmitting, isDirty]) => (
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!canSubmit || isSubmitting || !isDirty}
-            >
+          selector={(state) => [state.canSubmit, state.isSubmitting]}
+          children={([canSubmit, isSubmitting]) => (
+            <Button type="submit" disabled={!canSubmit || isSubmitting}>
               {isSubmitting ? "Saving..." : "Save Settings"}
             </Button>
           )}
@@ -225,4 +210,4 @@ const SettingsRunnableBlocksComponent: React.FC = () => {
   );
 };
 
-export const SettingsRunnableBlocks = React.memo(SettingsRunnableBlocksComponent); 
+export const SettingsRunnableBlocks = SettingsRunnableBlocksComponent; 

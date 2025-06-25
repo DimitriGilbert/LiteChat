@@ -15,6 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Separator } from "@/components/ui/separator";
 import { SettingsSection } from "@/components/LiteChat/common/SettingsSection";
 import type { CustomThemeColors } from "@/store/settings.store";
+import { THEME_OPTIONS, type Theme } from "@/types/litechat/common";
 
 const ColorInput: React.FC<{
   label: string;
@@ -216,14 +217,7 @@ const PRISM_THEMES = [
   },
 ];
 
-const themeEnum = z.enum([
-  "system",
-  "light",
-  "dark",
-  "TijuLight",
-  "TijuDark",
-  "custom",
-]);
+const themeEnum = z.enum(THEME_OPTIONS as [Theme, ...Theme[]]);
 const themeSettingsSchema = z.object({
   theme: themeEnum,
   prismThemeUrl: z.string(),
@@ -286,8 +280,6 @@ const SettingsThemeComponent: React.FC = () => {
       onChangeAsyncDebounceMs: 300,
     },
   });
-
-
 
   useEffect(() => {
     form.reset({
@@ -385,14 +377,18 @@ const SettingsThemeComponent: React.FC = () => {
             form={form}
             name="theme"
             label="Theme"
-            options={[
-              { value: "light", label: "Default Light" },
-              { value: "dark", label: "Default Dark" },
-              { value: "system", label: "System" },
-              { value: "TijuLight", label: "Tiju Light" },
-              { value: "TijuDark", label: "Tiju Dark" },
-              { value: "custom", label: "User Custom" },
-            ]}
+            options={THEME_OPTIONS.map((theme) => {
+              switch (theme) {
+                case "TijuLight":
+                  return { value: "TijuLight", label: "Tiju Light" };
+                case "TijuDark":
+                  return { value: "TijuDark", label: "Tiju Dark" };
+                case "custom":
+                  return { value: "custom", label: "User Custom" };
+                default:
+                  return { value: theme, label: theme };
+              }
+            })}
             triggerClassName="w-[180px]"
           />
         </div>

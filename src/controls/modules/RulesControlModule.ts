@@ -93,6 +93,19 @@ export class RulesControlModule implements ControlModule {
     this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded, unsubControlRules);
   }
 
+  private getEffectiveControlRuleAlwaysOn(controlRule: ModControlRule): boolean {
+    const userSetting = useSettingsStore.getState().controlRuleAlwaysOn[controlRule.id];
+    
+    // If the user has explicitly set a value (true or false), we must respect it.
+    if (typeof userSetting === 'boolean') {
+      return userSetting;
+    }
+    
+    // Otherwise, if no user setting exists for this rule, fall back to the 
+    // default value specified in the control rule's module definition.
+    return controlRule.alwaysOn;
+  }
+
   private populateAlwaysOnRules() {
     // Auto-activate always-on rules from both database and control rules
     const dbAlwaysOnRuleIds = this.allRules
@@ -100,31 +113,33 @@ export class RulesControlModule implements ControlModule {
       .map(rule => rule.id);
     
     const controlRules = this.getControlRulesFromStore();
-    const settings = useSettingsStore.getState();
     
     // For control rules, use settings preferences instead of module defaults
     const controlAlwaysOnRuleIds = Object.values(controlRules)
-      .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? rule.alwaysOn) // Use setting or fall back to rule's default
+      .filter(rule => this.getEffectiveControlRuleAlwaysOn(rule)) // Use setting or fall back to rule's default
       .map(rule => rule.id);
     
-    // Debug logging to track the issue
-    console.log('[RulesControlModule] Control rules evaluation:', {
-      controlRuleIds: Object.keys(controlRules),
-      settings: settings.controlRuleAlwaysOn,
-      filteredControlRuleIds: controlAlwaysOnRuleIds,
-      dbAlwaysOnRuleIds
-    });
+    const allAlwaysOnRuleIds = new Set([...dbAlwaysOnRuleIds, ...controlAlwaysOnRuleIds]);
     
-    const allAlwaysOnRuleIds = [...dbAlwaysOnRuleIds, ...controlAlwaysOnRuleIds];
-    
-    if (allAlwaysOnRuleIds.length > 0) {
-      this.transientActiveRuleIds = new Set([
-        ...this.transientActiveRuleIds,
-        ...allAlwaysOnRuleIds
-      ]);
+    // FIXED: Properly sync transientActiveRuleIds with the current always-on state
+    // Add rules that should be always-on but aren't active
+    for (const ruleId of allAlwaysOnRuleIds) {
+      this.transientActiveRuleIds.add(ruleId);
     }
     
-    console.log('[RulesControlModule] Final transientActiveRuleIds:', Array.from(this.transientActiveRuleIds));
+    // Remove rules that are no longer always-on (user turned them off)
+    for (const ruleId of this.transientActiveRuleIds) {
+      // Check if this is a control rule that's no longer always-on
+      const controlRule = controlRules[ruleId];
+      if (controlRule && !this.getEffectiveControlRuleAlwaysOn(controlRule)) {
+        this.transientActiveRuleIds.delete(ruleId);
+      }
+      // Check if this is a DB rule that's no longer always-on
+      const dbRule = this.allRules.find(r => r.id === ruleId);
+      if (dbRule && !dbRule.alwaysOn) {
+        this.transientActiveRuleIds.delete(ruleId);
+      }
+    }
   }
 
   private getControlRulesFromStore(): Record<string, ModControlRule> {
@@ -145,7 +160,6 @@ export class RulesControlModule implements ControlModule {
     // Merge database rules and control rules, converting control rules to DbRule format
     const dbRules = this.allRules;
     const controlRules = this.getControlRulesFromStore();
-    const settings = useSettingsStore.getState();
     
     // Convert control rules to DbRule format with settings override for alwaysOn
     const defaultDate = new Date(); // Create once and reuse
@@ -154,7 +168,7 @@ export class RulesControlModule implements ControlModule {
       name: controlRule.name,
       content: controlRule.content,
       type: controlRule.type,
-      alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? controlRule.alwaysOn, // Use setting or fall back to rule's default
+      alwaysOn: this.getEffectiveControlRuleAlwaysOn(controlRule), // Use setting or fall back to rule's default
       createdAt: defaultDate,
       updatedAt: defaultDate,
     }));
@@ -185,13 +199,12 @@ export class RulesControlModule implements ControlModule {
     const controlRules = this.getControlRulesFromStore();
     const controlRule = controlRules[ruleId];
     if (controlRule) {
-      const settings = useSettingsStore.getState();
       return {
         id: controlRule.id,
         name: controlRule.name,
         content: controlRule.content,
         type: controlRule.type,
-        alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? controlRule.alwaysOn, // Use setting or fall back to rule's default
+        alwaysOn: this.getEffectiveControlRuleAlwaysOn(controlRule), // Use setting or fall back to rule's default
         createdAt: new Date(), // Default date for control rules
         updatedAt: new Date(), // Default date for control rules
       };
@@ -215,10 +228,11 @@ export class RulesControlModule implements ControlModule {
     updates: Partial<Omit<DbRule, "id" | "createdAt">>
   ) => {
     // For control rules, only allow alwaysOn updates via settings
-    // For control rules, only allow alwaysOn updates via settings
     if (this.isControlRule(id)) {
       // Only allow toggling alwaysOn for control rules
       if (Object.keys(updates).length === 1 && 'alwaysOn' in updates) {
+        
+        
         // Update via settings store instead of in-memory control rules
         useSettingsStore.getState().setControlRuleAlwaysOn(id, updates.alwaysOn!);
         
@@ -230,6 +244,8 @@ export class RulesControlModule implements ControlModule {
           // Remove from active rules if turned off
           this.transientActiveRuleIds.delete(id);
         }
+        
+        
         
         // Emit control rules changed event so trigger components can refresh
         emitter.emit(controlRegistryEvent.controlRulesChanged, {
@@ -345,29 +361,6 @@ export class RulesControlModule implements ControlModule {
             }
           });
 
-          // Debug logging to track what's being sent to system prompt
-          console.log('[RulesControlModule] getMetadata - Sending to system prompt:', {
-            activeRuleIds,
-            allEffectiveRuleIds: Array.from(allEffectiveRuleIds),
-            effectiveRulesContent: effectiveRulesContent.map(r => ({ 
-              sourceRuleId: r.sourceRuleId, 
-              type: r.type, 
-              contentPreview: r.content.substring(0, 100) + '...' 
-            }))
-          });
-          
-          // Enhanced debug: Show actual rule names and settings
-          const controlRules = this.getControlRulesFromStore();
-          const settings = useSettingsStore.getState();
-          console.log('[RulesControlModule] getMetadata - Detailed rule analysis:', {
-            allControlRuleIds: Object.keys(controlRules),
-            controlRuleSettings: settings.controlRuleAlwaysOn,
-            activeRuleIdsWithNames: activeRuleIds.map(id => {
-              const rule = this.getRuleById(id);
-              return { id, name: rule?.name || 'Unknown', type: rule?.type, isControl: this.isControlRule(id) };
-            }),
-            currentTransientActiveRuleIds: Array.from(this.transientActiveRuleIds)
-          });
 
           if (
             activeTagIds.length > 0 ||
@@ -393,12 +386,11 @@ export class RulesControlModule implements ControlModule {
           );
           
           const controlRules = this.getControlRulesFromStore();
-          const settings = useSettingsStore.getState();
-          
+                    
           // For control rules, use settings preferences instead of module defaults
           const controlAlwaysOnRuleIds = new Set(
             Object.values(controlRules)
-              .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? rule.alwaysOn) // Use setting or fall back to rule's default
+              .filter(rule => this.getEffectiveControlRuleAlwaysOn(rule)) // Use setting or fall back to rule's default
               .map(rule => rule.id)
           );
           
