@@ -236,7 +236,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
             <button
               onClick={handleDownloadSvg}
               className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-              title="Download SVG"
+              title="Download Chart"
             >
               <DownloadIcon className="h-4 w-4" />
             </button>
