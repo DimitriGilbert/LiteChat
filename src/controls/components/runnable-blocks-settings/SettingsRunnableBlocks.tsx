@@ -1,23 +1,25 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useShallow } from "zustand/react/shallow";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useSettingsStore } from "@/store/settings.store";
-import { useProviderStore } from "@/store/provider.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
-import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector";
 import { Separator } from "@/components/ui/separator";
+import { SwitchField } from "@/components/LiteChat/common/form-fields/SwitchField";
+import { GlobalModelSelector } from "@/controls/components/global-model-selector/GlobalModelSelector";
+import { toast } from "sonner";
+
+const runnableBlocksSchema = z.object({
+  jsEnabled: z.boolean(),
+  pythonEnabled: z.boolean(),
+  runnableBlocksSecurityCheckEnabled: z.boolean(),
+  runnableBlocksSecurityModelId: z.string().nullable(),
+  runnableBlocksSecurityPrompt: z.string(),
+});
 
 const SettingsRunnableBlocksComponent: React.FC = () => {
   const settings = useSettingsStore(
@@ -30,205 +32,197 @@ const SettingsRunnableBlocksComponent: React.FC = () => {
     }))
   );
 
-  const { availableModels } = useProviderStore(
-    useShallow((state) => ({
-      availableModels: state.getAvailableModelListItems(),
-      defaultModelId: state.selectedModelId,
-    }))
-  );
-
   const form = useForm({
     defaultValues: {
+      jsEnabled:
+        settings.controlRuleAlwaysOn?.[
+          "core-js-runnable-block-renderer-control-rule"
+        ] ?? false,
+      pythonEnabled:
+        settings.controlRuleAlwaysOn?.[
+          "core-python-runnable-block-renderer-control-rule"
+        ] ?? false,
       runnableBlocksSecurityCheckEnabled:
-        settings.runnableBlocksSecurityCheckEnabled,
-      runnableBlocksSecurityModelId: settings.runnableBlocksSecurityModelId,
-      runnableBlocksSecurityPrompt: settings.runnableBlocksSecurityPrompt,
+        settings.runnableBlocksSecurityCheckEnabled ?? true,
+      runnableBlocksSecurityModelId:
+        settings.runnableBlocksSecurityModelId ?? null,
+      runnableBlocksSecurityPrompt:
+        settings.runnableBlocksSecurityPrompt ?? "",
+    },
+    validators: {
+      onChange: runnableBlocksSchema,
     },
     onSubmit: async ({ value }) => {
-      emitter.emit(settingsEvent.setRunnableBlocksSecurityCheckEnabledRequest, {
-        enabled: value.runnableBlocksSecurityCheckEnabled,
-      });
-      emitter.emit(settingsEvent.setRunnableBlocksSecurityModelIdRequest, {
-        modelId: value.runnableBlocksSecurityModelId,
-      });
-      emitter.emit(settingsEvent.setRunnableBlocksSecurityPromptRequest, {
-        prompt: value.runnableBlocksSecurityPrompt,
-      });
+      try {
+        emitter.emit(settingsEvent.setControlRuleAlwaysOnRequest, {
+          ruleId: "core-js-runnable-block-renderer-control-rule",
+          alwaysOn: value.jsEnabled,
+        });
+        emitter.emit(settingsEvent.setControlRuleAlwaysOnRequest, {
+          ruleId: "core-python-runnable-block-renderer-control-rule",
+          alwaysOn: value.pythonEnabled,
+        });
+
+        emitter.emit(
+          settingsEvent.setRunnableBlocksSecurityCheckEnabledRequest,
+          {
+            enabled: value.runnableBlocksSecurityCheckEnabled,
+          }
+        );
+        emitter.emit(settingsEvent.setRunnableBlocksSecurityModelIdRequest, {
+          modelId: value.runnableBlocksSecurityModelId,
+        });
+        emitter.emit(settingsEvent.setRunnableBlocksSecurityPromptRequest, {
+          prompt: value.runnableBlocksSecurityPrompt,
+        });
+        toast.success("Runnable block settings saved!");
+      } catch (error) {
+        toast.error("Failed to save runnable block settings.");
+        console.error("Error saving runnable block settings:", error);
+      }
     },
   });
 
   useEffect(() => {
     form.reset({
+      jsEnabled:
+        settings.controlRuleAlwaysOn?.[
+          "core-js-runnable-block-renderer-control-rule"
+        ] ?? false,
+      pythonEnabled:
+        settings.controlRuleAlwaysOn?.[
+          "core-python-runnable-block-renderer-control-rule"
+        ] ?? false,
       runnableBlocksSecurityCheckEnabled:
-        settings.runnableBlocksSecurityCheckEnabled,
-      runnableBlocksSecurityModelId: settings.runnableBlocksSecurityModelId,
-      runnableBlocksSecurityPrompt: settings.runnableBlocksSecurityPrompt,
+        settings.runnableBlocksSecurityCheckEnabled ?? true,
+      runnableBlocksSecurityModelId:
+        settings.runnableBlocksSecurityModelId ?? null,
+      runnableBlocksSecurityPrompt:
+        settings.runnableBlocksSecurityPrompt ?? "",
     });
   }, [
+    settings.controlRuleAlwaysOn,
     settings.runnableBlocksSecurityCheckEnabled,
     settings.runnableBlocksSecurityModelId,
     settings.runnableBlocksSecurityPrompt,
     form,
   ]);
 
-  const handleJsToggle = (enabled: boolean) => {
-    emitter.emit(settingsEvent.setControlRuleAlwaysOnRequest, {
-      ruleId: "core-js-runnable-block-renderer-control-rule",
-      alwaysOn: enabled,
-    });
-  };
-
-  const handlePythonToggle = (enabled: boolean) => {
-    emitter.emit(settingsEvent.setControlRuleAlwaysOnRequest, {
-      ruleId: "core-python-runnable-block-renderer-control-rule",
-      alwaysOn: enabled,
-    });
-  };
-
-  const isJsEnabled = useMemo(
-    () =>
-      settings.controlRuleAlwaysOn[
-        "core-js-runnable-block-renderer-control-rule"
-      ] ?? false,
-    [settings.controlRuleAlwaysOn]
-  );
-
-  const isPythonEnabled = useMemo(
-    () =>
-      settings.controlRuleAlwaysOn[
-        "core-python-runnable-block-renderer-control-rule"
-      ] ?? false,
-    [settings.controlRuleAlwaysOn]
-  );
-
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Runnable Code Blocks</CardTitle>
-          <CardDescription>
-            Enable or disable support for runnable code blocks and configure
-            their security settings. This is an advanced feature and should be
-            used with caution.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Activation</h3>
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="js-enabled" className="text-base">
-                  Runnable JavaScript
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Allow the AI to generate and execute JavaScript code blocks.
-                </p>
-              </div>
-              <Switch
-                id="js-enabled"
-                checked={isJsEnabled}
-                onCheckedChange={handleJsToggle}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="python-enabled" className="text-base">
-                  Runnable Python
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Allow the AI to generate and execute Python code blocks via
-                  Pyodide.
-                </p>
-              </div>
-              <Switch
-                id="python-enabled"
-                checked={isPythonEnabled}
-                onCheckedChange={handlePythonToggle}
-              />
-            </div>
-          </div>
-          <Separator />
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-            className="space-y-4"
-          >
-            <h3 className="text-lg font-medium">Security Validation</h3>
-            <form.Field
-              name="runnableBlocksSecurityCheckEnabled"
-              children={(field) => (
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="security-check-enabled" className="text-base">
-                      Enable Security Check
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Use an AI model to analyze code for security risks before
-                      execution.
-                    </p>
-                  </div>
-                  <Switch
-                    id="security-check-enabled"
-                    checked={field.state.value}
-                    onCheckedChange={field.handleChange}
-                  />
-                </div>
-              )}
-            />
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+      className="p-1 space-y-4"
+    >
+      <div className="space-y-3">
+        <h3 className="text-lg font-medium">Runnable Code Activation</h3>
+        <p className="text-sm text-muted-foreground">
+          Enable or disable support for runnable code blocks. This is an
+          advanced feature and should be used with caution.
+        </p>
 
-            <div className="space-y-2">
-              <Label htmlFor="security-model">Security Validation Model</Label>
-              <form.Field
-                name="runnableBlocksSecurityModelId"
-                children={(field) => (
-                  <ModelSelector
-                    models={availableModels}
-                    value={field.state.value}
-                    onChange={field.handleChange}
-                    disabled={!settings.runnableBlocksSecurityCheckEnabled}
-                  />
-                )}
-              />
-              <p className="text-sm text-muted-foreground">
+        <SwitchField
+          form={form}
+          name="jsEnabled"
+          label="Runnable JavaScript"
+          description="Allow the AI to generate and execute JavaScript code blocks."
+        />
+
+        <SwitchField
+          form={form}
+          name="pythonEnabled"
+          label="Runnable Python"
+          description="Allow the AI to generate and execute Python code blocks via Pyodide."
+        />
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <h3 className="text-lg font-medium">Security Validation</h3>
+        <p className="text-sm text-muted-foreground">
+          Use an AI model to analyze code for security risks before execution.
+        </p>
+
+        <SwitchField
+          form={form}
+          name="runnableBlocksSecurityCheckEnabled"
+          label="Enable Security Check"
+          description="Requires an AI call to validate code safety before running."
+        />
+
+        <form.Field
+          name="runnableBlocksSecurityModelId"
+          children={(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor={field.name}>Security Validation Model</Label>
+              <p className="text-xs text-muted-foreground">
                 Select the model used for security analysis. A fast, low-cost
                 model is recommended.
               </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="security-prompt">Security Validation Prompt</Label>
-              <form.Field
-                name="runnableBlocksSecurityPrompt"
-                children={(field) => (
-                  <Textarea
-                    id="security-prompt"
-                    value={field.state.value ?? ""}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    rows={10}
-                    placeholder="Enter the security validation system prompt..."
-                    disabled={!settings.runnableBlocksSecurityCheckEnabled}
-                  />
-                )}
+              <GlobalModelSelector
+                value={field.state.value}
+                onChange={(modelId: string | null) =>
+                  field.handleChange(modelId)
+                }
+                className="w-full"
+                disabled={
+                  !form.state.values.runnableBlocksSecurityCheckEnabled
+                }
               />
-              <p className="text-sm text-muted-foreground">
-                The system prompt used to instruct the AI during security
-                validation. Must include {"{{code}}"} placeholder.
+            </div>
+          )}
+        />
+
+        <form.Field
+          name="runnableBlocksSecurityPrompt"
+          children={(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor={field.name}>Security Validation Prompt</Label>
+              <p className="text-xs text-muted-foreground">
+                System prompt for the security check. Must include the{" "}
+                <code>{`{{code}}`}</code> placeholder.
               </p>
+              <Textarea
+                id={field.name}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                rows={8}
+                placeholder="Enter the security validation system prompt..."
+                className="font-mono"
+                disabled={
+                  !form.state.values.runnableBlocksSecurityCheckEnabled
+                }
+              />
             </div>
-            <div className="flex justify-end">
-              <Button type="submit" disabled={!form.state.isDirty}>
-                Save Security Settings
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          )}
+        />
+      </div>
+      <Separator />
+      <div className="flex items-center justify-end pt-3">
+        <form.Subscribe
+          selector={(state) => [
+            state.canSubmit,
+            state.isSubmitting,
+            state.isDirty,
+          ]}
+          children={([canSubmit, isSubmitting, isDirty]) => (
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!canSubmit || isSubmitting || !isDirty}
+            >
+              {isSubmitting ? "Saving..." : "Save Settings"}
+            </Button>
+          )}
+        />
+      </div>
+    </form>
   );
 };
 
-export const SettingsRunnableBlocks = SettingsRunnableBlocksComponent; 
+export const SettingsRunnableBlocks = React.memo(SettingsRunnableBlocksComponent); 

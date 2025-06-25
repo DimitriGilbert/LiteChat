@@ -104,7 +104,7 @@ export class RulesControlModule implements ControlModule {
     
     // For control rules, use settings preferences instead of module defaults
     const controlAlwaysOnRuleIds = Object.values(controlRules)
-      .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? true) // Use DB setting or default to true
+      .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? rule.alwaysOn) // Use setting or fall back to rule's default
       .map(rule => rule.id);
     
     // Debug logging to track the issue
@@ -154,7 +154,7 @@ export class RulesControlModule implements ControlModule {
       name: controlRule.name,
       content: controlRule.content,
       type: controlRule.type,
-      alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? true, // Use DB setting or default to true
+      alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? controlRule.alwaysOn, // Use setting or fall back to rule's default
       createdAt: defaultDate,
       updatedAt: defaultDate,
     }));
@@ -191,7 +191,7 @@ export class RulesControlModule implements ControlModule {
         name: controlRule.name,
         content: controlRule.content,
         type: controlRule.type,
-        alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? true, // Use DB setting or default to true
+        alwaysOn: settings.controlRuleAlwaysOn[controlRule.id] ?? controlRule.alwaysOn, // Use setting or fall back to rule's default
         createdAt: new Date(), // Default date for control rules
         updatedAt: new Date(), // Default date for control rules
       };
@@ -398,7 +398,7 @@ export class RulesControlModule implements ControlModule {
           // For control rules, use settings preferences instead of module defaults
           const controlAlwaysOnRuleIds = new Set(
             Object.values(controlRules)
-              .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? true) // Use DB setting or default to true
+              .filter(rule => settings.controlRuleAlwaysOn[rule.id] ?? rule.alwaysOn) // Use setting or fall back to rule's default
               .map(rule => rule.id)
           );
           
