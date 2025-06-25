@@ -13,6 +13,7 @@ import { SearchIcon, Settings } from "lucide-react";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import type { DbRule, DbTag } from "@/types/litechat/rules"; // Import types
+import { useSettingsStore } from "@/store/settings.store";
 
 interface RulesControlDialogContentProps {
   activeTagIds: Set<string>;
@@ -39,6 +40,7 @@ export const RulesControlDialogContent: React.FC<
 }) => {
   const [tagFilter, setTagFilter] = useState("");
   const [ruleFilter, setRuleFilter] = useState("");
+  const autoRuleSelectionEnabled = useSettingsStore((s) => s.autoRuleSelectionEnabled);
 
   const filteredTags = useMemo(() => {
     const lowerFilter = tagFilter.toLowerCase();
@@ -170,7 +172,7 @@ export const RulesControlDialogContent: React.FC<
             className="pl-8 h-9"
           />
         </div>
-        {onAutoSelectRules && (
+        {onAutoSelectRules && autoRuleSelectionEnabled && (
           <Button
             variant="outline"
             size="sm"

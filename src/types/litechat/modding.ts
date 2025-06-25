@@ -88,6 +88,7 @@ export interface ReadonlyChatContextSnapshot {
   readonly theme: SettingsState["theme"];
   readonly gitUserName: string | null;
   readonly gitUserEmail: string | null;
+  readonly promptInputValue?: string;
 }
 
 interface BaseControl {

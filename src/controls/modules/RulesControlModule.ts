@@ -47,7 +47,6 @@ export class RulesControlModule implements ControlModule {
   public isLoadingRules = true;
   private notifyComponentUpdate: (() => void) | null = null;
   private notifySettingsComponentUpdate: (() => void) | null = null;
-  private latestUserPrompt: string = "";
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
     this.modApiRef = modApi;
@@ -91,13 +90,6 @@ export class RulesControlModule implements ControlModule {
         this.notifyComponentUpdate?.();
       }
     });
-
-    // Listen for prompt input changes
-    const promptListener = (payload: { value: string }) => {
-      this.latestUserPrompt = payload.value;
-    };
-    emitter.on(promptEvent.inputChanged, promptListener);
-    this.eventUnsubscribers.push(() => emitter.off(promptEvent.inputChanged, promptListener));
 
     this.eventUnsubscribers.push(unsubStatus, unsubRulesLoaded, unsubControlRules);
   }
@@ -472,13 +464,15 @@ export class RulesControlModule implements ControlModule {
     return controlRules.hasOwnProperty(ruleId);
   };
 
-  public autoSelectRules = async () => {
+  public autoSelectRules = async (promptOverride?: string) => {
     const settings = useSettingsStore.getState();
     if (!settings.autoRuleSelectionEnabled) {
       toast.info("Auto-rule selection is disabled in settings.");
       return;
     }
-    const userPrompt = this.latestUserPrompt;
+    // Always get the current prompt value directly
+    let userPrompt = promptOverride ?? this.modApiRef?.getContextSnapshot().promptInputValue ?? "";
+    if (typeof userPrompt !== "string") userPrompt = String(userPrompt ?? "");
     if (!userPrompt) {
       toast.error("No user prompt found to base selection on.");
       return;
@@ -590,7 +584,12 @@ export class RulesControlModule implements ControlModule {
 
       let ruleIds: string[] = [];
       try {
-        const jsonMatch = result.match(/\[.*?\]/);
+        // Remove markdown code block wrappers and whitespace
+        let cleaned = result.trim();
+        // Remove ```json ... ``` or ``` ... ``` wrappers
+        cleaned = cleaned.replace(/^```json[\r\n]+|^```[\r\n]+|```$/gim, "").trim();
+        // Find the first JSON array in the cleaned string
+        const jsonMatch = cleaned.match(/\[.*?\]/s);
         if (!jsonMatch) {
           throw new Error("No JSON array found in the AI response.");
         }
@@ -630,6 +629,7 @@ export class RulesControlModule implements ControlModule {
       await PersistenceService.saveInteraction(finalInteraction);
 
       this.setActiveRuleIds(() => new Set(ruleIds));
+      toast.dismiss();
       toast.success(`AI selected ${ruleIds.length} rules.`);
       
     } catch (error) {

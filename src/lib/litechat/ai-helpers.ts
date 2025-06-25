@@ -22,6 +22,7 @@ import type {
   ToolCallPart,
   ToolResultPart,
 } from "ai";
+import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 
 export async function runMiddleware<H extends ModMiddlewareHookName>(
   hookName: H,
@@ -59,6 +60,7 @@ export function getContextSnapshot(): ReadonlyChatContextSnapshot {
   const pS = useProviderStore.getState();
   const sS = useSettingsStore.getState();
   const { providerId } = splitModelId(pS.selectedModelId);
+  const promptInputValue = usePromptInputValueStore.getState().value;
   const snapshot: ReadonlyChatContextSnapshot = {
     selectedConversationId: iS.currentConversationId,
     interactions: iS.interactions,
@@ -71,6 +73,7 @@ export function getContextSnapshot(): ReadonlyChatContextSnapshot {
     theme: sS.theme,
     gitUserName: sS.gitUserName,
     gitUserEmail: sS.gitUserEmail,
+    promptInputValue,
   };
   return Object.freeze(snapshot);
 }

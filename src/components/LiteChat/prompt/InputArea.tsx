@@ -14,6 +14,7 @@ import { useInputStore } from "@/store/input.store";
 import type { InputAreaRef } from "@/types/litechat/prompt";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
+import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 
 interface InputAreaProps {
   initialValue?: string;
@@ -41,11 +42,13 @@ export const InputArea = memo(
     ) => {
       const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
       const [internalValue, setInternalValue] = useState(initialValue);
+      const setPromptInputValue = usePromptInputValueStore((state) => state.setValue);
 
       useImperativeHandle(ref, () => ({
         getValue: () => internalValue,
         setValue: (value: string) => {
           setInternalValue(value);
+          setPromptInputValue(value);
           if (onValueChange) {
             onValueChange(value);
           }
@@ -63,6 +66,7 @@ export const InputArea = memo(
         focus: () => internalTextareaRef.current?.focus(),
         clearValue: () => {
           setInternalValue("");
+          setPromptInputValue("");
           if (onValueChange) {
             onValueChange("");
           }
@@ -96,6 +100,7 @@ export const InputArea = memo(
       ) => {
         const newValue = e.target.value;
         setInternalValue(newValue);
+        setPromptInputValue(newValue);
         if (onValueChange) {
           onValueChange(newValue);
         }
@@ -117,16 +122,18 @@ export const InputArea = memo(
       useEffect(() => {
         if (initialValue !== internalValue) {
           setInternalValue(initialValue);
+          setPromptInputValue(initialValue);
           if (onValueChange) {
             onValueChange(initialValue);
           }
         }
-      }, [initialValue, onValueChange]);
+      }, [initialValue, onValueChange, setPromptInputValue]);
 
       // Listen for setInputTextRequest events
       useEffect(() => {
         const handleSetInputText = (payload: { text: string }) => {
           setInternalValue(payload.text);
+          setPromptInputValue(payload.text);
           if (onValueChange) {
             onValueChange(payload.text);
           }
@@ -147,7 +154,7 @@ export const InputArea = memo(
         return () => {
           emitter.off(promptEvent.setInputTextRequest, handleSetInputText);
         };
-      }, [onValueChange]);
+      }, [onValueChange, setPromptInputValue]);
 
       return (
         <Textarea

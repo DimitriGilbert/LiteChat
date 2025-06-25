@@ -491,14 +491,17 @@ export const useSettingsStore = create(
     setAutoRuleSelectionEnabled: (enabled) => {
       set({ autoRuleSelectionEnabled: enabled });
       PersistenceService.saveSetting("autoRuleSelectionEnabled", enabled);
+      emitter.emit(settingsEvent.autoRuleSelectionEnabledChanged, { enabled });
     },
     setAutoRuleSelectionModelId: (modelId) => {
       set({ autoRuleSelectionModelId: modelId });
       PersistenceService.saveSetting("autoRuleSelectionModelId", modelId);
+      emitter.emit(settingsEvent.autoRuleSelectionModelIdChanged, { modelId });
     },
     setAutoRuleSelectionPrompt: (prompt) => {
       set({ autoRuleSelectionPrompt: prompt });
       PersistenceService.saveSetting("autoRuleSelectionPrompt", prompt);
+      emitter.emit(settingsEvent.autoRuleSelectionPromptChanged, { prompt });
     },
 
     loadSettings: async () => {

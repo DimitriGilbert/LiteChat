@@ -102,6 +102,9 @@ export const settingsEvent = {
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
   resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
   resetThemeSettingsRequest: "settings.reset.theme.settings.request",
+  autoRuleSelectionEnabledChanged: "settings.auto.rule.selection.enabled.changed",
+  autoRuleSelectionModelIdChanged: "settings.auto.rule.selection.model.id.changed",
+  autoRuleSelectionPromptChanged: "settings.auto.rule.selection.prompt.changed",
 } as const;
 
 export interface SettingsEventPayloads {
@@ -289,11 +292,14 @@ export interface SettingsEventPayloads {
   [settingsEvent.setAutoInitializeReposOnStartupRequest]: {
     enabled: SettingsState["autoInitializeReposOnStartup"];
   };
-  [settingsEvent.setAutoRuleSelectionEnabledRequest]: { enabled: boolean };
-  [settingsEvent.setAutoRuleSelectionModelIdRequest]: { modelId: string | null };
-  [settingsEvent.setAutoRuleSelectionPromptRequest]: { prompt: string | null };
+  [settingsEvent.setAutoRuleSelectionEnabledRequest]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
+  [settingsEvent.setAutoRuleSelectionModelIdRequest]: { modelId: SettingsState["autoRuleSelectionModelId"] };
+  [settingsEvent.setAutoRuleSelectionPromptRequest]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;
   [settingsEvent.resetAssistantSettingsRequest]: undefined;
   [settingsEvent.resetThemeSettingsRequest]: undefined;
+  [settingsEvent.autoRuleSelectionEnabledChanged]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
+  [settingsEvent.autoRuleSelectionModelIdChanged]: { modelId: SettingsState["autoRuleSelectionModelId"] };
+  [settingsEvent.autoRuleSelectionPromptChanged]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
 }

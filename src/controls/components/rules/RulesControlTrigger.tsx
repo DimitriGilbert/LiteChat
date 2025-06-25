@@ -19,6 +19,7 @@ import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
+import { useSettingsStore } from "@/store/settings.store";
 
 interface RulesControlTriggerProps {
   module: RulesControlModule;
@@ -28,6 +29,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
   module,
 }) => {
   const [, forceUpdate] = useState({});
+  const autoRuleSelectionEnabled = useSettingsStore((s) => s.autoRuleSelectionEnabled);
   
   useEffect(() => {
     // Listen to module notifications
@@ -161,7 +163,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
             allRules={allRules}
             allTags={allTags}
             getRulesForTag={getRulesForTag}
-            onAutoSelectRules={module.autoSelectRules}
+            onAutoSelectRules={autoRuleSelectionEnabled ? module.autoSelectRules : undefined}
           />
         </PopoverContent>
       )}
