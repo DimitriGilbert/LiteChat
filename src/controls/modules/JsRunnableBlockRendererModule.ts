@@ -189,7 +189,7 @@ export class JsRunnableBlockRendererModule implements ControlModule {
 
   register(modApi: LiteChatModApi): void {
     if (this.unregisterCallback) {
-      console.warn(`[${this.id}] Already registered. Skipping.`);
+      console.warn(`[JsRunnableBlockRendererModule] Already registered. Skipping.`);
       return;
     }
 
@@ -239,46 +239,41 @@ export class JsRunnableBlockRendererModule implements ControlModule {
       throw new Error("Module not initialized with modApi");
     }
 
-         // Create a custom litechat API that matches the control rule prompt
-     const customLitechatApi = {
-       // Utilities with log capture
-       utils: {
-         log: (level: 'info' | 'warn' | 'error', ...args: any[]) => {
-           const formatted = args.map(arg => {
-             if (typeof arg === 'object') {
-               try {
-                 return JSON.stringify(arg, null, 2);
-               } catch {
-                 return String(arg);
-               }
-             }
-             return String(arg);
-           }).join(' ');
-           
-           const logEntry = level === 'info' ? formatted : `${level.charAt(0).toUpperCase() + level.slice(1)}: ${formatted}`;
-           capturedLogs.push(logEntry);
-           
-           // Also log to browser console with prefix for debugging
-           this.modApiRef?.log(level, ...args);
-         },
-         toast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => {
-           this.modApiRef?.showToast(type, message);
-         }
-       },
-
-       // Event system
-       emit: (eventName: string, payload: any) => {
-         this.modApiRef?.emit(eventName as any, payload);
-       },
-
-       // VFS access
-       getVfsInstance: (vfsKey?: string) => {
-         return this.modApiRef?.getVfsInstance(vfsKey || 'orphan');
-       },
-
-       // DOM target element
-       target: previewElement
-     };
+    // Create a custom litechat API that matches the control rule prompt
+    const customLitechatApi = {
+      // Utilities with log capture
+      utils: {
+        log: (level: 'info' | 'warn' | 'error', ...args: any[]) => {
+          const formatted = args.map(arg => {
+            if (typeof arg === 'object') {
+              try {
+                return JSON.stringify(arg, null, 2);
+              } catch {
+                return String(arg);
+              }
+            }
+            return String(arg);
+          }).join(' ');
+          const logEntry = level === 'info' ? formatted : `${level.charAt(0).toUpperCase() + level.slice(1)}: ${formatted}`;
+          capturedLogs.push(logEntry);
+          // Also log to browser console with prefix for debugging
+          this.modApiRef?.log(level, ...args);
+        },
+        toast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => {
+          this.modApiRef?.showToast(type, message);
+        }
+      },
+      // Event system
+      emit: (eventName: string, payload: any) => {
+        this.modApiRef?.emit(eventName as any, payload);
+      },
+      // VFS access
+      getVfsInstance: (vfsKey?: string) => {
+        return this.modApiRef?.getVfsInstance(vfsKey || 'orphan');
+      },
+      // DOM target element
+      target: previewElement
+    };
 
     return {
       litechat: customLitechatApi,

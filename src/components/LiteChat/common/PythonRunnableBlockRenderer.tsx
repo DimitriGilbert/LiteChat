@@ -307,7 +307,6 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   isStreaming = false,
   interactionId,
   blockId,
-  module,
 }) => {
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({

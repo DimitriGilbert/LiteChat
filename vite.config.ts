@@ -3,9 +3,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { VitePWA } from "vite-plugin-pwa";
 import { readFileSync, existsSync } from "fs";
+import { analyzer } from 'vite-bundle-analyzer';
 
 // Custom plugin to read system prompt and user configuration files at build time
 function buildTimeConfigPlugin() {
@@ -73,16 +73,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
     buildTimeConfigPlugin(),
-    nodePolyfills({
-      // Optionally specify which globals to polyfill (true by default)
-      globals: {
-        Buffer: true,
-        global: true,
-        process: true,
-      },
-      // Optionally specify which protocols to polyfill (true by default)
-      protocolImports: true,
-    }),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
@@ -143,10 +133,16 @@ export default defineConfig({
         ]
       }
     }),
+    analyzer(),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      external: [], // Don't externalize any modules for better compatibility
     },
   },
   test: {

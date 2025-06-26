@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PromptTemplate } from '@/types/litechat/prompt-template';
 import type { ModelListItem } from '@/types/litechat/provider';
 import { ModelSelector } from '@/controls/components/global-model-selector/ModelSelector';
-import { ChevronDown, ChevronRight, Trash2, GripVertical, ArrowUp, ArrowDown, ChevronsUp, Pen } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, GripVertical, ArrowUp, ArrowDown, ChevronsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ActionTooltipButton } from '@/components/LiteChat/common/ActionTooltipButton';
 import { useSortable } from "@dnd-kit/sortable";
@@ -55,8 +55,8 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
     isDragDisabled = false,
 }) => {
     const [isExpanded, setIsExpanded] = useState(true);
-    const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
-    const [editingVariable, setEditingVariable] = React.useState<any>(null);
+    // const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
+    // const [editingVariable, setEditingVariable] = React.useState<any>(null);
     
     // Drag and drop functionality
     const {

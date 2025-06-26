@@ -5,7 +5,6 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import {
   interactionEvent,
-  InteractionEventPayloads,
 } from "@/types/litechat/events/interaction.events";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
