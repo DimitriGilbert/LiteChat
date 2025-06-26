@@ -26,6 +26,12 @@ declare global {
   interface Window {
     pyodide?: any;
     loadPyodide?: any;
+    liteChatPython?: {
+      isLoading: boolean;
+      isReady: boolean;
+      loadedPackages: Set<string>;
+      loadPromise?: Promise<void>;
+    };
   }
 }
 
@@ -37,8 +43,238 @@ interface PythonRunnableBlockRendererProps {
   module?: any; // Optional module for enhanced context access
 }
 
-// Add a constant for the directory
-const PYODIDE_INDEX_URL = PYODIDE_VERSION_URL.replace(/\/pyodide\.js$/, '/');
+// Global Python environment manager
+class GlobalPythonManager {
+  private static instance: GlobalPythonManager;
+  private loadPromise: Promise<void> | null = null;
+  private loadedPackages = new Set<string>();
+
+  static getInstance(): GlobalPythonManager {
+    if (!GlobalPythonManager.instance) {
+      GlobalPythonManager.instance = new GlobalPythonManager();
+    }
+    return GlobalPythonManager.instance;
+  }
+
+  async ensurePythonLoaded(): Promise<void> {
+    // Initialize window.liteChatPython if not exists
+    if (!window.liteChatPython) {
+      window.liteChatPython = {
+        isLoading: false,
+        isReady: false,
+        loadedPackages: new Set<string>(),
+      };
+    }
+
+    // If already ready, return immediately
+    if (window.pyodide && window.liteChatPython.isReady) {
+      return;
+    }
+
+    // If already loading, wait for that promise
+    if (this.loadPromise) {
+      return this.loadPromise;
+    }
+
+    // Start loading
+    window.liteChatPython.isLoading = true;
+    
+    this.loadPromise = this.loadPyodide();
+    return this.loadPromise;
+  }
+
+  private async loadPyodide(): Promise<void> {
+    try {
+      // Load Pyodide script if not already loaded
+      if (!window.loadPyodide) {
+        const script = document.createElement('script');
+        script.src = PYODIDE_VERSION_URL;
+        
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      // Initialize Pyodide
+      const indexURL = PYODIDE_VERSION_URL.replace(/\/pyodide\.js$/, '/');
+      window.pyodide = await window.loadPyodide({
+        indexURL: indexURL,
+      });
+
+      // Always load micropip for package management
+      await window.pyodide.loadPackage(['micropip']);
+      
+      // Set up global Python environment
+      window.pyodide.runPython(`
+import sys
+import traceback
+from io import StringIO
+import warnings
+
+# Configure warnings
+warnings.filterwarnings('ignore', category=UserWarning, message='.*non-interactive.*')
+
+# Global output capture system
+class GlobalOutputCapture:
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.stdout = StringIO()
+        self.stderr = StringIO()
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        self.original_excepthook = sys.excepthook
+    
+    def start_capture(self):
+        sys.stdout = self.stdout
+        sys.stderr = self.stderr
+        sys.excepthook = self.debug_excepthook
+    
+    def stop_capture(self):
+        sys.stdout = self.original_stdout
+        sys.stderr = self.original_stderr
+        sys.excepthook = self.original_excepthook
+        
+        stdout_content = self.stdout.getvalue()
+        stderr_content = self.stderr.getvalue()
+        self.reset()
+        return stdout_content, stderr_content
+    
+    def debug_excepthook(self, exc_type, exc_value, exc_traceback):
+        """Custom exception handler that provides detailed error information"""
+        if exc_traceback:
+            tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+            self.stderr.write("\\n=== DETAILED ERROR INFORMATION ===\\n")
+            self.stderr.write(f"Exception Type: {exc_type.__name__}\\n")
+            self.stderr.write(f"Exception Message: {str(exc_value)}\\n")
+            self.stderr.write("\\n=== FULL TRACEBACK ===\\n")
+            for line in tb_lines:
+                self.stderr.write(line)
+            self.stderr.write("\\n=== END TRACEBACK ===\\n")
+        else:
+            self.stderr.write(f"Error: {exc_type.__name__}: {str(exc_value)}\\n")
+
+# Create global output capture instance
+_global_capture = GlobalOutputCapture()
+      `);
+
+      window.liteChatPython!.isReady = true;
+      window.liteChatPython!.isLoading = false;
+      
+      toast.success("Python environment ready for all blocks!");
+
+    } catch (error) {
+      window.liteChatPython!.isLoading = false;
+      console.error("Failed to load Pyodide:", error);
+      toast.error("Failed to load Python environment");
+      throw error;
+    }
+  }
+
+  async loadPackages(packages: string[]): Promise<void> {
+    if (!window.pyodide || !window.liteChatPython?.isReady) {
+      throw new Error("Python environment not ready");
+    }
+
+    const newPackages = packages.filter(pkg => !this.loadedPackages.has(pkg));
+    if (newPackages.length === 0) {
+      return;
+    }
+
+    toast.info(`Loading packages: ${newPackages.join(', ')}...`);
+    
+    try {
+      // Load packages using pyodide.loadPackage for better performance
+      await window.pyodide.loadPackage(newPackages);
+      
+      // Mark packages as loaded
+      newPackages.forEach(pkg => this.loadedPackages.add(pkg));
+      window.liteChatPython!.loadedPackages = this.loadedPackages;
+      
+      toast.success(`Packages loaded: ${newPackages.join(', ')}`);
+    } catch (error) {
+      console.warn("Some packages failed to load via pyodide.loadPackage, trying micropip:", error);
+      
+      // Fallback to micropip for packages not in pyodide
+      try {
+        const micropip = window.pyodide.pyimport("micropip");
+        for (const pkg of newPackages) {
+          await micropip.install(pkg);
+          this.loadedPackages.add(pkg);
+        }
+        window.liteChatPython!.loadedPackages = this.loadedPackages;
+        toast.success(`Packages installed via micropip: ${newPackages.join(', ')}`);
+      } catch (micropipError) {
+        console.error("Failed to install packages:", micropipError);
+        toast.error("Some packages failed to install. Code may not work correctly.");
+        throw micropipError;
+      }
+    }
+  }
+
+  analyzeImports(code: string): string[] {
+    const lines = code.split('\n');
+    const requiredPackages = new Set<string>();
+    
+    const packageMap: Record<string, string> = {
+      'numpy': 'numpy',
+      'np': 'numpy',
+      'matplotlib': 'matplotlib',
+      'plt': 'matplotlib',
+      'pandas': 'pandas',
+      'pd': 'pandas',
+      'scipy': 'scipy',
+      'sklearn': 'scikit-learn',
+      'cv2': 'opencv-python',
+      'PIL': 'pillow',
+      'requests': 'requests',
+      'beautifulsoup4': 'beautifulsoup4',
+      'bs4': 'beautifulsoup4',
+      'sympy': 'sympy',
+      'networkx': 'networkx',
+      'plotly': 'plotly',
+      'seaborn': 'seaborn',
+      'statsmodels': 'statsmodels'
+    };
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      const importMatch = trimmed.match(/^import\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (importMatch) {
+        const pkg = importMatch[1];
+        if (packageMap[pkg]) {
+          requiredPackages.add(packageMap[pkg]);
+        }
+      }
+      
+      const fromMatch = trimmed.match(/^from\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (fromMatch) {
+        const pkg = fromMatch[1];
+        if (packageMap[pkg]) {
+          requiredPackages.add(packageMap[pkg]);
+        }
+      }
+      
+      const asMatch = trimmed.match(/^import\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+as\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+      if (asMatch) {
+        const pkg = asMatch[1];
+        const alias = asMatch[2];
+        if (packageMap[pkg]) {
+          requiredPackages.add(packageMap[pkg]);
+        }
+        if (packageMap[alias]) {
+          requiredPackages.add(packageMap[alias]);
+        }
+      }
+    }
+    
+    return Array.from(requiredPackages);
+  }
+}
 
 const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRendererProps> = ({
   code,
@@ -53,8 +289,6 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
     }))
   );
   
-  // For now, enable runnable blocks as this is an advanced feature
-  // TODO: Implement granular control using runnableBlockConfig when store is fixed
   const runnableBlocksEnabled = true;
 
   const [isFolded, setIsFolded] = useState(
@@ -63,18 +297,20 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   const [isEditing, setIsEditing] = useState(false);
   const [editedCode, setEditedCode] = useState(code);
   const [isRunning, setIsRunning] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [output, setOutput] = useState<string[]>([]);
   const [showOutput, setShowOutput] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [hasRun, setHasRun] = useState(false);
-  const [pyodideReady, setPyodideReady] = useState(false);
+  const [previewContentUpdated, setPreviewContentUpdated] = useState(0);
 
   // Security validation state
   const [securityResult, setSecurityResult] = useState<CodeSecurityResult | null>(null);
   const [isCheckingSecurity, setIsCheckingSecurity] = useState(false);
   const [clickCount, setClickCount] = useState(0);
   const [lastClickTime, setLastClickTime] = useState(0);
+
+  // Get global Python manager
+  const pythonManager = useMemo(() => GlobalPythonManager.getInstance(), []);
 
   // Update edited code when original code changes
   useEffect(() => {
@@ -90,60 +326,261 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   }, [editedCode]);
 
   const codeRef = useRef<HTMLElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null); // Simple target element reference
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  // Listen for matplotlib content updates
+  useEffect(() => {
+    const previewElement = previewRef.current;
+    if (!previewElement) return;
+
+    const handleContentAdded = () => {
+      setPreviewContentUpdated(prev => prev + 1);
+    };
+
+    previewElement.addEventListener('previewContentAdded', handleContentAdded);
+    return () => {
+      previewElement.removeEventListener('previewContentAdded', handleContentAdded);
+    };
+  }, []);
 
   const canvasControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.canvasControls))
   );
 
-  // Load Pyodide on demand
-  const loadPyodide = useCallback(async () => {
-    if (window.pyodide) {
-      setPyodideReady(true);
+  const checkSecurity = useCallback(async () => {
+    setIsCheckingSecurity(true);
+    try {
+      const codeToCheck = isEditing ? editedCode : code;
+      const result = await CodeSecurityService.validateCodeSecurity(codeToCheck, 'python');
+      setSecurityResult(result);
+      
+      if (result.score > 90) {
+        toast.error(`High-risk code detected (Score: ${result.score}/100). Please review carefully before running.`);
+      } else if (result.score > 60) {
+        toast.warning(`Potentially risky code detected (Score: ${result.score}/100). Use caution when running.`);
+      } else if (result.score > 30) {
+        toast.info(`Moderate-risk code detected (Score: ${result.score}/100). Review before running.`);
+      } else {
+        toast.success(`Code security check passed (Score: ${result.score}/100).`);
+      }
+    } catch (error) {
+      console.error("Security check failed:", error);
+      toast.error("Security check failed. Please try again.");
+    } finally {
+      setIsCheckingSecurity(false);
+    }
+  }, [code, editedCode, isEditing]);
+
+  const handleRunClick = useCallback(async () => {
+    if (!runnableBlocksEnabled) {
+      toast.error("Runnable blocks are disabled in settings.");
       return;
     }
 
-    if (window.loadPyodide) {
-      setIsLoading(true);
-      try {
-        window.pyodide = await window.loadPyodide({
-          indexURL: PYODIDE_INDEX_URL,
-        });
-        setPyodideReady(true);
-        toast.success("Python environment ready");
-      } catch (error) {
-        console.error("Failed to load Pyodide:", error);
-        toast.error("Failed to load Python environment");
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      // Load Pyodide script if not already loaded
-      setIsLoading(true);
-      const script = document.createElement('script');
-      script.src = PYODIDE_VERSION_URL;
-      script.onload = async () => {
-        try {
-          window.pyodide = await window.loadPyodide({
-            indexURL: PYODIDE_INDEX_URL,
-          });
-          setPyodideReady(true);
-          toast.success("Python environment ready");
-        } catch (error) {
-          console.error("Failed to load Pyodide:", error);
-          toast.error("Failed to load Python environment");
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      script.onerror = () => {
-        console.error("Failed to load Pyodide script");
-        toast.error("Failed to load Python environment");
-        setIsLoading(false);
-      };
-      document.head.appendChild(script);
+    // Immediately set running state and disable button for instant feedback
+    setIsRunning(true);
+
+    // Ensure Python is loaded
+    try {
+      await pythonManager.ensurePythonLoaded();
+    } catch (error) {
+      setIsRunning(false); // Reset running state on error
+      toast.error("Failed to load Python environment");
+      return;
     }
-  }, []);
+
+    // Security check logic
+    if (securityResult) {
+      const now = Date.now();
+      const timeSinceLastClick = now - lastClickTime;
+      
+      if (timeSinceLastClick > 3000) {
+        setClickCount(0);
+      }
+      
+      setLastClickTime(now);
+      const newClickCount = clickCount + 1;
+      setClickCount(newClickCount);
+
+      if (newClickCount < securityResult.clicksRequired) {
+        setIsRunning(false); // Reset running state if not enough clicks
+        const remaining = securityResult.clicksRequired - newClickCount;
+        toast.info(`Click ${remaining} more time${remaining > 1 ? 's' : ''} to confirm execution (Risk: ${securityResult.riskLevel})`);
+        return;
+      }
+
+      if (securityResult.score > 90) {
+        if (!confirm(`This code has a very high security risk score (${securityResult.score}/100). Are you absolutely sure you want to run it?`)) {
+          setClickCount(0);
+          setIsRunning(false); // Reset running state if user cancels
+          return;
+        }
+      }
+
+      setClickCount(0);
+    }
+
+    executeCode();
+  }, [securityResult, clickCount, lastClickTime, runnableBlocksEnabled, pythonManager]);
+
+  const executeCode = useCallback(async () => {
+    if (!window.pyodide || !window.liteChatPython?.isReady) return;
+
+    const capturedLogs: string[] = [];
+
+    // Clear the preview target
+    if (previewRef.current) {
+      previewRef.current.innerHTML = '';
+    }
+
+    try {
+      const codeToRun = isEditing ? editedCode : code;
+      
+      // Load required packages
+      const requiredPackages = pythonManager.analyzeImports(codeToRun);
+      if (requiredPackages.length > 0) {
+        await pythonManager.loadPackages(requiredPackages);
+      }
+      
+      // Always ensure matplotlib is properly configured if it's imported
+      const hasMatplotlib = requiredPackages.includes('matplotlib') || codeToRun.includes('matplotlib') || codeToRun.includes('plt');
+      if (hasMatplotlib) {
+        // Make sure matplotlib package is loaded even if not caught by import analysis
+        if (!window.liteChatPython?.loadedPackages.has('matplotlib')) {
+          await pythonManager.loadPackages(['matplotlib']);
+        }
+      }
+
+      // Setup matplotlib for this block if needed
+      if (hasMatplotlib && previewRef.current) {
+        // Set the official pyodide matplotlib target to the always-present preview element
+        (document as any).pyodideMplTarget = previewRef.current;
+        
+        window.pyodide.runPython(`
+# ALWAYS set up matplotlib for web display using Pyodide's official method
+import matplotlib
+import matplotlib.pyplot as plt
+from js import document
+
+# Configure matplotlib to use the target element set in document.pyodideMplTarget
+# This is the official Pyodide way as documented in matplotlib-pyodide
+
+# Configure matplotlib for web environments  
+matplotlib.use('module://matplotlib_pyodide.wasm_backend')
+plt.ioff()  # Turn off interactive mode
+
+print("✓ Matplotlib configured for Pyodide with always-present target element")
+        `);
+      }
+
+      // Setup context for this block
+      const contextObj = {
+          litechat: {
+            utils: {
+              log: (level: string, ...args: any[]) => {
+                const formatted = args.map(arg => {
+                  if (typeof arg === 'object') {
+                    try {
+                      return JSON.stringify(arg, null, 2);
+                    } catch {
+                      return String(arg);
+                    }
+                  }
+                  return String(arg);
+                }).join(' ');
+                const logEntry = level === 'info' ? formatted : `${level.charAt(0).toUpperCase() + level.slice(1)}: ${formatted}`;
+                capturedLogs.push(logEntry);
+              },
+              toast: (_type: string, message: string) => {
+                toast(message);
+              }
+            }
+          },
+          target: previewRef.current
+        };
+
+      // Make context available in Python
+      window.pyodide.globals.set("litechat", contextObj.litechat);
+      window.pyodide.globals.set("target", contextObj.target);
+
+      // Start output capture
+      window.pyodide.runPython("_global_capture.start_capture()");
+      
+      // Execute the code
+      try {
+        await window.pyodide.runPython(codeToRun);
+      } catch (error: any) {
+        // Let the global exception handler deal with it
+        console.error("Python execution error:", error);
+      }
+
+      // Stop capture and get output
+      const [stdout, stderr] = window.pyodide.runPython("_global_capture.stop_capture()");
+
+      // Process output
+      if (stdout && stdout.trim()) {
+        capturedLogs.push("=== PROGRAM OUTPUT ===");
+        stdout.split('\n').forEach((line: string) => {
+          if (line.trim()) {
+            capturedLogs.push(line);
+          }
+        });
+      }
+
+      if (stderr && stderr.trim()) {
+        capturedLogs.push("=== ERROR/DEBUG OUTPUT ===");
+        stderr.split('\n').forEach((line: string) => {
+          if (line.trim()) {
+            if (line.includes("=== DETAILED ERROR INFORMATION ===")) {
+              capturedLogs.push(`🔴 ${line}`);
+            } else if (line.includes("Exception Type:")) {
+              capturedLogs.push(`❌ ${line}`);
+            } else if (line.includes("Exception Message:")) {
+              capturedLogs.push(`💬 ${line}`);
+            } else if (line.includes("=== FULL TRACEBACK ===")) {
+              capturedLogs.push(`📍 ${line}`);
+            } else {
+              capturedLogs.push(`⚠️  ${line}`);
+            }
+          }
+        });
+      }
+
+      if (capturedLogs.length === 0) {
+        capturedLogs.push("✅ Code executed successfully (no output)");
+      }
+
+    } catch (error: any) {
+      capturedLogs.push("=== CRITICAL EXECUTION ERROR ===");
+      capturedLogs.push(`❌ JavaScript Error: ${error instanceof Error ? error.name : 'Unknown'}`);
+      capturedLogs.push(`💬 Message: ${error instanceof Error ? error.message : String(error)}`);
+      
+      console.error('Python execution error details:', {
+        error,
+        code: isEditing ? editedCode : code,
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setOutput(capturedLogs);
+      setHasRun(true);
+      setIsRunning(false);
+
+      // Auto-show preview if target has content, otherwise show console
+      if (previewRef.current && (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim())) {
+        setShowPreview(true);
+        setShowOutput(false);
+      } else {
+        setShowOutput(true);
+        setShowPreview(false);
+      }
+
+      if (capturedLogs.some(log => log.includes('❌') || log.includes('🔴'))) {
+        toast.error("Python execution failed - check output for details");
+      } else {
+        toast.success("Python code executed successfully");
+      }
+    }
+  }, [code, editedCode, isEditing, pythonManager]);
 
   const renderSlotForCodeBlock = useCallback(
     (
@@ -219,192 +656,6 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
     }
   };
 
-  const checkSecurity = useCallback(async () => {
-    setIsCheckingSecurity(true);
-    try {
-      const codeToCheck = isEditing ? editedCode : code;
-      const result = await CodeSecurityService.validateCodeSecurity(codeToCheck, 'python');
-      setSecurityResult(result);
-      
-      if (result.score > 90) {
-        toast.error(`High-risk code detected (Score: ${result.score}/100). Please review carefully before running.`);
-      } else if (result.score > 60) {
-        toast.warning(`Potentially risky code detected (Score: ${result.score}/100). Use caution when running.`);
-      } else if (result.score > 30) {
-        toast.info(`Moderate-risk code detected (Score: ${result.score}/100). Review before running.`);
-      } else {
-        toast.success(`Code security check passed (Score: ${result.score}/100).`);
-      }
-    } catch (error) {
-      console.error("Security check failed:", error);
-      toast.error("Security check failed. Please try again.");
-    } finally {
-      setIsCheckingSecurity(false);
-    }
-  }, [code, editedCode, isEditing]);
-
-  const handleRunClick = useCallback(async () => {
-    if (!runnableBlocksEnabled) {
-      toast.error("Runnable blocks are disabled in settings.");
-      return;
-    }
-
-    if (!pyodideReady) {
-      await loadPyodide();
-      return;
-    }
-
-    // If security result exists and requires multiple clicks
-    if (securityResult) {
-      const now = Date.now();
-      const timeSinceLastClick = now - lastClickTime;
-      
-      // Reset click count if more than 3 seconds have passed
-      if (timeSinceLastClick > 3000) {
-        setClickCount(0);
-      }
-      
-      setLastClickTime(now);
-      const newClickCount = clickCount + 1;
-      setClickCount(newClickCount);
-
-      // Check if we need more clicks
-      if (newClickCount < securityResult.clicksRequired) {
-        const remaining = securityResult.clicksRequired - newClickCount;
-        toast.info(`Click ${remaining} more time${remaining > 1 ? 's' : ''} to confirm execution (Risk: ${securityResult.riskLevel})`);
-        return;
-      }
-
-      // Show additional warning for high-risk code
-      if (securityResult.score > 90) {
-        if (!confirm(`This code has a very high security risk score (${securityResult.score}/100). Are you absolutely sure you want to run it?`)) {
-          setClickCount(0);
-          return;
-        }
-      }
-
-      // Reset click count and execute
-      setClickCount(0);
-    }
-
-    executeCode();
-  }, [securityResult, clickCount, lastClickTime, runnableBlocksEnabled, pyodideReady, loadPyodide]);
-
-  const executeCode = useCallback(async () => {
-    if (!window.pyodide) return;
-
-    setIsRunning(true);
-    const capturedLogs: string[] = [];
-
-    // Clear the preview target
-    if (previewRef.current) {
-      previewRef.current.innerHTML = '';
-    }
-
-    try {
-      // Setup stdout/stderr capture
-      window.pyodide.runPython(`
-import sys
-from io import StringIO
-sys.stdout = StringIO()
-sys.stderr = StringIO()
-`);
-
-      // Get enhanced context if module is provided
-      let contextObj: any = {};
-      if (module && module.getEnhancedContext) {
-        try {
-          contextObj = module.getEnhancedContext(capturedLogs, previewRef.current);
-        } catch (error) {
-          console.warn("Failed to get enhanced context:", error);
-        }
-      }
-      // Fallback context if module is not available
-      if (!contextObj.litechat) {
-        contextObj = {
-          litechat: {
-            utils: {
-              log: (level: string, ...args: any[]) => {
-                const formatted = args.map(arg => {
-                  if (typeof arg === 'object') {
-                    try {
-                      return JSON.stringify(arg, null, 2);
-                    } catch {
-                      return String(arg);
-                    }
-                  }
-                  return String(arg);
-                }).join(' ');
-                const logEntry = level === 'info' ? formatted : `${level.charAt(0).toUpperCase() + level.slice(1)}: ${formatted}`;
-                capturedLogs.push(logEntry);
-              },
-              toast: (_type: string, message: string) => {
-                toast(message);
-              }
-            }
-          },
-          target: previewRef.current
-        };
-      }
-
-      // Make enhanced LiteChat context available in Python global namespace
-      window.pyodide.globals.set("litechat", contextObj.litechat);
-      window.pyodide.globals.set("target", contextObj.target);
-
-      // Execute the Python code
-      const codeToRun = isEditing ? editedCode : code;
-      await window.pyodide.runPython(codeToRun);
-
-      // Get the captured output
-      const stdout = window.pyodide.runPython("sys.stdout.getvalue()") as string;
-      const stderr = window.pyodide.runPython("sys.stderr.getvalue()") as string;
-
-      if (stdout) {
-        stdout.split('\n').forEach((line: string) => {
-          if (line.trim()) capturedLogs.push(line);
-        });
-      }
-
-      if (stderr) {
-        stderr.split('\n').forEach((line: string) => {
-          if (line.trim()) capturedLogs.push(`Error: ${line}`);
-        });
-      }
-
-      if (capturedLogs.length === 0) {
-        capturedLogs.push("Code executed successfully (no output)");
-      }
-
-      // Reset stdout/stderr for next execution
-      window.pyodide.runPython(`
-sys.stdout = StringIO()
-sys.stderr = StringIO()
-`);
-
-    } catch (error) {
-      capturedLogs.push(`Execution Error: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setOutput(capturedLogs);
-      setHasRun(true);
-      setIsRunning(false);
-
-      // Auto-show preview if target has content, otherwise show console
-      if (previewRef.current && (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim())) {
-        setShowPreview(true);
-        setShowOutput(false);
-      } else {
-        setShowOutput(true);
-        setShowPreview(false);
-      }
-
-      if (capturedLogs.some(log => log.startsWith('Execution Error:') || log.startsWith('Error:'))) {
-        toast.error("Python execution failed - check output for details");
-      } else {
-        toast.success("Python code executed successfully");
-      }
-    }
-  }, [code, editedCode, isEditing, pyodideReady, loadPyodide, module]);
-
   const toggleConsole = () => {
     setShowOutput(true);
     setShowPreview(false);
@@ -437,7 +688,6 @@ sys.stderr = StringIO()
     toggleFold
   );
 
-  // Determine run button style based on security result
   const getRunButtonStyle = () => {
     if (!securityResult) return {};
     
@@ -450,27 +700,30 @@ sys.stderr = StringIO()
 
   const getRunButtonText = () => {
     if (isRunning) return "Running...";
-    if (isLoading) return "Loading...";
-    if (!pyodideReady) return "Load Python";
+    if (window.liteChatPython?.isLoading) return "Loading Python...";
+    if (!window.liteChatPython?.isReady) return "Load Python";
     if (securityResult && clickCount > 0 && clickCount < securityResult.clicksRequired) {
       return `Click ${securityResult.clicksRequired - clickCount} more`;
     }
     return "Run";
   };
 
-  // Check if preview has content (either DOM children or innerHTML content)
-  const hasPreviewContent = hasRun && previewRef.current && (
-    previewRef.current.children.length > 0 || 
-    previewRef.current.innerHTML.trim().length > 0
-  );
+  const hasPreviewContent = useMemo(() => {
+    return hasRun && previewRef.current && (
+      previewRef.current.children.length > 0 || 
+      previewRef.current.innerHTML.trim().length > 0
+    );
+  }, [hasRun, previewContentUpdated]);
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
           <div className="text-sm font-medium">RUNNABLE PYTHON</div>
-          {!pyodideReady && (
-            <div className="text-xs text-muted-foreground">(Pyodide)</div>
+          {window.liteChatPython?.isReady && (
+            <div className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
+              Ready ({window.liteChatPython.loadedPackages.size} packages)
+            </div>
           )}
           {securityResult && (
             <div className="flex items-center gap-1 text-xs" style={{ color: securityResult.color }}>
@@ -531,13 +784,13 @@ sys.stderr = StringIO()
           <Button
             size="sm"
             onClick={handleRunClick}
-            disabled={isRunning || isLoading || !runnableBlocksEnabled}
+            disabled={isRunning || window.liteChatPython?.isLoading || !runnableBlocksEnabled}
             className="text-xs h-7"
             style={getRunButtonStyle()}
           >
-            {isRunning || isLoading ? (
+            {isRunning || window.liteChatPython?.isLoading ? (
               <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-            ) : !pyodideReady ? (
+            ) : !window.liteChatPython?.isReady ? (
               <DownloadIcon className="h-3 w-3 mr-1" />
             ) : (
               <PlayIcon className="h-3 w-3 mr-1" />
@@ -574,19 +827,46 @@ sys.stderr = StringIO()
             PYTHON OUTPUT:
           </div>
           {output.length > 0 ? (
-            output.map((line, i) => (
-              <div 
-                key={i} 
-                className={
-                  line.startsWith('Execution Error:') ? 'text-red-400' :
-                  line.startsWith('Error:') ? 'text-red-400' :
-                  line.startsWith('Warning:') ? 'text-yellow-400' :
-                  'text-green-400'
-                }
-              >
-                {line}
-              </div>
-            ))
+            output.map((line, i) => {
+              let className = 'text-green-400';
+              let isHeader = false;
+              
+              if (line.includes('=== CRITICAL EXECUTION ERROR ===') || 
+                  line.includes('=== EXECUTION ERROR DETAILS ===') ||
+                  line.includes('=== DETAILED ERROR INFORMATION ===')) {
+                className = 'text-red-300 font-bold border-b border-red-500/30 pb-1 mb-1';
+                isHeader = true;
+              } else if (line.includes('=== PROGRAM OUTPUT ===')) {
+                className = 'text-blue-300 font-bold border-b border-blue-500/30 pb-1 mb-1';
+                isHeader = true;
+              } else if (line.includes('=== ERROR/DEBUG OUTPUT ===')) {
+                className = 'text-yellow-300 font-bold border-b border-yellow-500/30 pb-1 mb-1';
+                isHeader = true;
+              } else if (line.startsWith('🔴')) {
+                className = 'text-red-400 font-semibold';
+              } else if (line.startsWith('📍')) {
+                className = 'text-orange-400 font-semibold';
+              } else if (line.startsWith('💡')) {
+                className = 'text-cyan-400';
+              } else if (line.startsWith('❌')) {
+                className = 'text-red-400 font-medium';
+              } else if (line.startsWith('💬')) {
+                className = 'text-yellow-300 font-medium';
+              } else if (line.startsWith('⚠️')) {
+                className = 'text-yellow-400';
+              } else if (line.startsWith('✅')) {
+                className = 'text-green-300 font-medium';
+              }
+              
+              return (
+                <div 
+                  key={i} 
+                  className={`${className} ${isHeader ? 'my-2' : 'my-0.5'} leading-relaxed`}
+                >
+                  {line}
+                </div>
+              );
+            })
           ) : (
             <div className="text-muted-foreground">No output</div>
           )}
@@ -594,17 +874,19 @@ sys.stderr = StringIO()
       )}
 
       {/* ALWAYS render preview element (hidden when not shown) so ref is always available */}
-      <div ref={previewRef} className={!isFolded && showPreview ? "preview-container border border-border rounded-b-lg bg-background p-4" : "hidden"}>
+      <div ref={previewRef} className={!isFolded && showPreview ? "preview-container border border-border rounded-b-lg bg-background" : "hidden"}>
         {!isFolded && showPreview && (
           <>
-            <div className="preview-header text-muted-foreground mb-2 text-xs font-semibold">
+            <div className="preview-header text-muted-foreground px-4 pt-4 pb-2 text-xs font-semibold">
               PREVIEW:
             </div>
-            {/* The target element for DOM manipulation */}
-            <div className="preview-content min-h-[100px] border border-dashed border-muted-foreground/20 rounded p-2">
+            <div className="preview-content px-4 pb-4">
               {!hasPreviewContent && (
-                <div className="text-muted-foreground text-sm italic">
-                  No preview content. Use <code>litechat.target.appendChild(element)</code> to add DOM elements here.
+                <div className="min-h-[100px] border border-dashed border-muted-foreground/20 rounded p-4 flex items-center justify-center">
+                  <div className="text-muted-foreground text-sm italic text-center">
+                    No preview content.<br/>
+                    Use <code className="bg-muted px-1 py-0.5 rounded text-xs">plt.show()</code> or <code className="bg-muted px-1 py-0.5 rounded text-xs">litechat.target.appendChild(element)</code> to add content here.
+                  </div>
                 </div>
               )}
             </div>
