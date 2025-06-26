@@ -368,19 +368,25 @@ export const useSettingsStore = create(
       emitter.emit(settingsEvent.foldUserMessagesOnCompletionChanged, { fold });
     },
     setStreamingRenderFPS: (fps) => {
-      set({ streamingRenderFPS: fps });
-      persistSetting("streamingRenderFPS", fps);
-      emitter.emit(settingsEvent.streamingRenderFpsChanged, { fps });
+      // Clamp FPS to 3-60
+      const clamped = Math.max(3, Math.min(60, fps));
+      set({ streamingRenderFPS: clamped });
+      persistSetting("streamingRenderFPS", clamped);
+      emitter.emit(settingsEvent.streamingRenderFpsChanged, { fps: clamped });
     },
     setGitUserName: (name) => {
-      set({ gitUserName: name });
-      persistSetting("gitUserName", name);
-      emitter.emit(settingsEvent.gitUserNameChanged, { name });
+      // Trim whitespace
+      const trimmed = name ? name.trim() : name;
+      set({ gitUserName: trimmed });
+      persistSetting("gitUserName", trimmed);
+      emitter.emit(settingsEvent.gitUserNameChanged, { name: trimmed });
     },
     setGitUserEmail: (email) => {
-      set({ gitUserEmail: email });
-      persistSetting("gitUserEmail", email);
-      emitter.emit(settingsEvent.gitUserEmailChanged, { email });
+      // Trim whitespace
+      const trimmed = email ? email.trim() : email;
+      set({ gitUserEmail: trimmed });
+      persistSetting("gitUserEmail", trimmed);
+      emitter.emit(settingsEvent.gitUserEmailChanged, { email: trimmed });
     },
     setGitGlobalPat: (pat) => {
       set({ gitGlobalPat: pat });
@@ -388,9 +394,11 @@ export const useSettingsStore = create(
       emitter.emit(settingsEvent.gitGlobalPatChanged, { pat });
     },
     setToolMaxSteps: (steps) => {
-      set({ toolMaxSteps: steps });
-      persistSetting("toolMaxSteps", steps);
-      emitter.emit(settingsEvent.toolMaxStepsChanged, { steps });
+      // Clamp steps to 1-20
+      const clamped = Math.max(1, Math.min(20, steps));
+      set({ toolMaxSteps: clamped });
+      persistSetting("toolMaxSteps", clamped);
+      emitter.emit(settingsEvent.toolMaxStepsChanged, { steps: clamped });
     },
     setPrismThemeUrl: (url) => {
       set({ prismThemeUrl: url });
@@ -413,9 +421,11 @@ export const useSettingsStore = create(
       emitter.emit(settingsEvent.autoTitleModelIdChanged, { modelId });
     },
     setAutoTitlePromptMaxLength: (length) => {
-      set({ autoTitlePromptMaxLength: length });
-      persistSetting("autoTitlePromptMaxLength", length);
-      emitter.emit(settingsEvent.autoTitlePromptMaxLengthChanged, { length });
+      // Clamp to 32-4096
+      const clamped = Math.max(32, Math.min(4096, length));
+      set({ autoTitlePromptMaxLength: clamped });
+      persistSetting("autoTitlePromptMaxLength", clamped);
+      emitter.emit(settingsEvent.autoTitlePromptMaxLengthChanged, { length: clamped });
     },
     setAutoTitleIncludeFiles: (include) => {
       set({ autoTitleIncludeFiles: include });
@@ -443,9 +453,17 @@ export const useSettingsStore = create(
       emitter.emit(settingsEvent.customFontFamilyChanged, { fontFamily });
     },
     setCustomFontSize: (fontSize) => {
-      set({ customFontSize: fontSize });
-      persistSetting("customFontSize", fontSize);
-      emitter.emit(settingsEvent.customFontSizeChanged, { fontSize });
+      // Clamp font size to 10-24 if not null
+      if (typeof fontSize === "number") {
+        const clamped = Math.max(10, Math.min(24, fontSize));
+        set({ customFontSize: clamped });
+        persistSetting("customFontSize", clamped);
+        emitter.emit(settingsEvent.customFontSizeChanged, { fontSize: clamped });
+      } else {
+        set({ customFontSize: fontSize });
+        persistSetting("customFontSize", fontSize);
+        emitter.emit(settingsEvent.customFontSizeChanged, { fontSize });
+      }
     },
     setChatMaxWidth: (maxWidthClass) => {
       set({ chatMaxWidth: maxWidthClass });
