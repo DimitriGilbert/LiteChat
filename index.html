@@ -1,22 +1,77 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="icon" type="image/svg+xml" href="/icons/32.png" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>LiteChat</title>
-        
-        <!-- PWA Meta Tags -->
-        <meta name="theme-color" content="#4fd1c5" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="LiteChat" />
-        <link rel="apple-touch-icon" href="/icons/192.png" />
-        <link rel="manifest" href="/manifest.json" />
-    </head>
-    <body>
-        <div id="root"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/icons/32.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LiteChat</title>
 
-        <script type="module" src="/src/main.tsx"></script>
-    </body>
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#4fd1c5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="LiteChat" />
+    <link rel="apple-touch-icon" href="/icons/192.png" />
+    <link rel="manifest" href="/manifest.json" />
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="module">
+      // Ensure global state for QuickJS
+      if (!window.liteChatQuickJS) {
+        window.liteChatQuickJS = {
+          isLoading: false,
+          isReady: false,
+          loadPromise: undefined,
+          QuickJS: undefined,
+          context: undefined,
+        };
+      }
+      // Listen for a custom event to trigger QuickJS loading and VM creation
+      window.addEventListener("get-quickjs", (event) => {
+        if (window.liteChatQuickJS.isLoading || window.liteChatQuickJS.isReady) {
+          // Already loading or ready, fire event if ready
+          if (window.liteChatQuickJS.isReady) {
+            window.dispatchEvent(
+              new CustomEvent("quickjs-ready", {
+                detail: {
+                  QuickJS: window.liteChatQuickJS.QuickJS,
+                  vm: window.liteChatQuickJS.context,
+                },
+              })
+            );
+          }
+          return;
+        }
+        window.liteChatQuickJS.isLoading = true;
+        window.liteChatQuickJS.loadPromise = (async () => {
+          try {
+            const { getQuickJS } = await import("https://esm.sh/quickjs-emscripten@0.31.0");
+            const QuickJS = await getQuickJS();
+            const vm = QuickJS.newContext();
+            window.liteChatQuickJS.QuickJS = QuickJS;
+            window.liteChatQuickJS.context = vm;
+            window.liteChatQuickJS.isReady = true;
+            window.liteChatQuickJS.isLoading = false;
+            window.dispatchEvent(
+              new CustomEvent("quickjs-ready", {
+                detail: { QuickJS, vm },
+              })
+            );
+          } catch (error) {
+            window.liteChatQuickJS.isReady = false;
+            window.liteChatQuickJS.isLoading = false;
+            window.liteChatQuickJS.QuickJS = undefined;
+            window.liteChatQuickJS.context = undefined;
+            window.dispatchEvent(
+              new CustomEvent("quickjs-error", { detail: error })
+            );
+          }
+        })();
+      });
+    </script>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
