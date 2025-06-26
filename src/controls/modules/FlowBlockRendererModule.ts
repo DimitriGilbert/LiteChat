@@ -4,8 +4,8 @@ import type { BlockRenderer, BlockRendererContext } from "@/types/litechat/canva
 import { FlowBlockRenderer } from "@/components/LiteChat/common/FlowBlockRenderer";
 import React from "react";
 
-// Control rule prompt for Flow diagrams - extracted from system prompt for easy modification
-const FLOW_CONTROL_PROMPT = `LiteChat supports interactive workflow flow diagrams using the \`flow\` codeblock. These are particularly useful for visualizing workflows, processes, and step-by-step procedures.
+// Control rule prompt for Flow diagrams
+export const FLOW_CONTROL_PROMPT = `LiteChat supports interactive workflow flow diagrams using the \`flow\` codeblock. These are particularly useful for visualizing workflows, processes, and step-by-step procedures.
 These are very fancy and give amazing result, if you need to explain things graphically, this is your favorite block.
 
 **Functionality:**

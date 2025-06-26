@@ -16,7 +16,8 @@ export type InteractionType =
   | "system.error"
   | "workflow.run"
   | "rules.auto_selection"
-  | "code.security_check";
+  | "code.security_check"
+  | "code_block.repair_enhance";
 
 export type InteractionStatus =
   | "PENDING"

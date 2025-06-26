@@ -28,7 +28,6 @@ import { ReasoningControlModule } from "@/controls/modules/ReasoningControlModul
 import { WebSearchControlModule } from "@/controls/modules/WebSearchControlModule";
 import { RulesControlModule } from "@/controls/modules/RulesControlModule";
 import { AutoTitleControlModule } from "@/controls/modules/AutoTitleControlModule";
-import { EnhancedAutoTitleControlModule } from "@/controls/modules/EnhancedAutoTitleControlModule";
 import { UrlParameterControlModule } from "@/controls/modules/UrlParameterControlModule";
 import { ImageGenerationControlModule } from "@/controls/modules/ImageGenerationControlModule";
 import { RacePromptControlModule } from "@/controls/modules/RacePromptControlModule";
@@ -66,7 +65,7 @@ import { ZipDownloadControlModule } from "@/controls/modules/canvas/interaction/
 import { CopyCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/CopyCodeBlockControlModule";
 import { FoldCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/FoldCodeBlockControlModule";
 import { DownloadCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/DownloadCodeBlockControlModule";
-import { RepairEnhanceCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/RepairEnhanceCodeBlockControlModule";
+import { UniversalRepairEnhanceControlModule } from "@/controls/modules/canvas/codeblock/RepairEnhanceCodeBlockControlModule";
 import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCallStepControlModule";
 
 // Import block renderer modules
@@ -94,7 +93,6 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ProjectSettingsControlModule,
   GlobalModelSelectorModule,
   AutoTitleControlModule,
-  EnhancedAutoTitleControlModule,
   UsageDisplayControlModule,
   ReasoningControlModule,
   WebSearchControlModule,
@@ -141,7 +139,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   CopyCodeBlockControlModule, // For CodeBlockRenderer header
   FoldCodeBlockControlModule, // For CodeBlockRenderer header
   DownloadCodeBlockControlModule, // For CodeBlockRenderer header
-  RepairEnhanceCodeBlockControlModule, // For CodeBlockRenderer header
+  UniversalRepairEnhanceControlModule, // For ALL block types (universal repair/enhance)
   EditCodeBlockControlModule, // For CodeBlockRenderer header
   // ExampleCanvasControlModule,
   ToolCallStepControlModule,

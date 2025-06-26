@@ -5,7 +5,7 @@ import { JsRunnableBlockRenderer } from "@/components/LiteChat/common/JsRunnable
 import React from "react";
 
 // Control rule prompt for JavaScript runnable blocks  
-const JS_RUNNABLE_CONTROL_PROMPT = `# JavaScript Runnable Block Environment
+export const JS_RUNNABLE_CONTROL_PROMPT = `# JavaScript Runnable Block Environment
 
 You have access to a full JavaScript execution environment with the following context:
 
