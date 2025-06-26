@@ -4,8 +4,8 @@ import type { BlockRenderer, BlockRendererContext } from "@/types/litechat/canva
 import { MermaidBlockRenderer } from "@/components/LiteChat/common/MermaidBlockRenderer";
 import React from "react";
 
-// Control rule prompt for Mermaid diagrams - extracted from system prompt for easy modification
-const MERMAID_CONTROL_PROMPT = `Litechat support MermaidJS diagrams. only valid uncommented diagrams are supported.
+// Control rule prompt for Mermaid diagrams
+export const MERMAID_CONTROL_PROMPT = `Litechat support MermaidJS diagrams. only valid uncommented diagrams are supported.
 For example, if a user asks you a simple explanation on http request, you should use a sequence diagram like so : 
 \`\`\`mermaid
 sequenceDiagram

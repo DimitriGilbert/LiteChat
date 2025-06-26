@@ -29,13 +29,13 @@ export const WorkflowStatusDisplay: React.FC<WorkflowStatusDisplayProps> = ({ in
     let color = "text-muted-foreground";
 
     switch (status) {
-        case "RUNNING":
-        case "STREAMING":
+        case "running":
+        case "streaming":
             Icon = Loader2;
             text = `${workflowName}: Running step ${currentStep + 1} of ${totalSteps}...`;
             color = "text-blue-500";
             break;
-        case "PAUSED":
+        case "paused":
             if (pausePayload?.pauseReason === 'data-correction') {
                 Icon = UserCheck;
                 text = `${workflowName}: Paused - Awaiting data correction`;
@@ -46,17 +46,18 @@ export const WorkflowStatusDisplay: React.FC<WorkflowStatusDisplayProps> = ({ in
                 color = "text-yellow-500";
             }
             break;
-        case "COMPLETED":
+        case "completed":
             Icon = CircleCheck;
             text = `${workflowName}: Completed successfully.`;
             color = "text-green-500";
             break;
-        case "ERROR":
+        case "error":
+        case "failed":
             Icon = CircleX;
             text = `${workflowName}: Failed.`;
             color = "text-red-500";
             break;
-        case "CANCELLED":
+        case "cancelled":
             Icon = CircleX;
             text = `${workflowName}: Cancelled.`;
             color = "text-muted-foreground";
@@ -64,7 +65,7 @@ export const WorkflowStatusDisplay: React.FC<WorkflowStatusDisplayProps> = ({ in
     }
 
     const renderPauseControl = () => {
-        if (status !== 'PAUSED' || !pausePayload) return null;
+        if (status !== 'paused' || !pausePayload) return null;
 
         if (pausePayload.pauseReason === 'data-correction') {
             return <DataCorrectionControl 
@@ -84,11 +85,11 @@ export const WorkflowStatusDisplay: React.FC<WorkflowStatusDisplayProps> = ({ in
     return (
         <div className="p-4 space-y-4">
             <div className={`flex items-center gap-3 font-semibold text-lg ${color}`}>
-                <Icon className={`h-6 w-6 ${status === 'RUNNING' || status === 'STREAMING' ? 'animate-spin' : ''}`} />
+                <Icon className={`h-6 w-6 ${status === 'running' || status === 'streaming' ? 'animate-spin' : ''}`} />
                 <h2>{text}</h2>
             </div>
             {renderPauseControl()}
-            {status === 'ERROR' && activeRun?.error && (
+            {(status === 'error' || status === 'failed') && activeRun?.error && (
                 <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive text-sm">
                     <strong>Error:</strong> {activeRun.error}
                 </div>

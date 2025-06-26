@@ -29,6 +29,7 @@ import type {
 } from "@/types/litechat/control";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 import { useVfsStore } from "./vfs.store";
 import { BulkSyncService } from "@/services/bulk-sync.service";
 
@@ -518,31 +519,50 @@ export const useConversationStore = create(
     },
 
     selectItem: async (id, type) => {
-      const currentSelId = get().selectedItemId;
-      const currentSelType = get().selectedItemType;
+      const oldItemId = get().selectedItemId;
+      const oldItemType = get().selectedItemType;
 
-      if (currentSelId === id && currentSelType === type) {
+      if (oldItemId === id && oldItemType === type) {
+        console.log(
+          `[ConversationStore] Item ${id} (${type}) is already selected. Skipping.`
+        );
         return;
       }
-
+      set({ selectedItemId: id, selectedItemType: type });
       console.log(
-        `ConversationStore: Selecting item. ID: ${id}, Type: ${type}. Previous: ${currentSelId} (${currentSelType})`
+        `[ConversationStore] Selecting item. ID: ${id}, Type: ${type}. Previous: ${oldItemId} (${oldItemType})`
       );
 
-      // Update interaction store first if needed
-      const conversationIdForInteractions = type === "conversation" ? id : null;
-      if (conversationIdForInteractions) {
-        emitter.emit(interactionEvent.setCurrentConversationIdRequest, {
-          id: conversationIdForInteractions,
-        });
-        // Ensure interactions are loaded for the selected conversation
-        emitter.emit(interactionEvent.loadInteractionsRequest, {
-          conversationId: conversationIdForInteractions,
-        });
+      emitter.emit(interactionEvent.currentConversationIdChanged, {
+        conversationId: type === "conversation" ? id : null,
+      });
+      emitter.emit(uiEvent.contextChanged, {
+        selectedItemId: id,
+        selectedItemType: type,
+      });
+      
+      // Auto-select project's VFS
+      if (type === "project" && id) {
+        emitter.emit(vfsEvent.initializeVFSRequest, { vfsKey: id });
       }
 
-      // Then update local state
-      set({ selectedItemId: id, selectedItemType: type });
+      // Update interaction store first if needed
+      if (type === "conversation") {
+        emitter.emit(interactionEvent.setCurrentConversationIdRequest, {
+          id: id,
+        });
+        if (id) {
+          // Ensure interactions are loaded for the selected conversation
+          emitter.emit(interactionEvent.loadInteractionsRequest, {
+            conversationId: id,
+          });
+        }
+      }
+
+      // Auto-load project settings
+      if (type === "project") {
+        // Implementation of auto-load project settings
+      }
 
       // Finally notify about the selection change
       emitter.emit(conversationEvent.selectedItemChanged, {

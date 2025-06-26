@@ -5,7 +5,7 @@ import { PythonRunnableBlockRenderer } from "@/components/LiteChat/common/Python
 import React from "react";
 
 // Control rule prompt for Python runnable blocks
-const PYTHON_RUNNABLE_CONTROL_PROMPT = `# Python Scientific Computing Environment
+export const PYTHON_RUNNABLE_CONTROL_PROMPT = `# Python Scientific Computing Environment
 
 You have access to an enhanced Pyodide environment with numpy, pandas, matplotlib, and the full LiteChat API.
 

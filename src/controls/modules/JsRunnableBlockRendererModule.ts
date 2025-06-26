@@ -5,7 +5,7 @@ import { JsRunnableBlockRenderer } from "@/components/LiteChat/common/JsRunnable
 import React from "react";
 
 // Control rule prompt for JavaScript runnable blocks  
-const JS_RUNNABLE_CONTROL_PROMPT = `# JavaScript Runnable Block Environment
+export const JS_RUNNABLE_CONTROL_PROMPT = `# JavaScript Runnable Block Environment
 
 You have access to a full JavaScript execution environment with the following context:
 
@@ -40,7 +40,7 @@ litechat.target.replaceChildren();
 // Create and append elements
 const heading = document.createElement('h3');
 heading.textContent = 'Hello from DOM!';
-heading.style.color = 'blue';
+heading.className = 'text-blue-500';
 litechat.target.appendChild(heading);
 
 // Create interactive elements
@@ -59,7 +59,7 @@ litechat.target.replaceChildren();
 
 // Create a container
 const container = document.createElement('div');
-container.style.cssText = 'padding: 20px; background: #f0f0f0; border-radius: 8px; margin: 10px 0;';
+container.className = 'p-5 bg-gray-100 rounded-lg m-2';
 
 // Add title
 const title = document.createElement('h3');
@@ -70,17 +70,17 @@ container.appendChild(title);
 const input = document.createElement('input');
 input.type = 'text';
 input.placeholder = 'Type something...';
-input.style.cssText = 'padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;';
+input.className = 'p-2 m-2 border border-gray-300 rounded-md';
 container.appendChild(input);
 
 // Add interactive button
 const button = document.createElement('button');
 button.textContent = 'Process Input';
-button.style.cssText = 'padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;';
+button.className = 'p-2 px-4 bg-blue-500 text-white border-none rounded-md cursor-pointer';
 button.onclick = () => {
   const output = document.createElement('div');
   output.textContent = \`You typed: \${input.value}\`;
-  output.style.cssText = 'margin-top: 10px; padding: 10px; background: #e9ecef; border-radius: 4px;';
+  output.className = 'mt-2 p-2 bg-gray-200 rounded-md';
   container.appendChild(output);
 };
 container.appendChild(button);
@@ -100,7 +100,7 @@ litechat.target.replaceChildren();
 const canvas = document.createElement('canvas');
 canvas.width = 400;
 canvas.height = 300;
-canvas.style.border = '1px solid #ccc';
+canvas.className = 'border border-gray-300';
 litechat.target.appendChild(canvas);
 
 // Draw on canvas
@@ -125,24 +125,17 @@ const maxVal = Math.max(...data);
 
 // Create chart container
 const chart = document.createElement('div');
-chart.style.cssText = 'display: flex; align-items: end; gap: 5px; height: 200px; padding: 20px;';
+chart.className = 'flex items-end gap-1 h-52 p-5';
 
 data.forEach((value, index) => {
   const bar = document.createElement('div');
   const height = (value / maxVal) * 150;
-  bar.style.cssText = \`
-    width: 40px;
-    height: \${height}px;
-    background: linear-gradient(to top, #667eea, #764ba2);
-    border-radius: 4px 4px 0 0;
-    position: relative;
-    transition: all 0.3s ease;
-  \`;
+  bar.className = \`w-10 h-[\${height}px] bg-gradient-to-t from-purple-400 to-purple-600 rounded-t-md relative transition-all duration-300 ease-in-out\`;
   
   // Add value label
   const label = document.createElement('span');
   label.textContent = value;
-  label.style.cssText = 'position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: bold;';
+  label.className = 'absolute top-[-25px] left-1/2 -translate-x-1/2 text-xs font-bold';
   bar.appendChild(label);
   
   // Add hover effect
@@ -166,7 +159,7 @@ litechat.target.replaceChildren();
 
 // Create code display
 const pre = document.createElement('pre');
-pre.style.cssText = 'background: #f8f9fa; padding: 15px; border-radius: 8px; overflow: auto; font-family: monospace;';
+pre.className = 'bg-gray-50 p-3 rounded-lg overflow-auto font-mono';
 pre.textContent = content;
 litechat.target.appendChild(pre);
 
@@ -176,7 +169,7 @@ litechat.utils.log('info', 'File content displayed in DOM');
 ## IMPORTANT PRINCIPLES:
 1. **ALWAYS use \`litechat.target.appendChild()\`, \`litechat.target.replaceChildren()\`, etc.**
 2. **Create elements with \`document.createElement()\`**
-3. **Use \`element.style.cssText\` for efficient styling**
+3. **Use Tailwind utility classes via \`className\` for styling**
 4. **Add event listeners directly: \`element.onclick = () => {...}\`**
 5. **Avoid innerHTML/outerHTML - use DOM methods for performance**
 6. **Use \`litechat.target.replaceChildren()\` to clear content before adding new content**

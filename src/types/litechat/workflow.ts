@@ -1,4 +1,14 @@
-export type WorkflowStepType = "prompt" | "agent-task" | "human-in-the-loop" | "transform";
+import type { PromptVariable } from './prompt-template';
+
+export type WorkflowStepType =
+  | "trigger"
+  | "prompt"
+  | "agent-task"
+  | "transform"
+  | "tool-call"
+  | "custom-prompt"
+  | "function"
+  | "human-in-the-loop";
 
 export interface WorkflowStep {
   id: string; // nanoid
@@ -15,6 +25,19 @@ export interface WorkflowStep {
   // For 'transform' type - JSON query mappings to transform data
   transformMappings?: Record<string, string>; // Field name -> JSONPath query string
 
+  // For 'tool-call' type
+  toolName?: string; // Name of the tool to call
+  toolArgs?: Record<string, any>; // Static arguments defined in the UI
+
+  // For 'custom-prompt' type
+  promptContent?: string; // The custom prompt content
+  promptVariables?: PromptVariable[]; // Input variables this step requires
+
+  // For 'function' type
+  functionLanguage?: 'js' | 'py'; // Language of the function
+  functionCode?: string; // The function code
+  functionVariables?: PromptVariable[]; // Input variables the function expects
+
   // Defines how to map output from the *previous* step to the input variables of *this* step.
   // The keys are the variable names in this step's template (e.g., 'customer_email').
   // The values are JSONPath-like strings to extract data from the previous step's structured output (e.g., '$.user.email').
@@ -26,6 +49,11 @@ export interface WorkflowStep {
     schema: Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array'>;
     jsonSchema: object;
   };
+
+  promptTemplateId?: string | null;
+  agentId?: string | null;
+  taskId?: string | null;
+  transformDefinition?: any; //FIXME: should be WorkflowTransformDefinition but it's not defined
 }
 
 export interface WorkflowTemplate {
@@ -43,7 +71,7 @@ export interface WorkflowTemplate {
   updatedAt: string; // ISO 8601
 }
 
-export type WorkflowRunStatus = "IDLE" | "RUNNING" | "PAUSED" | "COMPLETED" | "ERROR" | "STREAMING" | "CANCELLED";
+export type WorkflowRunStatus = "idle" | "running" | "completed" | "failed" | "paused" | "streaming" | "cancelled" | "error";
 
 export interface WorkflowRun {
   runId: string; // Unique ID for this specific run
@@ -70,6 +98,9 @@ export type WorkflowErrorCode =
   | 'TRANSFORM_STEP_FAILED'
   | 'HUMAN_STEP_FAILED'
   | 'AI_STEP_FAILED'
+  | 'TOOL_NOT_FOUND'
+  | 'TOOL_NO_IMPLEMENTATION'
+  | 'TOOL_EXECUTION_FAILED'
   | 'DATA_VALIDATION_FAILED'
   | 'JSONPATH_INVALID'
   | 'OUTPUT_PARSING_FAILED'
@@ -86,6 +117,7 @@ export interface WorkflowErrorContext {
   templateId?: string;
   modelId?: string;
   query?: string;
+  toolName?: string;
   expectedFields?: string[];
   actualOutput?: any;
   [key: string]: any;
@@ -183,6 +215,12 @@ export class WorkflowError extends Error {
         return `Invalid JSONPath query: "${this.context.query}". Please check the syntax.`;
       case 'OUTPUT_PARSING_FAILED':
         return `Failed to parse AI response. The output format may be incorrect.`;
+      case 'TOOL_NOT_FOUND':
+        return `Tool "${this.context.toolName}" not found. Please check that the tool is still available.`;
+      case 'TOOL_NO_IMPLEMENTATION':
+        return `Tool "${this.context.toolName}" has no implementation. Please contact the tool provider.`;
+      case 'TOOL_EXECUTION_FAILED':
+        return `Tool "${this.context.toolName}" execution failed. Please check the tool arguments and try again.`;
       case 'CONVERSATION_NOT_FOUND':
         return `Conversation not found. Please ensure you have an active conversation.`;
       default:

@@ -5,7 +5,7 @@ import { FormedibleBlockRenderer } from "@/components/LiteChat/common/Formedible
 import React from "react";
 
 // Control rule prompt for Formedible code blocks - extracted from system prompt for easy modification
-const FORMEDIBLE_CONTROL_PROMPT = `For guided deterministic interaction with the user through a form, you can use the \`formedible\` codeblock.
+export const FORMEDIBLE_CONTROL_PROMPT = `For guided deterministic interaction with the user through a form, you can use the \`formedible\` codeblock.
 If you need to get precise information from the user you can use the \`formedible\` codeblock.
 
 **Functionality:**

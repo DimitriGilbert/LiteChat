@@ -23,7 +23,7 @@ export const WorkflowControlFooter: React.FC<WorkflowControlFooterProps> = ({ mo
     const [resumeData, setResumeData] = useState<string>('');
 
     // Only render if there's an active paused workflow
-    if (!activeRun || activeRun.status !== 'PAUSED' || !pausePayload) {
+    if (!activeRun || activeRun.status !== 'paused' || !pausePayload) {
         return null;
     }
     

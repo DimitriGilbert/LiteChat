@@ -23,6 +23,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFormedible } from '@/hooks/use-formedible';
 import { useInteractionStore } from '@/store/interaction.store';
+import { useControlRegistryStore } from '@/store/control.store';
 import { TabbedLayout } from '@/components/LiteChat/common/TabbedLayout';
 import { PersistenceService } from '@/services/persistence.service';
 import { toast } from 'sonner';
@@ -420,10 +421,11 @@ const StepsForm = React.forwardRef<
         promptTemplates: any[];
         agentTasks: any[];
         models: any[];
+        tools: Array<{ name: string; description?: string }>;
         module: any;
         currentWorkflow: WorkflowTemplate;
     }
->(({ initialSteps, promptTemplates, agentTasks, models, module, currentWorkflow }, ref) => {
+>(({ initialSteps, promptTemplates, agentTasks, models, tools, module, currentWorkflow }, ref) => {
     const [steps, setSteps] = useState<WorkflowStep[]>(initialSteps);
     const [activeStepId, setActiveStepId] = useState<string | null>(null);
 
@@ -601,6 +603,7 @@ const StepsForm = React.forwardRef<
                                 promptTemplates={promptTemplates}
                                 agentTasks={agentTasks}
                                 models={models}
+                                tools={tools}
                                 module={module}
                                 workflow={currentWorkflow}
                                 stepIndex={index}
@@ -628,6 +631,7 @@ const StepsForm = React.forwardRef<
                         promptTemplates={promptTemplates}
                         agentTasks={agentTasks}
                         models={models}
+                        tools={tools}
                         module={module}
                         workflow={currentWorkflow}
                         stepIndex={steps.findIndex(s => s.id === activeStepId)}
@@ -704,6 +708,12 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     const promptTemplates = module.getPromptTemplates();
     const agentTasks = module.getAgentTasks();
     const models = module.getModels();
+    // Get available tools from control registry
+    const controlRegistry = useControlRegistryStore();
+    const tools = Object.keys(controlRegistry.tools).map(toolName => ({
+        name: toolName,
+        description: controlRegistry.tools[toolName]?.definition?.description
+    }));
 
     // Function to gather all form data when needed
     const gatherFormData = useCallback(async (): Promise<{
@@ -1058,15 +1068,16 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                         value: 'builder',
                                         label: 'Builder',
                                         content: (
-                                            <StepsForm
-                                                ref={stepsFormRef}
-                                                initialSteps={initialSteps}
-                                                promptTemplates={promptTemplates}
-                                                agentTasks={agentTasks}
-                                                models={models}
-                                                module={module}
-                                                currentWorkflow={currentWorkflow}
-                                            />
+                                                                        <StepsForm 
+                                ref={stepsFormRef}
+                                initialSteps={initialSteps}
+                                promptTemplates={promptTemplates}
+                                agentTasks={agentTasks}
+                                models={models}
+                                tools={tools}
+                                module={module}
+                                currentWorkflow={currentWorkflow}
+                            />
                                         ),
                                     },
                                     {

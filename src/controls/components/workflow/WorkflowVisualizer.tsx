@@ -24,6 +24,8 @@ interface StepDisplayData {
   modelName?: string;
   type: string;
   status?: StepStatus;
+  toolName?: string;
+  functionLanguage?: string;
 }
 
 // Step status for workflow execution
@@ -43,105 +45,156 @@ interface WorkflowVisualizerProps {
 
 const WorkflowStepNode: React.FC<{ data: any }> = ({ data }) => {
   const getNodeColor = (type: string, status?: StepStatus) => {
-    // Status-based colors take priority (with glow)
     if (status) {
       switch (status) {
         case 'running':
-          return 'bg-blue-50 border-blue-400 text-blue-900 shadow-lg shadow-blue-200';
+          return 'bg-[var(--foreground)] border-[var(--primary)] text-[var(--background)] shadow-lg shadow-[var(--primary)/20]';
         case 'success':
-          return 'bg-green-50 border-green-400 text-green-900 shadow-lg shadow-green-200';
+          return 'bg-[var(--foreground)] border-[var(--chart-2)] text-[var(--background)] shadow-lg shadow-[var(--chart-2)/20]';
         case 'error':
-          return 'bg-red-50 border-red-400 text-red-900 shadow-lg shadow-red-200';
+          return 'bg-[var(--foreground)] border-[var(--destructive)] text-[var(--destructive)] shadow-lg shadow-[var(--destructive)/20]';
         case 'pending':
-          return 'bg-gray-50 border-gray-300 text-gray-700 shadow-lg shadow-gray-200';
+          return 'bg-[var(--foreground)] border-[var(--muted)] text-[var(--background)] shadow-lg shadow-[var(--muted)/20]';
       }
     }
-
-    // Default type-based colors (minimal shadow when no status)
+    
     switch (type) {
       case 'initial':
-        return 'bg-indigo-100 border-indigo-400 text-indigo-900 shadow-sm';
+        return 'bg-[var(--foreground)] border-[var(--primary)] text-[var(--background)] shadow-sm';
       case 'prompt':
-        return 'bg-green-100 border-green-400 text-green-900 shadow-sm';
+        return 'bg-[var(--foreground)] border-[var(--chart-1)] text-[var(--background)] shadow-sm';
       case 'agent-task':
-        return 'bg-purple-100 border-purple-400 text-purple-900 shadow-sm';
+        return 'bg-[var(--foreground)] border-[var(--chart-2)] text-[var(--background)] shadow-sm';
       case 'transform':
-        return 'bg-yellow-100 border-yellow-400 text-yellow-900 shadow-sm';
+        return 'bg-[var(--foreground)] border-[var(--chart-3)] text-[var(--background)] shadow-sm';
       case 'human-in-the-loop':
-        return 'bg-orange-100 border-orange-400 text-orange-900 shadow-sm';
+        return 'bg-[var(--foreground)] border-[var(--chart-4)] text-[var(--background)] shadow-sm';
+      case 'tool-call':
+        return 'bg-[var(--foreground)] border-[var(--chart-5)] text-[var(--background)] shadow-sm';
+      case 'custom-prompt':
+        return 'bg-[var(--foreground)] border-[var(--accent)] text-[var(--background)] shadow-sm';
+      case 'function':
+        return 'bg-[var(--foreground)] border-[var(--secondary)] text-[var(--background)] shadow-sm';
+      case 'trigger':
+        return 'bg-[var(--foreground)] border-[var(--primary)] text-[var(--background)] shadow-sm';
       default:
-        return 'bg-gray-100 border-gray-400 text-gray-900 shadow-sm';
+        return 'bg-[var(--foreground)] border-[var(--border)] text-[var(--background)] shadow-sm';
     }
   };
 
   const getTypeIcon = (type: string, status?: StepStatus) => {
-    // Status-based icons take priority
     if (status) {
       switch (status) {
-        case 'running':
-          return '⏳';
-        case 'success':
-          return '✅';
-        case 'error':
-          return '❌';
-        case 'pending':
-          return '⏸️';
+        case 'running': return '⚡';
+        case 'success': return '✅';
+        case 'error': return '❌';
+        case 'pending': return '⏸️';
       }
     }
-
-    // Default type-based icons
     switch (type) {
-      case 'initial':
-        return '🎯';
-      case 'prompt':
-        return '💬';
-      case 'agent-task':
-        return '🤖';
-      case 'transform':
-        return '🔄';
-      case 'human-in-the-loop':
-        return '👤';
-      default:
-        return '⚙️';
+      case 'initial': return '🎯';
+      case 'prompt': return '💬';
+      case 'agent-task': return '🤖';
+      case 'transform': return '🔄';
+      case 'human-in-the-loop': return '👤';
+      case 'tool-call': return '🛠️';
+      case 'custom-prompt': return '✨';
+      case 'function': return '🧩';
+      case 'trigger': return '🚀';
+      default: return '⚙️';
     }
   };
 
+  const colorClasses = getNodeColor(data.type, data.status);
+  const icon = getTypeIcon(data.type, data.status);
+
+  // Enhanced secondary info rendering
+  let secondaryInfo: React.ReactNode = null;
+  if (data.type === 'tool-call' && data.toolName) {
+    secondaryInfo = (
+      <div className="text-xs opacity-75 mb-2 px-2 py-1 bg-[var(--background)] text-[var(--foreground)] rounded-md truncate max-w-[200px]">
+        {data.toolName}
+      </div>
+    );
+  } else if (data.type === 'custom-prompt') {
+    secondaryInfo = (
+      <div className="text-xs opacity-75 mb-2 px-2 py-1 bg-[var(--background)] text-[var(--foreground)] rounded-md">
+        Custom Prompt
+      </div>
+    );
+  } else if (data.type === 'function' && data.functionLanguage) {
+    secondaryInfo = (
+      <div className="text-xs opacity-75 mb-2 px-2 py-1 bg-[var(--background)] text-[var(--foreground)] rounded-md">
+        {data.functionLanguage === 'js' ? 'JavaScript' : 'Python'}
+      </div>
+    );
+  } else if (data.type === 'transform') {
+    secondaryInfo = (
+      <div className="text-xs opacity-75 mb-2 px-2 py-1 bg-[var(--background)] text-[var(--foreground)] rounded-md">
+        Transform Data
+      </div>
+    );
+  } else if (data.type === 'human-in-the-loop') {
+    secondaryInfo = (
+      <div className="text-xs opacity-75 mb-2 px-2 py-1 bg-[var(--background)] text-[var(--foreground)] rounded-md">
+        Human Review
+      </div>
+    );
+  }
+
+  // Template/Model info (always show if available)
+  let modelInfo: React.ReactNode = null;
+  if (data.modelName && data.type !== 'transform' && data.type !== 'trigger') {
+    modelInfo = (
+      <div className="text-xs font-mono opacity-70 px-2 py-1 bg-[var(--background)] text-[var(--foreground)] rounded-md truncate max-w-[220px] border border-[var(--border)]">
+        {data.modelName}
+      </div>
+    );
+  }
+
   return (
-    <div className={cn(
-      'px-4 py-3 rounded-lg border-2 min-w-[200px] max-w-[280px]',
-      getNodeColor(data.type, data.status)
-    )}>
-      <Handle type="target" position={Position.Left} id="input" className="!bg-gray-700" />
+    <div 
+      className={cn(
+        'rounded-xl border-2 min-w-[160px] max-w-[240px] transition-all duration-200 hover:scale-105 px-4 py-3',
+        colorClasses
+      )}
+    >
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        id="input" 
+        className="w-3 h-3 !bg-[var(--muted-foreground)] border-2 border-[var(--background)]"
+      />
       
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">{getTypeIcon(data.type, data.status)}</span>
-        <span className="font-semibold text-sm">{data.stepName || data.name}</span>
-        {data.status && (
-          <span className="text-xs px-2 py-1 rounded-full bg-white/60 font-medium capitalize">
-            {data.status}
-          </span>
-        )}
+      {/* Header with icon and step name */}
+      <div className="flex items-center gap-3 mb-3">
+        <span className="text-xl flex-shrink-0">{icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm truncate">
+            {data.stepName || data.name}
+          </div>
+          {data.status && (
+            <div className="text-xs mt-1">
+              <span className="px-2 py-1 rounded-full bg-[var(--background)] text-[var(--foreground)] font-medium capitalize border border-[var(--border)]">
+                {data.status}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
       
-      {data.templateName && data.type !== 'transform' && (
-        <div className="text-sm font-medium mb-1 text-slate-700">
-          {data.templateName}
-        </div>
-      )}
+      {/* Secondary info */}
+      {secondaryInfo}
       
-      {data.type === 'transform' && (
-        <div className="text-sm font-medium mb-1 text-slate-700">
-          Data Transform
-        </div>
-      )}
+      {/* Model info */}
+      {modelInfo}
       
-      {data.modelName && data.type !== 'transform' && (
-        <div className="text-xs opacity-75 font-mono bg-white/50 px-2 py-1 rounded">
-          {data.modelName}
-        </div>
-      )}
-      
-      <Handle type="source" position={Position.Right} id="output" className="!bg-gray-700" />
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        id="output" 
+        className="w-3 h-3 !bg-[var(--muted-foreground)] border-2 border-[var(--background)]"
+      />
     </div>
   );
 };
@@ -163,7 +216,7 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
     const nodes: Node[] = [];
     const edges: Edge[] = [];
 
-    // Add initial step node with data from props
+    // Add initial step node with enhanced styling
     nodes.push({
       id: 'initial',
       type: 'workflowStep',
@@ -177,7 +230,7 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
       },
     });
 
-    // Add workflow step nodes with data from props
+    // Add workflow step nodes with enhanced styling
     if (workflow.steps && workflow.steps.length > 0) {
       workflow.steps.forEach((step: WorkflowStep, index: number) => {
         const displayData = stepDisplayData[index] || {
@@ -190,7 +243,6 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
         nodes.push({
           id: step.id,
           type: 'workflowStep',
-          // position will be set by getTreeLayout
           position: { x: 0, y: 0 },
           data: {
             stepName: displayData.stepName,
@@ -198,11 +250,32 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
             type: displayData.type,
             modelName: displayData.modelName,
             status: stepStatuses[step.id],
+            toolName: displayData.toolName,
+            functionLanguage: displayData.functionLanguage,
           },
         });
 
-        // Create edge with better contrast
+        // Create enhanced edges with better styling using CSS variables
         const sourceId = index === 0 ? 'initial' : workflow.steps[index - 1].id;
+        
+        // Get CSS variable colors based on source step type for color consistency
+        const getEdgeColor = (sourceType: string) => {
+          switch (sourceType) {
+            case 'initial': return 'var(--primary)';
+            case 'prompt': return 'var(--chart-1)';
+            case 'agent-task': return 'var(--chart-2)';
+            case 'transform': return 'var(--chart-3)';
+            case 'human-in-the-loop': return 'var(--chart-4)';
+            case 'tool-call': return 'var(--chart-5)';
+            case 'custom-prompt': return 'var(--accent)';
+            case 'function': return 'var(--secondary)';
+            default: return 'var(--muted-foreground)';
+          }
+        };
+
+        const sourceType = index === 0 ? 'initial' : workflow.steps[index - 1].type;
+        const edgeColor = getEdgeColor(sourceType);
+
         edges.push({
           id: `${sourceId}-${step.id}`,
           source: sourceId,
@@ -210,54 +283,55 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
           sourceHandle: 'output',
           targetHandle: 'input',
           type: 'smoothstep',
-          animated: true,
+          animated: stepStatuses[step.id] === 'running',
           style: { 
-            stroke: 'var(--chart-3)',
-            strokeWidth: 3,
+            stroke: edgeColor,
+            strokeWidth: stepStatuses[step.id] === 'running' ? 4 : 3,
+            strokeDasharray: stepStatuses[step.id] === 'pending' ? '8,4' : undefined,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: 'var(--chart-3)',
-            width: 18,
-            height: 18,
+            color: edgeColor,
+            width: 20,
+            height: 20,
           },
         });
       });
     }
 
-    // Use d3-hierarchy to layout nodes
-    const layoutedNodes = getTreeLayout(nodes, edges, [220, 120]);
+    // Use improved layout with better spacing
+    const layoutedNodes = getTreeLayout(nodes, edges, [260, 140]);
     return { nodes: layoutedNodes, edges };
   }, [workflow, initialStepData, stepDisplayData, stepStatuses]);
 
-  // Show empty state if no steps
+  // Show enhanced empty state if no steps
   if (!workflow.steps || workflow.steps.length === 0) {
     return (
       <div className={cn(
-        'flex items-center justify-center h-full border-2 border-dashed border-border rounded-lg',
+        'flex items-center justify-center h-full border-2 border-dashed border-[var(--border)] rounded-lg bg-[var(--background)]',
         className
       )}>
-        <div className="text-center text-muted-foreground">
-          <div className="text-4xl mb-2">📋</div>
-          <div className="text-lg font-medium">No workflow steps</div>
-          <div className="text-sm">Add steps to see the workflow visualization</div>
+        <div className="text-center text-[var(--muted-foreground)] p-8">
+          <div className="text-6xl mb-4 opacity-60">🔄</div>
+          <div className="text-xl font-semibold mb-2">No workflow steps defined</div>
+          <div className="text-sm opacity-75">Add steps in the Builder tab to see the workflow visualization</div>
         </div>
       </div>
     );
   }
 
-  // INTERACTIVE REACT FLOW WITH STATIC DATA
+  // ENHANCED REACT FLOW WITH BEAUTIFUL STYLING
   return (
-    <div className={cn('h-full w-full relative', className)}>
+    <div className={cn('h-full w-full relative bg-[var(--background)]', className)}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{
-          padding: 50,
-          maxZoom: 2.25, // 1.5 * 1.5 = 50% closer
-          minZoom: 0.15, // 0.1 * 1.5 = 50% closer
+          padding: 60,
+          maxZoom: 1.5,
+          minZoom: 0.3,
         }}
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false}
@@ -267,31 +341,57 @@ export const WorkflowVisualizer: React.FC<WorkflowVisualizerProps> = ({
         panOnScroll={false}
         zoomOnDoubleClick={true}
         panOnDrag={true}
-        className="bg-background"
+        className="bg-[var(--background)]"
       >
         <MiniMap 
           nodeColor={(node) => {
             if (node.data?.status) {
               switch (node.data.status) {
-                case 'running': return '#3b82f6';
-                case 'success': return '#10b981';
-                case 'error': return '#ef4444';
-                case 'pending': return '#6b7280';
+                case 'running': return 'var(--primary)';
+                case 'success': return 'var(--chart-2)';
+                case 'error': return 'var(--destructive)';
+                case 'pending': return 'var(--muted-foreground)';
               }
             }
             switch (node.data?.type) {
-              case 'initial': return '#6366f1';
-              case 'prompt': return '#10b981';
-              case 'agent-task': return '#8b5cf6';
-              case 'human-in-the-loop': return '#f59e0b';
-              default: return '#6b7280';
+              case 'initial': return 'var(--primary)';
+              case 'prompt': return 'var(--chart-1)';
+              case 'agent-task': return 'var(--chart-2)';
+              case 'transform': return 'var(--chart-3)';
+              case 'human-in-the-loop': return 'var(--chart-4)';
+              case 'tool-call': return 'var(--chart-5)';
+              case 'custom-prompt': return 'var(--accent)';
+              case 'function': return 'var(--secondary)';
+              default: return 'var(--muted-foreground)';
             }
           }}
           position="bottom-right"
-          style={{ width: 120, height: 80 }}
+          style={{ 
+            width: 140, 
+            height: 100,
+            borderRadius: 8,
+            border: '2px solid var(--border)',
+            backgroundColor: 'var(--card)',
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+          }}
         />
-        <Controls position="top-left" showInteractive={false} />
-        <Background variant={BackgroundVariant.Dots} gap={20} size={2} />
+        <Controls 
+          position="top-left" 
+          showInteractive={false}
+          style={{
+            borderRadius: 8,
+            border: '2px solid var(--border)',
+            backgroundColor: 'var(--card)',
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+          }}
+        />
+        <Background 
+          variant={BackgroundVariant.Dots} 
+          gap={24} 
+          size={2} 
+          color="var(--muted-foreground)"
+          style={{ opacity: 0.2 }}
+        />
       </ReactFlow>
     </div>
   );

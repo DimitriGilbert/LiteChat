@@ -65,6 +65,7 @@ import { ZipDownloadControlModule } from "@/controls/modules/canvas/interaction/
 import { CopyCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/CopyCodeBlockControlModule";
 import { FoldCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/FoldCodeBlockControlModule";
 import { DownloadCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/DownloadCodeBlockControlModule";
+import { UniversalRepairEnhanceControlModule } from "@/controls/modules/canvas/codeblock/RepairEnhanceCodeBlockControlModule";
 import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCallStepControlModule";
 
 // Import block renderer modules
@@ -138,6 +139,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   CopyCodeBlockControlModule, // For CodeBlockRenderer header
   FoldCodeBlockControlModule, // For CodeBlockRenderer header
   DownloadCodeBlockControlModule, // For CodeBlockRenderer header
+  UniversalRepairEnhanceControlModule, // For ALL block types (universal repair/enhance)
   EditCodeBlockControlModule, // For CodeBlockRenderer header
   // ExampleCanvasControlModule,
   ToolCallStepControlModule,
