@@ -274,6 +274,32 @@ _global_capture = GlobalOutputCapture()
     
     return Array.from(requiredPackages);
   }
+
+  /**
+   * Disposes the GlobalPythonManager singleton and resets all related state.
+   * Useful for cleanup, memory management, or testing.
+   */
+  static dispose(): void {
+    if (GlobalPythonManager.instance) {
+      GlobalPythonManager.instance.loadPromise = null;
+      GlobalPythonManager.instance.loadedPackages.clear();
+      GlobalPythonManager.instance = null as any;
+    }
+    if (window.liteChatPython) {
+      window.liteChatPython.isLoading = false;
+      window.liteChatPython.isReady = false;
+      if (window.liteChatPython.loadedPackages && typeof window.liteChatPython.loadedPackages.clear === 'function') {
+        window.liteChatPython.loadedPackages.clear();
+      } else {
+        window.liteChatPython.loadedPackages = new Set<string>();
+      }
+      window.liteChatPython.loadPromise = undefined;
+    }
+    // Optionally remove pyodide from window for full cleanup
+    // delete window.pyodide;
+    // delete window.loadPyodide;
+  }
+  
 }
 
 const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRendererProps> = ({

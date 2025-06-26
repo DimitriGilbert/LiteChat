@@ -57,7 +57,7 @@ export const CodeExecutionService = {
     }
 
     // No security validation needed - this is user-authored workflow code
-
+    // i just **CHOSE** to open the door !
     try {
       // Create function with context variables available
       const contextKeys = Object.keys(context);
@@ -70,7 +70,9 @@ export const CodeExecutionService = {
         })
       `;
 
-      // Evaluate the function
+      // Evaluate the function, user provided code is consider "safe", 
+      // their machine, their code, their choice, 
+      // they could do that in userscripts land, i just **CHOSE** to open the door !
       const func = eval(wrappedCode);
       
       // Execute with context

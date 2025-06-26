@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PromptTemplate } from '@/types/litechat/prompt-template';
 import type { ModelListItem } from '@/types/litechat/provider';
 import { ModelSelector } from '@/controls/components/global-model-selector/ModelSelector';
-import { ChevronDown, ChevronRight, Trash2, GripVertical, ArrowUp, ArrowDown, ChevronsUp } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, GripVertical, ArrowUp, ArrowDown, ChevronsUp, Pen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ActionTooltipButton } from '@/components/LiteChat/common/ActionTooltipButton';
 import { useSortable } from "@dnd-kit/sortable";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CodeEditor } from '@/components/LiteChat/common/CodeEditor';
+import { VariableManager } from '@/controls/components/assistant-settings/common/VariableManager';
 
 interface WorkflowStepCardProps {
     step: WorkflowStep;
@@ -54,6 +55,8 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
     isDragDisabled = false,
 }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
+    const [editingVariable, setEditingVariable] = React.useState<any>(null);
     
     // Drag and drop functionality
     const {
@@ -388,10 +391,11 @@ export const WorkflowStepCard: React.FC<WorkflowStepCardProps> = ({
                                 <div className="text-xs text-muted-foreground mb-2">
                                     Define variables that this step requires from previous steps
                                 </div>
-                                {/* Variable management UI could be added here */}
-                                <div className="text-sm text-muted-foreground p-2 bg-muted/30 rounded border">
-                                    Variables: {step.promptVariables?.map(v => v.name).join(', ') || 'None defined'}
-                                </div>
+                                <VariableManager
+                                    variables={step.promptVariables || []}
+                                    onVariablesChange={(vars) => onChange({ ...step, promptVariables: vars })}
+                                    templateId={step.id}
+                                />
                             </div>
                         </div>
                     )}

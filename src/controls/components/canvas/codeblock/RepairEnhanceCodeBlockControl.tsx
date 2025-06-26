@@ -1,5 +1,12 @@
 import React from "react";
-import { Wand2, Bug, MessagesSquare, MessageCircle, FileText, Files } from "lucide-react";
+import {
+  Wand2,
+  Bug,
+  MessagesSquare,
+  MessageCircle,
+  FileText,
+  Files,
+} from "lucide-react";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { canvasEvent } from "@/types/litechat/events/canvas.events";
 import {
@@ -22,7 +29,9 @@ export interface RepairEnhanceCodeBlockControlProps {
   disabled?: boolean;
 }
 
-export const RepairEnhanceCodeBlockControl: React.FC<RepairEnhanceCodeBlockControlProps> = ({
+export const RepairEnhanceCodeBlockControl: React.FC<
+  RepairEnhanceCodeBlockControlProps
+> = ({
   interactionId,
   codeBlockId,
   language,
@@ -78,7 +87,9 @@ export const RepairEnhanceCodeBlockControl: React.FC<RepairEnhanceCodeBlockContr
           <MessageCircle className="mr-2 h-4 w-4" />
           <span>This Message's Blocks</span>
         </DropdownMenuItem>
-         <DropdownMenuItem onClick={() => handleRequest("other-blocks-conversation")}>
+        <DropdownMenuItem
+          onClick={() => handleRequest("other-blocks-conversation")}
+        >
           <MessagesSquare className="mr-2 h-4 w-4" />
           <span>This Conversation's Blocks</span>
         </DropdownMenuItem>
@@ -88,11 +99,13 @@ export const RepairEnhanceCodeBlockControl: React.FC<RepairEnhanceCodeBlockContr
           <FileText className="mr-2 h-4 w-4" />
           <span>This Message's Blocks</span>
         </DropdownMenuItem>
-         <DropdownMenuItem onClick={() => handleRequest("complete-conversation")}>
+        <DropdownMenuItem
+          onClick={() => handleRequest("complete-conversation")}
+        >
           <Files className="mr-2 h-4 w-4" />
           <span>This Conversation's Blocks</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}; 
+};

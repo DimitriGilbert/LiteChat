@@ -1267,9 +1267,38 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
           } else {
             throw new WorkflowError(`Unsupported function language: ${step.functionLanguage}`, "STEP_CREATION_FAILED", { runId: run.runId, stepId: step.id });
           }
-          emitter.emit(workflowEvent.stepCompleted, { runId: run.runId, stepId: step.id, output: result, metadata: createWorkflowEventMetadata(run.runId, "normal", stepIndex + 40) });
+          // Update flow visualization
+          const interactionStore = useInteractionStore.getState();
+          const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+          const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+            stepId: step.id,
+            status: "success",
+          });
+          if (updatedContent !== currentContent) {
+            interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
+          }
+          emitter.emit(workflowEvent.stepCompleted, {
+            runId: run.runId,
+            stepId: step.id,
+            output: result,
+            metadata: createWorkflowEventMetadata(run.runId, "normal", stepIndex + 40)
+          });
         } catch (error) {
-          throw WorkflowError.fromError(error, "STEP_CREATION_FAILED", { runId: run.runId, stepId: step.id, error: error instanceof Error ? error.message : String(error)});
+          // Update flow visualization for error
+          const interactionStore = useInteractionStore.getState();
+          const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+          const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+            stepId: step.id,
+            status: "error",
+          });
+          if (updatedContent !== currentContent) {
+            interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
+          }
+          throw WorkflowError.fromError(error, "STEP_CREATION_FAILED", {
+            runId: run.runId,
+            stepId: step.id,
+            error: error instanceof Error ? error.message : String(error)
+          });
         }
         return;
       }
