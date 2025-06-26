@@ -57,151 +57,151 @@ interface JsRunnableBlockRendererProps {
 }
 
 // Global QuickJS environment manager
-class GlobalQuickJSManager {
-  private static instance: GlobalQuickJSManager;
-  private loadPromise: Promise<void> | null = null;
+// class GlobalQuickJSManager {
+//   private static instance: GlobalQuickJSManager;
+//   private loadPromise: Promise<void> | null = null;
 
-  static getInstance(): GlobalQuickJSManager {
-    if (!GlobalQuickJSManager.instance) {
-      GlobalQuickJSManager.instance = new GlobalQuickJSManager();
-    }
-    return GlobalQuickJSManager.instance;
-  }
+//   static getInstance(): GlobalQuickJSManager {
+//     if (!GlobalQuickJSManager.instance) {
+//       GlobalQuickJSManager.instance = new GlobalQuickJSManager();
+//     }
+//     return GlobalQuickJSManager.instance;
+//   }
 
-  async ensureQuickJSLoaded(): Promise<void> {
-    // Initialize window.liteChatQuickJS if not exists
-    if (!window.liteChatQuickJS) {
-      window.liteChatQuickJS = {
-        isLoading: false,
-        isReady: false,
-      };
-    }
+//   async ensureQuickJSLoaded(): Promise<void> {
+//     // Initialize window.liteChatQuickJS if not exists
+//     if (!window.liteChatQuickJS) {
+//       window.liteChatQuickJS = {
+//         isLoading: false,
+//         isReady: false,
+//       };
+//     }
 
-    // If already ready, return immediately
-    if (window.liteChatQuickJS.isReady && window.liteChatQuickJS.QuickJS) {
-      return;
-    }
+//     // If already ready, return immediately
+//     if (window.liteChatQuickJS.isReady && window.liteChatQuickJS.QuickJS) {
+//       return;
+//     }
 
-    // If already loading, wait for that promise
-    if (this.loadPromise) {
-      return this.loadPromise;
-    }
+//     // If already loading, wait for that promise
+//     if (this.loadPromise) {
+//       return this.loadPromise;
+//     }
 
-    // Start loading
-    window.liteChatQuickJS.isLoading = true;
-    this.loadPromise = this.loadQuickJS();
-    return this.loadPromise;
-  }
+//     // Start loading
+//     window.liteChatQuickJS.isLoading = true;
+//     this.loadPromise = this.loadQuickJS();
+//     return this.loadPromise;
+//   }
 
-  private async loadQuickJS(): Promise<void> {
-    try {
-      // Load QuickJS from CDN if not already loaded
-      if (!window.getQuickJS) {
-        await this.loadQuickJSScript();
-      }
+//   private async loadQuickJS(): Promise<void> {
+//     try {
+//       // Load QuickJS from CDN if not already loaded
+//       if (!window.getQuickJS) {
+//         await this.loadQuickJSScript();
+//       }
 
-      // Initialize QuickJS
-      const QuickJS = await window.getQuickJS!();
-      const context = QuickJS.newContext();
+//       // Initialize QuickJS
+//       const QuickJS = await window.getQuickJS!();
+//       const context = QuickJS.newContext();
 
-      // Store in global state
-      window.liteChatQuickJS!.QuickJS = QuickJS;
-      window.liteChatQuickJS!.context = context;
-      window.liteChatQuickJS!.isReady = true;
-      window.liteChatQuickJS!.isLoading = false;
+//       // Store in global state
+//       window.liteChatQuickJS!.QuickJS = QuickJS;
+//       window.liteChatQuickJS!.context = context;
+//       window.liteChatQuickJS!.isReady = true;
+//       window.liteChatQuickJS!.isLoading = false;
 
-      toast.success("QuickJS environment ready for all blocks!");
-    } catch (error) {
-      window.liteChatQuickJS!.isLoading = false;
-      window.liteChatQuickJS!.isReady = false;
-      this.loadPromise = null; // Reset load promise on failure
-      console.error("Failed to load QuickJS:", error);
-      toast.error("Failed to load QuickJS environment");
-      throw error;
-    }
-  }
+//       toast.success("QuickJS environment ready for all blocks!");
+//     } catch (error) {
+//       window.liteChatQuickJS!.isLoading = false;
+//       window.liteChatQuickJS!.isReady = false;
+//       this.loadPromise = null; // Reset load promise on failure
+//       console.error("Failed to load QuickJS:", error);
+//       toast.error("Failed to load QuickJS environment");
+//       throw error;
+//     }
+//   }
 
-  private loadQuickJSScript(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Create script element for QuickJS
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/quickjs-emscripten@0.31.0/dist/index.js";
-      script.type = "module";
+//   private loadQuickJSScript(): Promise<void> {
+//     return new Promise((resolve, reject) => {
+//       // Create script element for QuickJS
+//       const script = document.createElement("script");
+//       script.src = "https://cdn.jsdelivr.net/npm/quickjs-emscripten@0.31.0/dist/index.js";
+//       script.type = "module";
       
-      script.onload = () => {
-        console.log("[QuickJS Loader] Script loaded successfully");
+//       script.onload = () => {
+//         console.log("[QuickJS Loader] Script loaded successfully");
         
-        // The CDN version should expose getQuickJS globally
-        if (window.getQuickJS) {
-          resolve();
-        } else {
-          // Fallback: try to load as ES module
-          this.loadQuickJSESModule().then(resolve).catch(reject);
-        }
-      };
+//         // The CDN version should expose getQuickJS globally
+//         if (window.getQuickJS) {
+//           resolve();
+//         } else {
+//           // Fallback: try to load as ES module
+//           this.loadQuickJSESModule().then(resolve).catch(reject);
+//         }
+//       };
       
-      script.onerror = () => {
-        console.error("[QuickJS Loader] Failed to load script, trying ES module");
-        // Fallback to ES module approach
-        this.loadQuickJSESModule().then(resolve).catch(reject);
-      };
+//       script.onerror = () => {
+//         console.error("[QuickJS Loader] Failed to load script, trying ES module");
+//         // Fallback to ES module approach
+//         this.loadQuickJSESModule().then(resolve).catch(reject);
+//       };
       
-      document.head.appendChild(script);
-    });
-  }
+//       document.head.appendChild(script);
+//     });
+//   }
 
-  private loadQuickJSESModule(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.type = "module";
-      script.textContent = `
-        console.log('[QuickJS ESM Loader] Loading...');
-        try {
-          const { getQuickJS } = await import("https://cdn.jsdelivr.net/npm/quickjs-emscripten@0.31.0/+esm");
-          window.getQuickJS = getQuickJS;
-          window.dispatchEvent(new Event('quickjs-ready'));
-          console.log('[QuickJS ESM Loader] Successfully loaded');
-        } catch (error) {
-          console.error('[QuickJS ESM Loader] Failed:', error);
-          window.dispatchEvent(new CustomEvent('quickjs-error', { detail: error }));
-        }
-      `;
+//   private loadQuickJSESModule(): Promise<void> {
+//     return new Promise((resolve, reject) => {
+//       const script = document.createElement("script");
+//       script.type = "module";
+//       script.textContent = `
+//         console.log('[QuickJS ESM Loader] Loading...');
+//         try {
+//           const { getQuickJS } = await import("https://cdn.jsdelivr.net/npm/quickjs-emscripten@0.31.0/+esm");
+//           window.getQuickJS = getQuickJS;
+//           window.dispatchEvent(new Event('quickjs-ready'));
+//           console.log('[QuickJS ESM Loader] Successfully loaded');
+//         } catch (error) {
+//           console.error('[QuickJS ESM Loader] Failed:', error);
+//           window.dispatchEvent(new CustomEvent('quickjs-error', { detail: error }));
+//         }
+//       `;
 
-      const handleReady = () => {
-        window.removeEventListener("quickjs-ready", handleReady);
-        window.removeEventListener("quickjs-error", handleError);
-        resolve();
-      };
+//       const handleReady = () => {
+//         window.removeEventListener("quickjs-ready", handleReady);
+//         window.removeEventListener("quickjs-error", handleError);
+//         resolve();
+//       };
 
-      const handleError = (event: any) => {
-        window.removeEventListener("quickjs-ready", handleReady);
-        window.removeEventListener("quickjs-error", handleError);
-        reject(new Error("Failed to load QuickJS ESM module: " + event.detail));
-      };
+//       const handleError = (event: any) => {
+//         window.removeEventListener("quickjs-ready", handleReady);
+//         window.removeEventListener("quickjs-error", handleError);
+//         reject(new Error("Failed to load QuickJS ESM module: " + event.detail));
+//       };
 
-      window.addEventListener("quickjs-ready", handleReady);
-      window.addEventListener("quickjs-error", handleError);
+//       window.addEventListener("quickjs-ready", handleReady);
+//       window.addEventListener("quickjs-error", handleError);
 
-      document.head.appendChild(script);
-    });
-  }
+//       document.head.appendChild(script);
+//     });
+//   }
 
-  static dispose(): void {
-    if (GlobalQuickJSManager.instance) {
-      // Properly dispose of the context if it exists
-      if (window.liteChatQuickJS?.context) {
-        try {
-          window.liteChatQuickJS.context.dispose();
-        } catch (e) {
-          console.error("Error disposing QuickJS context", e);
-        }
-      }
+//   static dispose(): void {
+//     if (GlobalQuickJSManager.instance) {
+//       // Properly dispose of the context if it exists
+//       if (window.liteChatQuickJS?.context) {
+//         try {
+//           window.liteChatQuickJS.context.dispose();
+//         } catch (e) {
+//           console.error("Error disposing QuickJS context", e);
+//         }
+//       }
       
-      window.liteChatQuickJS = undefined;
-      GlobalQuickJSManager.instance.loadPromise = null;
-    }
-  }
-}
+//       window.liteChatQuickJS = undefined;
+//       GlobalQuickJSManager.instance.loadPromise = null;
+//     }
+//   }
+// }
 
 const waitForQuickJS = () => {
   if (window.liteChatQuickJS?.isReady && window.liteChatQuickJS.QuickJS && window.liteChatQuickJS.context) {
@@ -401,10 +401,11 @@ const JsRunnableBlockRendererComponent: React.FC<
 
   const executeCode = useCallback(async () => {
     let quickjsVm: any = undefined;
-    // let quickjsInstance: any = undefined;
+    let QuickJS: any = undefined;
+    
     if (useSafeMode) {
       if (window.liteChatQuickJS?.isReady && window.liteChatQuickJS.QuickJS && window.liteChatQuickJS.context) {
-        // quickjsInstance = window.liteChatQuickJS.QuickJS;
+        QuickJS = window.liteChatQuickJS.QuickJS;
         quickjsVm = window.liteChatQuickJS.context;
       } else {
         toast.error('Safe execution environment not ready. Please try running again.');
@@ -423,40 +424,370 @@ const JsRunnableBlockRendererComponent: React.FC<
       const codeToRun = isEditing ? editedCode : code;
 
       if (useSafeMode) {
-        // QUICKJS MODE
+        // QUICKJS MODE with improved DOM bridge and litechat API
         try {
-          // Create a sandbox environment with console.log capture
+          // Create litechat object with proper structure
+          const litechatObj = quickjsVm.newObject();
+
+          // Create utils object
+          const utilsObj = quickjsVm.newObject();
+
+          // Create log function for utils
+          const utilsLogFn = quickjsVm.newFunction('log', (level: any, ...args: any[]) => {
+            const jsLevel = quickjsVm.dump(level);
+            const jsArgs = args.map((arg) => quickjsVm.dump(arg));
+            capturedLogs.push(`[${jsLevel.toUpperCase()}] ${jsArgs.join(' ')}`);
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(utilsObj, 'log', utilsLogFn);
+
+          // Create direct log function (for backward compatibility)
+          const logFn = quickjsVm.newFunction('log', (...args: any[]) => {
+            const jsArgs = args.map((arg) => quickjsVm.dump(arg));
+            capturedLogs.push(jsArgs.join(' '));
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(litechatObj, 'log', logFn);
+
+          // Set utils on litechat
+          quickjsVm.setProp(litechatObj, 'utils', utilsObj);
+
+          // Create toast function
+          const toastFn = quickjsVm.newFunction('toast', (msg: any) => {
+            const message = quickjsVm.dump(msg);
+            toast(message);
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(litechatObj, 'toast', toastFn);
+
+          // DOM Bridge - Map to track DOM nodes
+          const nodeMap = new Map<string, Node>();
+          let nodeIdCounter = 1;
+
+          function genNodeId() {
+            return `qjsnode_${nodeIdCounter++}`;
+          }
+
+          // Get root element ID
+          const getRootIdFn = quickjsVm.newFunction("__getRootId", () => {
+            let id = (previewRef.current as any).__qjs_id;
+            if (!id) {
+              id = genNodeId();
+              (previewRef.current as any).__qjs_id = id;
+              nodeMap.set(id, previewRef.current!);
+            }
+            return quickjsVm.newString(id);
+          });
+          quickjsVm.setProp(quickjsVm.global, "__getRootId", getRootIdFn);
+
+          // Create element
+          const createElementFn = quickjsVm.newFunction("__createElement", (tag: any) => {
+            const tagName = quickjsVm.dump(tag);
+            const el = document.createElement(tagName);
+            const id = genNodeId();
+            (el as any).__qjs_id = id;
+            nodeMap.set(id, el);
+            return quickjsVm.newString(id);
+          });
+          quickjsVm.setProp(quickjsVm.global, "__createElement", createElementFn);
+
+          // Create text node
+          const createTextNodeFn = quickjsVm.newFunction("__createTextNode", (text: any) => {
+            const value = quickjsVm.dump(text);
+            const node = document.createTextNode(value);
+            const id = genNodeId();
+            (node as any).__qjs_id = id;
+            nodeMap.set(id, node);
+            return quickjsVm.newString(id);
+          });
+          quickjsVm.setProp(quickjsVm.global, "__createTextNode", createTextNodeFn);
+
+          // Set attribute
+          const setAttributeFn = quickjsVm.newFunction("__setAttribute", (id: any, name: any, value: any) => {
+            const el = nodeMap.get(quickjsVm.dump(id));
+            if (el && el instanceof Element) {
+              el.setAttribute(quickjsVm.dump(name), quickjsVm.dump(value));
+            }
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(quickjsVm.global, "__setAttribute", setAttributeFn);
+
+          // Remove attribute
+          const removeAttributeFn = quickjsVm.newFunction("__removeAttribute", (id: any, name: any) => {
+            const el = nodeMap.get(quickjsVm.dump(id));
+            if (el && el instanceof Element) {
+              el.removeAttribute(quickjsVm.dump(name));
+            }
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(quickjsVm.global, "__removeAttribute", removeAttributeFn);
+
+          // Append child
+          const appendChildFn = quickjsVm.newFunction("__appendChild", (parentId: any, childId: any) => {
+            const parent = nodeMap.get(quickjsVm.dump(parentId));
+            const child = nodeMap.get(quickjsVm.dump(childId));
+            if (parent && child) {
+              parent.appendChild(child);
+            }
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(quickjsVm.global, "__appendChild", appendChildFn);
+
+          // Remove child
+          const removeChildFn = quickjsVm.newFunction("__removeChild", (parentId: any, childId: any) => {
+            const parent = nodeMap.get(quickjsVm.dump(parentId));
+            const child = nodeMap.get(quickjsVm.dump(childId));
+            if (parent && child && parent.contains(child)) {
+              parent.removeChild(child);
+            }
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(quickjsVm.global, "__removeChild", removeChildFn);
+
+          // Set text content
+          const setTextContentFn = quickjsVm.newFunction("__setTextContent", (id: any, value: any) => {
+            const node = nodeMap.get(quickjsVm.dump(id));
+            if (node) {
+              (node as any).textContent = quickjsVm.dump(value);
+            }
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(quickjsVm.global, "__setTextContent", setTextContentFn);
+
+          // Set innerHTML
+          const setInnerHTMLFn = quickjsVm.newFunction("__setInnerHTML", (id: any, value: any) => {
+            const node = nodeMap.get(quickjsVm.dump(id));
+            if (node && node instanceof Element) {
+              node.innerHTML = quickjsVm.dump(value);
+            }
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(quickjsVm.global, "__setInnerHTML", setInnerHTMLFn);
+
+          // Set style property
+          const setStyleFn = quickjsVm.newFunction("__setStyle", (id: any, property: any, value: any) => {
+            const node = nodeMap.get(quickjsVm.dump(id));
+            if (node && node instanceof HTMLElement) {
+              (node.style as any)[quickjsVm.dump(property)] = quickjsVm.dump(value);
+            }
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(quickjsVm.global, "__setStyle", setStyleFn);
+
+          // Add event listener
+          const addEventListenerFn = quickjsVm.newFunction("__addEventListener", (id: any, event: any, handlerId: any) => {
+            const node = nodeMap.get(quickjsVm.dump(id));
+            const eventType = quickjsVm.dump(event);
+            const hId = quickjsVm.dump(handlerId);
+            if (node && node instanceof Element) {
+              const handler = () => {
+                try {
+                  const callbackResult = quickjsVm.evalCode(`
+                    if (typeof __eventHandlers !== 'undefined' && __eventHandlers['${hId}']) {
+                      __eventHandlers['${hId}']();
+                    }
+                  `);
+                  if (callbackResult.error) {
+                    console.error('Event handler error:', quickjsVm.dump(callbackResult.error));
+                    callbackResult.error.dispose();
+                  } else {
+                    callbackResult.value.dispose();
+                  }
+                } catch (e) {
+                  console.error('Event handler execution error:', e);
+                }
+              };
+              node.addEventListener(eventType, handler);
+              (node as any)[`__handler_${hId}`] = handler;
+            }
+            return quickjsVm.undefined;
+          });
+          quickjsVm.setProp(quickjsVm.global, "__addEventListener", addEventListenerFn);
+
+          // Set litechat as global
+          quickjsVm.setProp(quickjsVm.global, 'litechat', litechatObj);
+          quickjsVm.evalCode('globalThis.litechat = litechat;');
+
+          // Virtual DOM API injection
+          const vdomInjection = `
+            // Event handlers registry
+            var __eventHandlers = {};
+            var __eventHandlerCounter = 0;
+
+            function QNode(id) {
+              this.__id = id;
+            }
+            
+            QNode.prototype.setAttribute = function(name, value) {
+              __setAttribute(this.__id, name, value);
+              return this;
+            };
+            
+            QNode.prototype.removeAttribute = function(name) {
+              __removeAttribute(this.__id, name);
+              return this;
+            };
+            
+            QNode.prototype.appendChild = function(child) {
+              __appendChild(this.__id, child.__id);
+              return this;
+            };
+            
+            QNode.prototype.removeChild = function(child) {
+              __removeChild(this.__id, child.__id);
+              return this;
+            };
+
+            QNode.prototype.addEventListener = function(event, handler) {
+              var handlerId = '__handler_' + (++__eventHandlerCounter);
+              __eventHandlers[handlerId] = handler;
+              __addEventListener(this.__id, event, handlerId);
+              return this;
+            };
+
+            QNode.prototype.setStyle = function(property, value) {
+              __setStyle(this.__id, property, value);
+              return this;
+            };
+            
+            Object.defineProperty(QNode.prototype, 'textContent', {
+              set: function(value) { 
+                __setTextContent(this.__id, value); 
+              },
+              configurable: true
+            });
+            
+            Object.defineProperty(QNode.prototype, 'innerHTML', {
+              set: function(value) { 
+                __setInnerHTML(this.__id, value); 
+              },
+              configurable: true
+            });
+
+            // Add style property to QNode
+            Object.defineProperty(QNode.prototype, 'style', {
+              get: function() {
+                const self = this;
+                // Proxy to handle cssText and individual property sets
+                return new Proxy({}, {
+                  set(target, prop, value) {
+                    if (prop === 'cssText') {
+                      // Parse cssText string and set each property
+                      if (typeof value === 'string') {
+                        value.split(';').forEach(function(rule) {
+                          const [k, v] = rule.split(':');
+                          if (k && v) {
+                            __setStyle(self.__id, k.trim().replace(/-([a-z])/g, (g) => g[1].toUpperCase()), v.trim());
+                          }
+                        });
+                      }
+                      return true;
+                    } else {
+                      // Set individual property
+                      __setStyle(self.__id, prop, value);
+                      return true;
+                    }
+                  },
+                  get(target, prop) {
+                    if (prop === 'cssText') {
+                      // Not tracked, just return empty string
+                      return '';
+                    }
+                    // Not tracked, always undefined
+                    return undefined;
+                  }
+                });
+              },
+              configurable: true
+            });
+
+            // Document API with proper createElement
+            var document = {
+              createElement: function(tag) {
+                return new QNode(__createElement(tag));
+              },
+              createTextNode: function(text) {
+                return new QNode(__createTextNode(text));
+              },
+              getRoot: function() {
+                return new QNode(__getRootId());
+              }
+            };
+
+            // Global document
+            globalThis.document = document;
+            
+            // Enhanced litechat.target
+            litechat.target = document.getRoot();
+            
+            // Add replaceChildren method to QNode
+            QNode.prototype.replaceChildren = function() {
+              __setInnerHTML(this.__id, '');
+              return this;
+            };
+            
+            // Helper functions
+            litechat.createElement = function(tag) {
+              return document.createElement(tag);
+            };
+            
+            litechat.createTextNode = function(text) {
+              return document.createTextNode(text);
+            };
+          `;
+
+          // Execute the code with DOM bridge
           const sandboxCode = `
             (function() {
-              const logs = [];
-              const console = {
-                log: (...args) => {
-                  logs.push(args.map(arg => 
-                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                  ).join(' '));
+              ${vdomInjection}
+              
+              var logs = [];
+              var console = {
+                log: function() {
+                  var args = Array.prototype.slice.call(arguments);
+                  var message = args.map(function(arg) {
+                    return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+                  }).join(' ');
+                  logs.push(message);
+                  if (typeof litechat !== 'undefined' && typeof litechat.log === 'function') {
+                    litechat.log.apply(litechat, args);
+                  }
                 },
-                error: (...args) => {
-                  logs.push('Error: ' + args.map(arg => 
-                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                  ).join(' '));
+                error: function() {
+                  var args = Array.prototype.slice.call(arguments);
+                  var message = 'Error: ' + args.map(function(arg) {
+                    return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+                  }).join(' ');
+                  logs.push(message);
+                  if (typeof litechat !== 'undefined' && typeof litechat.log === 'function') {
+                    litechat.log('Error:', args.join(' '));
+                  }
                 },
-                warn: (...args) => {
-                  logs.push('Warning: ' + args.map(arg => 
-                    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                  ).join(' '));
+                warn: function() {
+                  var args = Array.prototype.slice.call(arguments);
+                  var message = 'Warning: ' + args.map(function(arg) {
+                    return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+                  }).join(' ');
+                  logs.push(message);
+                  if (typeof litechat !== 'undefined' && typeof litechat.log === 'function') {
+                    litechat.log('Warning:', args.join(' '));
+                  }
                 }
               };
               
-              let result;
+              var result;
               try {
                 result = (function() {
                   ${codeToRun}
                 })();
               } catch (error) {
                 logs.push('Execution Error: ' + error.message);
+                if (typeof litechat !== 'undefined' && typeof litechat.log === 'function') {
+                  litechat.log('Execution Error:', error.message);
+                }
               }
               
-              return { result, logs };
+              return { result: result, logs: logs };
             })()
           `;
 
@@ -469,11 +800,11 @@ const JsRunnableBlockRendererComponent: React.FC<
           } else {
             const result = quickjsVm.dump(resultHandle.value);
             
-            if (result && result.logs) {
+            if (result && result.logs && Array.isArray(result.logs)) {
               capturedLogs.push(...result.logs);
             }
             
-            if (result && result.result !== undefined) {
+            if (result && result.result !== undefined && result.result !== null) {
               capturedLogs.push(`Result: ${result.result}`);
             }
             
@@ -481,10 +812,26 @@ const JsRunnableBlockRendererComponent: React.FC<
           }
 
           if (capturedLogs.length === 0) {
-            capturedLogs.push(
-              "Code executed successfully in QuickJS sandbox (no output)"
-            );
+            capturedLogs.push("Code executed successfully in QuickJS sandbox (no output)");
           }
+
+          // Clean up function handles
+          logFn.dispose();
+          utilsLogFn.dispose();
+          toastFn.dispose();
+          utilsObj.dispose();
+          litechatObj.dispose();
+          getRootIdFn.dispose();
+          createElementFn.dispose();
+          createTextNodeFn.dispose();
+          setAttributeFn.dispose();
+          removeAttributeFn.dispose();
+          appendChildFn.dispose();
+          removeChildFn.dispose();
+          setTextContentFn.dispose();
+          setInnerHTMLFn.dispose();
+          setStyleFn.dispose();
+          addEventListenerFn.dispose();
         } catch (error) {
           console.error("QuickJS execution error:", error);
           capturedLogs.push(
