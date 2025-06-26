@@ -208,16 +208,31 @@ const waitForQuickJS = () => {
     return Promise.resolve({ QuickJS: window.liteChatQuickJS.QuickJS, vm: window.liteChatQuickJS.context });
   }
   return new Promise<{ QuickJS: any; vm: any }>((resolve, reject) => {
-    function onReady(e: any) {
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    function cleanup() {
       window.removeEventListener('quickjs-ready', onReady);
       window.removeEventListener('quickjs-error', onError);
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+    function onReady(e: any) {
+      if (settled) return;
+      settled = true;
+      cleanup();
       resolve(e.detail);
     }
     function onError(e: any) {
-      window.removeEventListener('quickjs-ready', onReady);
-      window.removeEventListener('quickjs-error', onError);
+      if (settled) return;
+      settled = true;
+      cleanup();
       reject(e.detail);
     }
+    timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Timed out waiting for QuickJS to load. This may be due to network issues, CSP restrictions, or a script error.'));
+    }, 10000); // 10 seconds
     window.addEventListener('quickjs-ready', onReady);
     window.addEventListener('quickjs-error', onError);
     window.dispatchEvent(new Event('get-quickjs'));
@@ -256,11 +271,37 @@ const JsRunnableBlockRendererComponent: React.FC<
   const [useSafeMode, setUseSafeMode] = useState(true);
 
   // LOCAL STATE: Track QuickJS loading state for UI updates
-  const [quickjsLoading, /*setQuickjsLoading*/] = useState(false);
-  const [quickjsReady, /*setQuickjsReady*/] = useState(false);
+  const [quickjsStatus, setQuickjsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(() => {
+    if (typeof window !== 'undefined' && window.liteChatQuickJS) {
+      if (window.liteChatQuickJS.isReady) return 'ready';
+      if (window.liteChatQuickJS.isLoading) return 'loading';
+      return 'idle';
+    }
+    return 'idle';
+  });
 
-  // Get global QuickJS manager
-  // const quickjsManager = useMemo(() => GlobalQuickJSManager.getInstance(), []);
+  // Keep quickjsStatus in sync with global state and events
+  useEffect(() => {
+    function updateStatusFromGlobal() {
+      if (window.liteChatQuickJS?.isReady) setQuickjsStatus('ready');
+      else if (window.liteChatQuickJS?.isLoading) setQuickjsStatus('loading');
+      else setQuickjsStatus('idle');
+    }
+    function onReady() {
+      setQuickjsStatus('ready');
+    }
+    function onError() {
+      setQuickjsStatus('error');
+    }
+    window.addEventListener('quickjs-ready', onReady);
+    window.addEventListener('quickjs-error', onError);
+    // Also update on mount
+    updateStatusFromGlobal();
+    return () => {
+      window.removeEventListener('quickjs-ready', onReady);
+      window.removeEventListener('quickjs-error', onError);
+    };
+  }, []);
 
   // Update edited code when original code changes
   useEffect(() => {
@@ -1017,8 +1058,8 @@ const JsRunnableBlockRendererComponent: React.FC<
 
   const getRunButtonText = () => {
     if (isRunning) return "Running...";
-    if (quickjsLoading) return "Loading...";
-    if (useSafeMode && !quickjsReady) return "Run";
+    if (quickjsStatus === 'loading') return "Loading...";
+    if (useSafeMode && quickjsStatus !== 'ready') return "Run";
     if (
       securityResult &&
       clickCount > 0 &&
@@ -1041,9 +1082,19 @@ const JsRunnableBlockRendererComponent: React.FC<
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
           <div className="text-sm font-medium">RUNNABLE JS</div>
-          {quickjsReady && (
+          {quickjsStatus === 'ready' && (
             <div className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
               QuickJS Ready
+            </div>
+          )}
+          {quickjsStatus === 'loading' && (
+            <div className="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
+              QuickJS Loading
+            </div>
+          )}
+          {quickjsStatus === 'error' && (
+            <div className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded">
+              QuickJS Error
             </div>
           )}
           <span
@@ -1130,13 +1181,13 @@ const JsRunnableBlockRendererComponent: React.FC<
           <Button
             size="sm"
             onClick={handleRunClick}
-            disabled={isRunning || quickjsLoading || !runnableBlocksEnabled}
+            disabled={isRunning || quickjsStatus === 'loading' || !runnableBlocksEnabled}
             className="text-xs h-7"
             style={getRunButtonStyle()}
           >
-            {isRunning || quickjsLoading ? (
+            {isRunning || quickjsStatus === 'loading' ? (
               <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-            ) : !quickjsReady && useSafeMode ? (
+            ) : quickjsStatus !== 'ready' && useSafeMode ? (
               <DownloadIcon className="h-3 w-3 mr-1" />
             ) : (
               <PlayIcon className="h-3 w-3 mr-1" />
