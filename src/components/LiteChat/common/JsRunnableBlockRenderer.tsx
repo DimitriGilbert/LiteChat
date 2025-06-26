@@ -266,6 +266,7 @@ const JsRunnableBlockRendererComponent: React.FC<
     useState<CodeSecurityResult | null>(null);
   const [isCheckingSecurity, setIsCheckingSecurity] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+  const [lastClickTime, setLastClickTime] = useState(0);
 
   // LOCAL STATE: Safety mode toggle (per block) - Safe by default
   const [useSafeMode, setUseSafeMode] = useState(true);
@@ -314,6 +315,7 @@ const JsRunnableBlockRendererComponent: React.FC<
   useEffect(() => {
     setSecurityResult(null);
     setClickCount(0);
+    setLastClickTime(0);
   }, [editedCode]);
 
   const codeRef = useRef<HTMLElement>(null);
@@ -442,11 +444,11 @@ const JsRunnableBlockRendererComponent: React.FC<
 
   const executeCode = useCallback(async () => {
     let quickjsVm: any = undefined;
-    let QuickJS: any = undefined;
+    // let QuickJS: any = undefined;
     
     if (useSafeMode) {
       if (window.liteChatQuickJS?.isReady && window.liteChatQuickJS.QuickJS && window.liteChatQuickJS.context) {
-        QuickJS = window.liteChatQuickJS.QuickJS;
+        // QuickJS = window.liteChatQuickJS.QuickJS;
         quickjsVm = window.liteChatQuickJS.context;
       } else {
         toast.error('Safe execution environment not ready. Please try running again.');
@@ -1002,6 +1004,33 @@ const JsRunnableBlockRendererComponent: React.FC<
       toast.error('Runnable blocks are disabled in settings.');
       return;
     }
+    // Multi-click security confirmation logic
+    if (securityResult) {
+      const now = Date.now();
+      const timeSinceLastClick = now - lastClickTime;
+      // Reset click count if more than 3 seconds have passed
+      if (timeSinceLastClick > 3000) {
+        setClickCount(0);
+      }
+      setLastClickTime(now);
+      const newClickCount = clickCount + 1;
+      setClickCount(newClickCount);
+      // Check if we need more clicks
+      if (newClickCount < securityResult.clicksRequired) {
+        const remaining = securityResult.clicksRequired - newClickCount;
+        toast.info(`Click ${remaining} more time${remaining > 1 ? 's' : ''} to confirm execution (Risk: ${securityResult.riskLevel})`);
+        return;
+      }
+      // Show additional warning for high-risk code
+      if (securityResult.score > 90) {
+        if (!window.confirm(`This code has a very high security risk score (${securityResult.score}/100). Are you absolutely sure you want to run it?`)) {
+          setClickCount(0);
+          return;
+        }
+      }
+      // Reset click count and execute
+      setClickCount(0);
+    }
     setIsRunning(true);
     if (useSafeMode) {
       if (!window.liteChatQuickJS?.isReady || !window.liteChatQuickJS.QuickJS || !window.liteChatQuickJS.context) {
@@ -1014,7 +1043,7 @@ const JsRunnableBlockRendererComponent: React.FC<
       }
     }
     executeCode();
-  }, [runnableBlocksEnabled, useSafeMode, executeCode]);
+  }, [runnableBlocksEnabled, useSafeMode, executeCode, securityResult, clickCount, lastClickTime]);
 
   const toggleConsole = () => {
     setShowOutput(true);

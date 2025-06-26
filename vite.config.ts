@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
 import { readFileSync, existsSync } from "fs";
+import { analyzer } from 'vite-bundle-analyzer';
 
 // Custom plugin to read system prompt and user configuration files at build time
 function buildTimeConfigPlugin() {
@@ -132,6 +133,7 @@ export default defineConfig({
         ]
       }
     }),
+    analyzer(),
   ],
   resolve: {
     alias: {
