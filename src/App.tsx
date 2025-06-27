@@ -76,6 +76,7 @@ import { FormedibleBlockRendererModule } from "@/controls/modules/FormedibleBloc
 import { ChartBlockRendererModule } from "@/controls/modules/ChartBlockRendererModule";
 import { JsRunnableBlockRendererModule } from "@/controls/modules/JsRunnableBlockRendererModule";
 import { PythonRunnableBlockRendererModule } from "@/controls/modules/PythonRunnableBlockRendererModule";
+import { BeatBlockRendererModule } from "@/controls/modules/BeatBlockRendererModule";
 
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
@@ -123,6 +124,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ChartBlockRendererModule,
   JsRunnableBlockRendererModule,
   PythonRunnableBlockRendererModule,
+  BeatBlockRendererModule,
   // Canvas Action Controls
   CopyActionControlModule, // For InteractionCard header
   FoldInteractionControlModule, // For InteractionCard header
