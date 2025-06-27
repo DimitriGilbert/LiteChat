@@ -300,9 +300,10 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
     const handleScroll = () => {
       if (!viewportRef.current) return;
       
-      // Track user scrolling (not auto-scroll and not ToC scroll)
+      // Track user scrolling (not auto-scroll, not ToC scroll, and not codeblock button interactions)
       const isToCScrolling = (viewportRef.current as any)._isToCScrolling;
-      if (!isAutoScrollingRef.current && !isToCScrolling) {
+      const isCodeblockButtonInteraction = (viewportRef.current as any)._isCodeblockButtonInteraction;
+      if (!isAutoScrollingRef.current && !isToCScrolling && !isCodeblockButtonInteraction) {
         lastUserScrollTimeRef.current = Date.now();
       } 
       

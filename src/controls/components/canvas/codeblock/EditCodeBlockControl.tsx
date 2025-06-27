@@ -34,6 +34,17 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
 
   const handleStartEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
+    
+    // Mark as codeblock button interaction to prevent scroll interference
+    const viewport = document.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+    if (viewport) {
+      (viewport as any)._isCodeblockButtonInteraction = true;
+      setTimeout(() => {
+        (viewport as any)._isCodeblockButtonInteraction = false;
+      }, 100);
+    }
+    
     if (disabled || !originalContent || !interactionId || !codeBlockId) {
       toast.info("Code editing is currently disabled.");
       return;
@@ -118,6 +129,7 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
       icon={<NotebookPenIcon />}
       iconClassName="h-3.5 w-3.5"
       className="h-6 w-6 text-muted-foreground hover:text-foreground"
+      tabIndex={-1}
     />
   );
 };

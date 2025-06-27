@@ -68,6 +68,18 @@ export const RepairEnhanceCodeBlockControl: React.FC<
           tooltipText="AI Actions"
           icon={<Wand2 className="h-4 w-4" />}
           disabled={disabled}
+          tabIndex={-1}
+          onClick={(e) => {
+            e.preventDefault();
+            // Mark as codeblock button interaction to prevent scroll interference
+            const viewport = document.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+            if (viewport) {
+              (viewport as any)._isCodeblockButtonInteraction = true;
+              setTimeout(() => {
+                (viewport as any)._isCodeblockButtonInteraction = false;
+              }, 100);
+            }
+          }}
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

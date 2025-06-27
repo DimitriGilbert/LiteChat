@@ -16,7 +16,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { InlineCodeEditor } from "@/controls/components/canvas/codeblock/EditCodeBlockControl";
 import { Button } from "@/components/ui/button";
-import { Loader2Icon, CodeIcon, MusicIcon, DownloadIcon, PlayIcon } from "lucide-react";
+import { Loader2Icon, CodeIcon, DownloadIcon, PlayIcon } from "lucide-react";
 import { toast } from "sonner";
 
 // Strudel embed types declaration
@@ -270,13 +270,7 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
     }
   };
 
-  const foldedPreviewText = useMemo(() => {
-    if (!code) return "";
-    return code
-      .split('\n')
-      .slice(0, 3)
-      .join('\n');
-  }, [code]);
+
 
   const codeBlockHeaderActions = renderSlotForCodeBlock(
     "codeblock-header-actions",
@@ -400,33 +394,6 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
         <div className="border border-border rounded-b-lg bg-muted/20 p-8 text-center">
           <Loader2Icon className="h-8 w-8 animate-spin mx-auto mb-4" />
           <div className="text-sm text-muted-foreground">Loading Strudel environment...</div>
-        </div>
-      )}
-
-      {/* Error state */}
-      {!isFolded && !strudelLoaded && !window.strudelLoading && !showRepl && (
-        <div className="border border-border rounded-b-lg bg-muted/20 p-8 text-center">
-          <MusicIcon className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-          <div className="text-sm text-muted-foreground mb-4">Strudel not loaded</div>
-          <Button
-            size="sm"
-            onClick={handleRunClick}
-          >
-            <DownloadIcon className="h-3 w-3 mr-1" />
-            Load Strudel
-          </Button>
-        </div>
-      )}
-
-      {/* Folded state */}
-      {isFolded && (
-        <div
-          className="folded-content-preview p-4 cursor-pointer w-full box-border border border-t-0 border-border rounded-b-lg bg-muted/10 hover:bg-muted/20 transition-colors"
-          onClick={toggleFold}
-        >
-          <pre className="whitespace-pre-wrap break-words text-muted-foreground font-mono text-sm">
-            {foldedPreviewText}
-          </pre>
         </div>
       )}
     </div>

@@ -23,6 +23,17 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
   const handleDownload = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      e.preventDefault();
+      
+      // Mark as codeblock button interaction to prevent scroll interference
+      const viewport = document.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+      if (viewport) {
+        (viewport as any)._isCodeblockButtonInteraction = true;
+        setTimeout(() => {
+          (viewport as any)._isCodeblockButtonInteraction = false;
+        }, 100);
+      }
+      
       if (disabled || !codeToDownload) return;
 
       try {
@@ -77,6 +88,7 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
       icon={<DownloadIcon />}
       iconClassName="h-3.5 w-3.5"
       className="h-6 w-6 text-muted-foreground hover:text-foreground"
+      tabIndex={-1}
     />
   );
 };
