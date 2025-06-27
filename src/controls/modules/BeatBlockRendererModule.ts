@@ -234,7 +234,7 @@ stack(
 ## ❌ Do not use sample without loading and do not assume that a sample exists. only load existing samples !
 this is a barebones strudle editor without any samples loaded by default.
 
-available in dirt-sample : 
+available in dirt-samples : 
 \`\`\`
 808/{CB,CH,CL,CP,MA,RS}
 808bd/{BD0000,BD0010,BD0025,BD0050,BD0075,BD1000,BD1010,BD1025,BD1050,BD1075,BD2500,BD2510,BD2525,BD2550,BD2575,BD5000,BD5010,BD5025,BD5050,BD5075,BD7500,BD7510,BD7525,BD7550,BD7575}
@@ -520,13 +520,17 @@ export class BeatBlockRendererModule implements ControlModule {
   }
 
   destroy(): void {
-    if (this.unregisterCallback) {
-      this.unregisterCallback();
-      this.unregisterCallback = undefined;
-    }
-    if (this.unregisterRuleCallback) {
-      this.unregisterRuleCallback();
-      this.unregisterRuleCallback = undefined;
+    try {
+      if (this.unregisterCallback) {
+        this.unregisterCallback();
+        this.unregisterCallback = undefined;
+      }
+      if (this.unregisterRuleCallback) {
+        this.unregisterRuleCallback();
+        this.unregisterRuleCallback = undefined;
+      }
+    } catch (error) {
+      console.error(`[${this.id}] Error during cleanup:`, error);
     }
   }
 } 

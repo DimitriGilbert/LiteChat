@@ -16,7 +16,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { InlineCodeEditor } from "@/controls/components/canvas/codeblock/EditCodeBlockControl";
 import { Button } from "@/components/ui/button";
-import { Loader2Icon, CodeIcon, MusicIcon, DownloadIcon } from "lucide-react";
+import { Loader2Icon, CodeIcon, MusicIcon, DownloadIcon, PlayIcon } from "lucide-react";
 import { toast } from "sonner";
 
 // Strudel embed types declaration
@@ -89,7 +89,8 @@ class GlobalStrudelManager {
         });
 
         // Wait a bit for the custom element to be defined
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait for the custom element to be defined
+        await customElements.whenDefined('strudel-repl');
       }
 
       window.strudelLoaded = true;
@@ -137,7 +138,8 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
   );
   const [isEditing, setIsEditing] = useState(false);
   const [editedCode, setEditedCode] = useState(code);
-  const [showCode, setShowCode] = useState(false);
+  const [showCode, setShowCode] = useState(true);
+  const [showRepl, setShowRepl] = useState(false);
   const [strudelLoaded, setStrudelLoaded] = useState(false);
 
   // Get global Strudel manager
@@ -153,23 +155,22 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
   const codeRef = useRef<HTMLElement>(null);
   const strudelRef = useRef<HTMLElement>(null);
 
-  // Load Strudel automatically when component mounts
-  useEffect(() => {
-    const loadStrudel = async () => {
-      try {
-        await strudelManager.ensureStrudelLoaded();
-        setStrudelLoaded(true);
-      } catch (error) {
-        console.error("Failed to load Strudel:", error);
-      }
-    };
-    
-    if (!window.strudelLoaded && !window.strudelLoading) {
-      loadStrudel();
-    } else if (window.strudelLoaded) {
+  // Load Strudel only when Run is clicked
+  const handleRunClick = async () => {
+    try {
+      await strudelManager.ensureStrudelLoaded();
       setStrudelLoaded(true);
+      setShowRepl(true);
+      setShowCode(false);
+    } catch (error) {
+      console.error("Failed to load Strudel:", error);
     }
-  }, [strudelManager]);
+  };
+
+  const handleShowCode = () => {
+    setShowCode(true);
+    setShowRepl(false);
+  };
 
   // Update Strudel REPL content when code changes
   useEffect(() => {
@@ -269,10 +270,6 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
     }
   };
 
-  const toggleCode = () => {
-    setShowCode(!showCode);
-  };
-
   const foldedPreviewText = useMemo(() => {
     if (!code) return "";
     return code
@@ -310,71 +307,82 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant={showCode ? "default" : "outline"}
-            onClick={toggleCode}
-            className="text-xs h-7"
-          >
-            <CodeIcon className="h-3 w-3 mr-1" />
-            {showCode ? 'Hide' : 'Show'} Code
-          </Button>
-          {!strudelLoaded && !window.strudelLoading && (
+          {showRepl ? (
             <Button
               size="sm"
-              onClick={async () => {
-                try {
-                  await strudelManager.ensureStrudelLoaded();
-                  setStrudelLoaded(true);
-                } catch (error) {
-                  console.error("Failed to load Strudel:", error);
-                }
-              }}
-              disabled={!runnableBlocksEnabled}
+              variant={showCode ? "outline" : "default"}
+              onClick={handleShowCode}
               className="text-xs h-7"
             >
-              <DownloadIcon className="h-3 w-3 mr-1" />
-              Load Strudel
+              <CodeIcon className="h-3 w-3 mr-1" />
+              Code
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant={showCode ? "default" : "outline"}
+              onClick={() => setShowCode(!showCode)}
+              className="text-xs h-7"
+            >
+              <CodeIcon className="h-3 w-3 mr-1" />
+              {showCode ? 'Hide' : 'Show'} Code
+            </Button>
+          )}
+          {!showRepl && (
+            <Button
+              size="sm"
+              onClick={handleRunClick}
+              disabled={!runnableBlocksEnabled || window.strudelLoading}
+              className="text-xs h-7"
+            >
+              {window.strudelLoading ? (
+                <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+              ) : !strudelLoaded ? (
+                <DownloadIcon className="h-3 w-3 mr-1" />
+              ) : (
+                <PlayIcon className="h-3 w-3 mr-1" />
+              )}
+              Run
             </Button>
           )}
         </div>
       </div>
 
-             {/* Strudel REPL - Always visible when not folded and not editing */}
-       {!isFolded && !isEditing && strudelLoaded && !showCode && (
-         <div className="strudel-container border border-border rounded-b-lg bg-background overflow-hidden" style={{ height: '500px' }}>
-           <style>
-             {`
-               .strudel-container iframe {
-                 width: 100% !important;
-                 height: 100% !important;
-                 border: none !important;
-               }
-             `}
-           </style>
-           {React.createElement('strudel-repl', {
-             ref: strudelRef,
-             code: code,
-             style: {
-               width: '100%',
-               height: '100%',
-               display: 'block'
-             }
-           })}
-         </div>
-       )}
+      {/* Strudel REPL - Only visible when showRepl is true and not folded or editing */}
+      {!isFolded && !isEditing && strudelLoaded && showRepl && (
+        <div className="strudel-container border border-border rounded-b-lg bg-background overflow-hidden" style={{ height: '500px' }}>
+          <style>
+            {`
+              .strudel-container iframe {
+                width: 100% !important;
+                height: 100% !important;
+                border: none !important;
+              }
+            `}
+          </style>
+          {React.createElement('strudel-repl', {
+            ref: strudelRef,
+            code: code,
+            style: {
+              width: '100%',
+              height: '100%',
+              display: 'block'
+            }
+          })}
+        </div>
+      )}
 
-             {/* Code view - shown when showCode is true */}
-       {!isFolded && showCode && (
-         <div className="overflow-hidden w-full">
-           <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere border border-border rounded-b-lg bg-muted/20">
-             <code 
-               ref={codeRef} 
-               className="language-javascript block p-4 font-mono text-sm leading-relaxed"
-             />
-           </pre>
-         </div>
-       )}
+      {/* Code view - shown when showCode is true */}
+      {!isFolded && showCode && (
+        <div className="overflow-hidden w-full">
+          <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere border border-border rounded-b-lg bg-muted/20">
+            <code 
+              ref={codeRef} 
+              className="language-javascript block p-4 font-mono text-sm leading-relaxed"
+            />
+          </pre>
+        </div>
+      )}
       
       {/* Inline editor */}
       {!isFolded && isEditing && (
@@ -388,7 +396,7 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
       )}
 
       {/* Loading state */}
-      {!isFolded && !strudelLoaded && window.strudelLoading && (
+      {!isFolded && !strudelLoaded && window.strudelLoading && !showRepl && (
         <div className="border border-border rounded-b-lg bg-muted/20 p-8 text-center">
           <Loader2Icon className="h-8 w-8 animate-spin mx-auto mb-4" />
           <div className="text-sm text-muted-foreground">Loading Strudel environment...</div>
@@ -396,20 +404,13 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
       )}
 
       {/* Error state */}
-      {!isFolded && !strudelLoaded && !window.strudelLoading && (
+      {!isFolded && !strudelLoaded && !window.strudelLoading && !showRepl && (
         <div className="border border-border rounded-b-lg bg-muted/20 p-8 text-center">
           <MusicIcon className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
           <div className="text-sm text-muted-foreground mb-4">Strudel not loaded</div>
           <Button
             size="sm"
-            onClick={async () => {
-              try {
-                await strudelManager.ensureStrudelLoaded();
-                setStrudelLoaded(true);
-              } catch (error) {
-                console.error("Failed to load Strudel:", error);
-              }
-            }}
+            onClick={handleRunClick}
           >
             <DownloadIcon className="h-3 w-3 mr-1" />
             Load Strudel
