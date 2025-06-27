@@ -229,11 +229,148 @@ stack(
   .room(1)
 \`\`\`
 
+\`\`\`beat
+// "Jux und tollerei"
+// @license CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/
+// @by Felix Roos
+
+note("c3 eb3 g3 bb3").palindrome()
+.s('sawtooth')
+.jux(x=>x.rev().color('green').s('sawtooth'))
+.off(1/4, x=>x.add(note("<7 12>/2")).slow(2).late(.005).s('triangle'))
+.lpf(sine.range(200,2000).slow(8))
+.lpa(.2).lpenv(-2)
+.decay(.05).sustain(0)
+.room(.6)
+.delay(.5).delaytime(.1).delayfeedback(.4)
+.pianoroll()
+\`\`\`
+
+\`\`\`beat
+// "Holy flute"
+// @license CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/
+// @by Felix Roos
+
+"c3 eb3(3,8) c4/2 g3*2"
+.superimpose(
+  x=>x.slow(2).add(12),
+  x=>x.slow(4).sub(5)
+).add("<0 1>/16")
+.note().s('ocarina_vib').clip(1)
+.release(.1).room(1).gain(.2)
+.color("salmon | orange | darkseagreen")
+.pianoroll({fold:0,autorange:0,vertical:0,cycles:12,smear:0,minMidi:40})
+
+\`\`\`
+
+\`\`\`beat
+// "Wavy kalimba"
+// @license CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/
+// @by Felix Roos
+
+setcps(1)
+
+samples({
+  'kalimba': { c5:'https://cdn.freesound.org/previews/536/536549_11935698-lq.mp3' }
+})
+const scales = "<C:major C:mixolydian F:lydian [F:minor Db:major]>"
+
+stack(
+  "[0 2 4 6 9 2 0 -2]*3"
+  .add("<0 2>/4")
+  .scale(scales)
+  .struct("x*8")
+  .velocity("<.8 .3 .6>*8")
+  .slow(2),
+  "<c2 c2 f2 [[F2 C2] db2]>"
+  .scale(scales)
+  .scaleTranspose("[0 <2 4>]*2")
+  .struct("x*4")
+  .velocity("<.8 .5>*4")
+  .velocity(0.8)
+  .slow(2)
+)
+  .fast(1)
+  .note()
+  .clip("<.4 .8 1 1.2 1.4 1.6 1.8 2>/8")
+  .s('kalimba')
+  .delay(.2)
+\`\`\`
+
+\`\`\`beat
+// "Flatrave"
+// @license CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/
+// @by Felix Roos
+
+stack(
+  s("bd*2,~ [cp,sd]").bank('RolandTR909'),
+  
+  s("hh:1*4").sometimes(fast("2"))
+  .rarely(x=>x.speed(".5").delay(.5))
+  .end(perlin.range(0.02,.05).slow(8))
+  .bank('RolandTR909').room(.5)
+  .gain("0.4,0.4(5,8,-1)"),
+  
+  note("<0 2 5 3>".scale('G1 minor')).struct("x(5,8,-1)")
+  .s('sawtooth').decay(.1).sustain(0)
+  .lpa(.1).lpenv(-4).lpf(800).lpq(8),
+  
+  note("<G4 A4 Bb4 A4>,Bb3,D3").struct("~ x*2").s('square').clip(1)
+  .cutoff(sine.range(500,4000).slow(16)).resonance(10)
+  .decay(sine.slow(15).range(.05,.2)).sustain(0)
+  .room(.5).gain(.3).delay(.2).mask("<0 1@3>/8"),
+  
+  "0 5 3 2".sometimes(slow(2)).off(1/8,add(5)).scale('G4 minor').note()
+  .decay(.05).sustain(0).delay(.2).degradeBy(.5).mask("<0 1>/16")
+)
+\`\`\`
+
+\`\`\`beat
+// "Lounge sponge"
+// @license CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/
+// @by Felix Roos, livecode.orc by Steven Yi
+
+await loadOrc('github:kunstmusik/csound-live-code/master/livecode.orc')
+
+stack(
+  chord("<C^7 A7 Dm7 Fm7>/2").dict('lefthand').voicing()
+  .cutoff(sine.range(500,2000).round().slow(16))
+  .euclidLegato(3,8).csound('FM1')
+  ,
+  note("<C2 A1 D2 F2>/2").ply(8).csound('Bass').gain("1 4 1 4")
+  ,
+  n("0 7 [4 3] 2".fast(2/3).off(".25 .125", add("<2 4 -3 -1>"))
+  .slow(2).scale('A4 minor'))
+  .clip(.25).csound('SynHarp')
+  ,
+  s("bd*2,[~ hh]*2,~ cp").bank('RolandTR909')
+)
+\`\`\`
+
 ---
 
 ## ❌ Do not use sample without loading and do not assume that a sample exists. only load existing samples !
 this is a barebones strudle editor without any samples loaded by default.
 
+---
+
+## 🎯 Your Mission
+
+When the user asks you to create a beat, do **not** just generate random code. Instead:
+
+* Think musically: **what's the vibe? genre? instrumentation?**
+* Build up the beat with **clear sections** (drums, bass, melody, fx)
+* Use **realistic patterns**: don't overcomplicate the MiniTidal syntax
+* Stick to known, real APIs
+
+Be bold, but **keep it tight and playable**.
+
+Output a **single self-contained beat pattern** in a 'beat' gated block, with musical layers and valid syntax. If you're unsure a method or sample exists — **don't use it.**
+The beat block will be interpreted in the chat ui using the strudel editor so you syntax must be valid !
+`
+
+/**
+ * 
 available in dirt-samples : 
 \`\`\`
 808/{CB,CH,CL,CP,MA,RS}
@@ -455,23 +592,7 @@ world/{bd,gabbakick,sn}
 xmas/{170535__cognito-perceptu__merry-christmas}
 yeah/{000_Sound0,001_Sound10,002_Sound11,003_Sound13,004_Sound14,005_Sound15,006_Sound17,007_Sound18,008_Sound19,009_Sound20,010_Sound21,011_Sound22,012_Sound23,013_Sound24,014_Sound25,015_Sound26,016_Sound27,017_Sound28,018_Sound29,019_Sound3,020_Sound32,021_Sound33,022_Sound34,023_Sound35,024_Sound36,025_Sound4,026_Sound5,027_Sound6,028_Sound7,029_Sound8,030_Sound9}
 \`\`\`
-
----
-
-## 🎯 Your Mission
-
-When the user asks you to create a beat, do **not** just generate random code. Instead:
-
-* Think musically: **what's the vibe? genre? instrumentation?**
-* Build up the beat with **clear sections** (drums, bass, melody, fx)
-* Use **realistic patterns**: don't overcomplicate the MiniTidal syntax
-* Stick to known, real APIs
-
-Be bold, but **keep it tight and playable**.
-
-Output a **single self-contained beat pattern** in a 'beat' gated block, with musical layers and valid syntax. If you're unsure a method or sample exists — **don't use it.**
-The beat block will be interpreted in the chat ui using the strudel editor so you syntax must be valid !
-`
+ */
 
 export class BeatBlockRendererModule implements ControlModule {
   readonly id = "core-block-renderer-beat";
