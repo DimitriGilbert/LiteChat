@@ -167,20 +167,62 @@ ${contextPrompt}`;
     language?: string,
     filepath?: string
   ): string {
-    const tokens = md.parse(originalMarkdown, {});
-    let idx = 0;
-    for (const token of tokens) {
-      if (token.type === "fence") {
-        if (idx === blockIndex) {
-          token.content = newContent;
-          token.info = `${language || ""}${
-            filepath ? ` filepath="${filepath}"` : ""
-          }`.trim();
+    // Split the markdown into lines for easier manipulation
+    const lines = originalMarkdown.split('\n');
+    const codeBlocks = this.parseMarkdownForCodeBlocks(originalMarkdown);
+    
+    if (blockIndex < 0 || blockIndex >= codeBlocks.length) {
+      throw new Error(`Code block index ${blockIndex} not found`);
+    }
+    
+    // Find the actual line positions of the target code block
+    let currentBlockIndex = 0;
+    let startLine = -1;
+    let endLine = -1;
+    let inCodeBlock = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith('```')) {
+        if (!inCodeBlock) {
+          // Starting a code block
+          if (currentBlockIndex === blockIndex) {
+            startLine = i;
+          }
+          inCodeBlock = true;
+        } else {
+          // Ending a code block
+          if (currentBlockIndex === blockIndex) {
+            endLine = i + 1; // Include the closing ```
+            break;
+          }
+          currentBlockIndex++;
+          inCodeBlock = false;
         }
-        idx++;
       }
     }
-    return md.renderer.render(tokens, md.options, {});
+    
+    if (startLine === -1 || endLine === -1) {
+      throw new Error(`Could not find line positions for code block ${blockIndex}`);
+    }
+    
+    // Create the new code block
+    const langPrefix = language || "";
+    const filepathSuffix = filepath ? ` filepath="${filepath}"` : "";
+    const newCodeBlockLines = [
+      `\`\`\`${langPrefix}${filepathSuffix}`,
+      ...newContent.split('\n'),
+      '```'
+    ];
+    
+    // Replace the lines
+    const newLines = [
+      ...lines.slice(0, startLine),
+      ...newCodeBlockLines,
+      ...lines.slice(endLine)
+    ];
+    
+    return newLines.join('\n');
   }
 
   private async handleRepairEnhanceRequest(
