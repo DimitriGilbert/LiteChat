@@ -194,7 +194,18 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       toast[t](`[Mod: ${modName}] ${m}`);
     },
     log: (l, ...a) => {
-      console[l](`[Mod: ${modName}]`, ...a);
+      // Use safe console access instead of dynamic property access
+      if (l === 'log') {
+        console.log(`[Mod: ${modName}]`, ...a);
+      } else if (l === 'error') {
+        console.error(`[Mod: ${modName}]`, ...a);
+      } else if (l === 'warn') {
+        console.warn(`[Mod: ${modName}]`, ...a);
+      } else if (l === 'info') {
+        console.info(`[Mod: ${modName}]`, ...a);
+      } else {
+        console.log(`[Mod: ${modName}]`, ...a);
+      }
     },
     registerModalProvider: (modalId: string, provider: ModalProvider) => {
       emitter.emit(controlRegistryEvent.registerModalProviderRequest, {

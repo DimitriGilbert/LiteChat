@@ -91,6 +91,38 @@ litechat.target.appendChild(container);
 litechat.utils.log('info', 'Complex DOM structure created');
 \`\`\`
 
+### three.js initialization
+\`\`\`runjs
+
+// Clear any previous content in the target
+litechat.target.replaceChildren();
+
+// Define a function to load scripts
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Failed to load ' + src));
+        document.head.appendChild(s);
+    });
+}
+
+// 1) Pull in the latest Three.js (non-module build)
+// Using @latest for the non-module build is perfect for this context.
+loadScript('https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js')
+    .then(init)
+    .catch(err => {
+        litechat.utils.error('Failed to load Three.js: ' + err.message);
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'p-4 text-red-600 bg-red-100 border border-red-200 rounded-md';
+        errorDiv.textContent = 'Error loading Three.js: ' + err.message + '. Please check console for details.';
+        litechat.target.appendChild(errorDiv);
+    });
+
+// your three.js code here
+\`\`\`
+
 ### Canvas/WebGL Example
 \`\`\`runjs
 // Clear target

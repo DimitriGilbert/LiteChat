@@ -6,7 +6,6 @@ import React, {
   useEffect,
   useState,
   useCallback,
-  useLayoutEffect,
 } from "react";
 import type { Interaction } from "@/types/litechat/interaction";
 import { StreamingInteractionCard } from "./StreamingInteractionCard";
