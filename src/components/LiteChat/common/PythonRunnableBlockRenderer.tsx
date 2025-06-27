@@ -20,6 +20,7 @@ import { PlayIcon, Loader2Icon, EyeIcon, CodeIcon, DownloadIcon, ShieldIcon, Shi
 import { toast } from "sonner";
 import { PYODIDE_VERSION_URL } from "@/lib/litechat/constants";
 import { CodeSecurityService, type CodeSecurityResult } from "@/services/code-security.service";
+import { ActionTooltipButton } from "./ActionTooltipButton";
 
 // Pyodide types declaration
 declare global {
@@ -713,16 +714,6 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
     toggleFold
   );
 
-  const getRunButtonStyle = () => {
-    if (!securityResult) return {};
-    
-    return {
-      backgroundColor: securityResult.color,
-      borderColor: securityResult.color,
-      color: securityResult.score > 50 ? '#ffffff' : '#000000',
-    };
-  };
-
   const getRunButtonText = () => {
     if (isRunning) return "Running...";
     if (window.liteChatPython?.isLoading) return "Loading Python...";
@@ -761,57 +752,65 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button
+          <ActionTooltipButton
+            tooltipText={securityResult ? 'Recheck Security' : 'Check Security'}
             size="sm"
             variant="outline"
             onClick={checkSecurity}
             disabled={isCheckingSecurity}
             className="text-xs h-7"
-          >
-            {isCheckingSecurity ? (
-              <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-            ) : (
-              <ShieldCheckIcon className="h-3 w-3 mr-1" />
-            )}
-            {securityResult ? 'Recheck' : 'Check'}
-          </Button>
+            icon={
+              isCheckingSecurity ? (
+                <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <ShieldCheckIcon className="h-3 w-3 mr-1" />
+              )
+            }
+          />
           {hasRun && (
             <>
-              <Button
+              <ActionTooltipButton
+                tooltipText="Show Code"
                 size="sm"
                 variant={!showOutput && !showPreview ? "default" : "outline"}
                 onClick={toggleCode}
                 className="text-xs h-7"
-              >
-                <CodeIcon className="h-3 w-3 mr-1" />
-                Code
-              </Button>
-              <Button
+                icon={<CodeIcon className="h-3 w-3 mr-1" />}
+              />
+              <ActionTooltipButton
+                tooltipText="Show Console"
                 size="sm"
                 variant={showOutput ? "default" : "outline"}
                 onClick={toggleConsole}
                 className="text-xs h-7"
-              >
-                <MonitorSpeakerIcon className="h-3 w-3 mr-1" />
-                Console
-              </Button>
-              <Button
+                icon={<MonitorSpeakerIcon className="h-3 w-3 mr-1" />}
+              />
+              <ActionTooltipButton
+                tooltipText="Show Preview"
                 size="sm"
                 variant={showPreview ? "default" : "outline"}
                 onClick={togglePreview}
                 className="text-xs h-7"
-              >
-                <EyeIcon className="h-3 w-3 mr-1" />
-                Preview
-              </Button>
+                icon={<EyeIcon className="h-3 w-3 mr-1" />}
+              />
             </>
           )}
           <Button
             size="sm"
             onClick={handleRunClick}
             disabled={isRunning || window.liteChatPython?.isLoading || !runnableBlocksEnabled}
-            className="text-xs h-7"
-            style={getRunButtonStyle()}
+            className={
+              `text-xs h-7 ` +
+              (securityResult
+                ? securityResult.score > 90
+                  ? 'bg-[hsl(var(--destructive))] border-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]'
+                  : securityResult.score > 60
+                  ? 'bg-[hsl(var(--accent))] border-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]'
+                  : securityResult.score > 30
+                  ? 'bg-[hsl(var(--warning, var(--primary)))] border-[hsl(var(--warning, var(--primary)))] text-[hsl(var(--foreground))]'
+                  : 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'
+                : '')
+            }
           >
             {isRunning || window.liteChatPython?.isLoading ? (
               <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />

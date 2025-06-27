@@ -33,6 +33,7 @@ import {
   CodeSecurityService,
   type CodeSecurityResult,
 } from "@/services/code-security.service";
+import { ActionTooltipButton } from "./ActionTooltipButton";
 
 // QuickJS types declaration
 declare global {
@@ -1074,17 +1075,6 @@ const JsRunnableBlockRendererComponent: React.FC<
     toggleFold
   );
 
-  // Determine run button style based on security result
-  const getRunButtonStyle = () => {
-    if (!securityResult) return {};
-
-    return {
-      backgroundColor: securityResult.color,
-      borderColor: securityResult.color,
-      color: securityResult.score > 50 ? "#ffffff" : "#000000",
-    };
-  };
-
   const getRunButtonText = () => {
     if (isRunning) return "Running...";
     if (quickjsStatus === 'loading') return "Loading...";
@@ -1110,7 +1100,7 @@ const JsRunnableBlockRendererComponent: React.FC<
     <div className="code-block-container group/codeblock my-4 max-w-full">
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
-          <div className="text-sm font-medium">RUNNABLE JS</div>
+          <div className="text-sm font-medium">RUN JS</div>
           {quickjsStatus === 'ready' && (
             <div className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
               QuickJS Ready
@@ -1162,57 +1152,57 @@ const JsRunnableBlockRendererComponent: React.FC<
               className="scale-75"
             />
           </div>
-          <Button
-            size="sm"
-            variant="outline"
+          <ActionTooltipButton
+            tooltipText={securityResult ? "Recheck Security" : "Check Security"}
             onClick={checkSecurity}
             disabled={isCheckingSecurity}
             className="text-xs h-7"
-          >
-            {isCheckingSecurity ? (
-              <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-            ) : (
-              <ShieldCheckIcon className="h-3 w-3 mr-1" />
-            )}
-            {securityResult ? "Recheck" : "Check"}
-          </Button>
+            icon={
+              isCheckingSecurity ? (
+                <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <ShieldCheckIcon className="h-3 w-3 mr-1" />
+              )
+            }
+          />
           {hasRun && (
             <>
-              <Button
-                size="sm"
-                variant={!showOutput && !showPreview ? "default" : "outline"}
+              <ActionTooltipButton
+                tooltipText="Show Code"
                 onClick={toggleCode}
                 className="text-xs h-7"
-              >
-                <CodeIcon className="h-3 w-3 mr-1" />
-                Code
-              </Button>
-              <Button
-                size="sm"
-                variant={showOutput ? "default" : "outline"}
+                icon={<CodeIcon className="h-3 w-3 mr-1" />}
+              />
+              <ActionTooltipButton
+                tooltipText="Show Console"
                 onClick={toggleConsole}
                 className="text-xs h-7"
-              >
-                <MonitorSpeakerIcon className="h-3 w-3 mr-1" />
-                Console
-              </Button>
-              <Button
-                size="sm"
-                variant={showPreview ? "default" : "outline"}
+                icon={<MonitorSpeakerIcon className="h-3 w-3 mr-1" />}
+              />
+              <ActionTooltipButton
+                tooltipText="Show Preview"
                 onClick={togglePreview}
                 className="text-xs h-7"
-              >
-                <EyeIcon className="h-3 w-3 mr-1" />
-                Preview
-              </Button>
+                icon={<EyeIcon className="h-3 w-3 mr-1" />}
+              />
             </>
           )}
           <Button
             size="sm"
             onClick={handleRunClick}
             disabled={isRunning || quickjsStatus === 'loading' || !runnableBlocksEnabled}
-            className="text-xs h-7"
-            style={getRunButtonStyle()}
+            className={
+              `text-xs h-7 ` +
+              (securityResult
+                ? securityResult.score > 90
+                  ? 'bg-[hsl(var(--destructive))] border-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]'
+                  : securityResult.score > 60
+                  ? 'bg-[hsl(var(--accent))] border-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]'
+                  : securityResult.score > 30
+                  ? 'bg-[hsl(var(--warning, var(--primary)))] border-[hsl(var(--warning, var(--primary)))] text-[hsl(var(--foreground))]'
+                  : 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'
+                : '')
+            }
           >
             {isRunning || quickjsStatus === 'loading' ? (
               <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />

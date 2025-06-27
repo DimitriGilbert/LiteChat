@@ -67,45 +67,25 @@ export class TableOfContentsControlModule implements ControlModule {
             return;
           }
 
-          // CALCULATE TARGET POSITION MANUALLY
+          // Mark as ToC scrolling to prevent ChatCanvas from detecting it as user scroll
+          (scrollViewport as any)._isToCScrolling = true;
+
+          // Calculate target position manually
           const elementRect = element.getBoundingClientRect();
           const viewportRect = scrollViewport.getBoundingClientRect();
           const currentScrollTop = scrollViewport.scrollTop;
           const elementTopRelativeToViewport = elementRect.top - viewportRect.top;
           const targetScrollTop = currentScrollTop + elementTopRelativeToViewport - 20; // 20px offset from top
 
-          // console.log('[ToC] About to scroll to interaction', interactionId, 'targetScrollTop:', targetScrollTop, 'current:', scrollViewport.scrollTop);
           scrollViewport.scrollTo({
             top: targetScrollTop,
             behavior: "instant"
           });
-          // console.log('[ToC] After scrollTo for', interactionId, 'scrollTop now:', scrollViewport.scrollTop);
-
-          // Patch: After 150ms, check if scrollTop is still at target, if not, re-apply scroll once
-          // THIS IS PURE SHIT ! I WILL NEED A FIX AT SOME POINT !
-          // TODO FIX THIS !
-          setTimeout(() => {
-            const currentScrollTop = scrollViewport.scrollTop;
-            const distance = Math.abs(currentScrollTop - targetScrollTop);
-            if (distance > 2) {
-              // console.log('[ToC] 150ms patch: scrollTop drifted (', currentScrollTop, '), re-applying scrollTo', targetScrollTop);
-              scrollViewport.scrollTo({
-                top: targetScrollTop,
-                behavior: "instant"
-              });
-            // } else {
-              // console.log('[ToC] 150ms patch: scrollTop still correct (', currentScrollTop, ')');
-            }
-          }, 250);
-
-          // Mark as ToC scrolling to prevent ChatCanvas from detecting it as user scroll
-          (scrollViewport as any)._isToCScrolling = true;
 
           // Use IntersectionObserver to detect when element is visible
           const observer = new window.IntersectionObserver((entries, obs) => {
             entries.forEach(entry => {
               if (entry.isIntersecting) {
-                // console.log('[ToC] IntersectionObserver: element is intersecting for', interactionId);
                 addHighlight(element);
                 obs.disconnect();
                 // Clear ToC scrolling flag after highlight
@@ -135,23 +115,13 @@ export class TableOfContentsControlModule implements ControlModule {
 
           const scrollViewport = context.scrollViewport;
           
-          // Debug logging BEFORE scroll
-          console.log(`ToC: BEFORE scroll to heading "${headingText}":`, {
-            currentScrollTop: scrollViewport?.scrollTop || 0,
-            elementRect: targetElement.getBoundingClientRect(),
-            scrollHeight: scrollViewport?.scrollHeight || 0,
-            clientHeight: scrollViewport?.clientHeight || 0
-          });
-
-          // Mark as auto-scroll to prevent ChatCanvas from detecting it as user scroll
+          // Mark as ToC scrolling to prevent ChatCanvas from detecting it as user scroll
           if (scrollViewport) {
-            // @ts-ignore - Adding custom property to track ToC scroll
-            scrollViewport._isToCScrolling = true;
+            (scrollViewport as any)._isToCScrolling = true;
             
             // Clean up the flag after scroll completes
             setTimeout(() => {
-              // @ts-ignore
-              scrollViewport._isToCScrolling = false;
+              (scrollViewport as any)._isToCScrolling = false;
             }, 1000);
           }
 
@@ -162,27 +132,10 @@ export class TableOfContentsControlModule implements ControlModule {
             inline: "nearest"
           });
 
-          // Debug logging 50ms AFTER scroll start
-          setTimeout(() => {
-            console.log(`ToC: 50ms AFTER scroll start for heading "${headingText}":`, {
-              actualScrollTop: scrollViewport?.scrollTop || 0,
-              scrollComplete: "Using scrollIntoView - no target calculation"
-            });
-          }, 50);
-
-          // Debug logging 200ms AFTER scroll start
-          setTimeout(() => {
-            console.log(`ToC: 200ms AFTER scroll start for heading "${headingText}":`, {
-              actualScrollTop: scrollViewport?.scrollTop || 0,
-              elementVisible: targetElement.getBoundingClientRect().top < window.innerHeight && targetElement.getBoundingClientRect().bottom > 0
-            });
-          }, 200);
-
           addHighlight(targetElement);
         };
 
         const addHighlight = (element: HTMLElement) => {
-          // console.log('[ToC] addHighlight called for', element.dataset.interactionId);
           element.style.outline = "2px solid #3b82f6";
           element.style.outlineOffset = "2px";
           setTimeout(() => {

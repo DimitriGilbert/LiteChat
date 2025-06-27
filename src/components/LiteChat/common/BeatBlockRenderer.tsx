@@ -15,9 +15,9 @@ import type { CanvasControl } from "@/types/litechat/canvas/control";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { InlineCodeEditor } from "@/controls/components/canvas/codeblock/EditCodeBlockControl";
-import { Button } from "@/components/ui/button";
-import { Loader2Icon, CodeIcon, DownloadIcon, PlayIcon } from "lucide-react";
+import { Loader2Icon, CodeIcon, PlayIcon } from "lucide-react";
 import { toast } from "sonner";
+import { ActionTooltipButton } from "./ActionTooltipButton";
 
 // Strudel embed types declaration
 declare global {
@@ -285,12 +285,7 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
     <div className="code-block-container group/codeblock my-4 max-w-full">
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
-          <div className="text-sm font-medium">BEAT PATTERN</div>
-          {strudelLoaded && (
-            <div className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
-              Strudel Ready
-            </div>
-          )}
+          <div className="text-sm font-medium">BEAT</div>
           {window.strudelLoading && (
             <div className="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
               Loading...
@@ -302,42 +297,35 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
         </div>
         <div className="flex items-center gap-1">
           {showRepl ? (
-            <Button
-              size="sm"
-              variant={showCode ? "outline" : "default"}
+            <ActionTooltipButton
+              tooltipText="Show/Hide Code"
               onClick={handleShowCode}
-              className="text-xs h-7"
-            >
-              <CodeIcon className="h-3 w-3 mr-1" />
-              Code
-            </Button>
+              className="text-xs h-7 w-7"
+              icon={<CodeIcon className="h-3 w-3 mr-1" />}
+              variant={showCode ? "outline" : "default"}
+            />
           ) : (
-            <Button
-              size="sm"
-              variant={showCode ? "default" : "outline"}
+            <ActionTooltipButton
+              tooltipText={showCode ? 'Hide Code' : 'Show Code'}
               onClick={() => setShowCode(!showCode)}
-              className="text-xs h-7"
-            >
-              <CodeIcon className="h-3 w-3 mr-1" />
-              {showCode ? 'Hide' : 'Show'} Code
-            </Button>
+              className="text-xs h-7 w-7"
+              icon={<CodeIcon className="h-3 w-3 mr-1" />}
+              variant={showCode ? "default" : "outline"}
+            />
           )}
           {!showRepl && (
-            <Button
-              size="sm"
+            <ActionTooltipButton
+              tooltipText="Run"
               onClick={handleRunClick}
               disabled={!runnableBlocksEnabled || window.strudelLoading}
-              className="text-xs h-7"
-            >
-              {window.strudelLoading ? (
+              className="text-xs h-7 w-7"
+              icon={window.strudelLoading ? (
                 <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-              ) : !strudelLoaded ? (
-                <DownloadIcon className="h-3 w-3 mr-1" />
               ) : (
                 <PlayIcon className="h-3 w-3 mr-1" />
               )}
-              Run
-            </Button>
+              variant="default"
+            />
           )}
         </div>
       </div>

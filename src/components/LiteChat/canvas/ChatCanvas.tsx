@@ -59,7 +59,8 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
   const autoScrollIntervalTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastUserScrollTimeRef = useRef<number>(0);
   const isAutoScrollingRef = useRef<boolean>(false);
-  const initialScrollDone = useRef(false);
+  const lastConversationIdRef = useRef<string | null>(null);
+  const hasScrolledForConversationRef = useRef<boolean>(false);
 
   const streamingInteractionIds = useInteractionStore(
     (state) => state.streamingInteractionIds
@@ -150,29 +151,12 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
       contextInteraction?: Interaction,
       overrideContext?: Partial<CanvasControlRenderContext>
     ): React.ReactNode[] => {
-      // console.log(
-      //   `[ChatCanvas] renderSlotForCanvas attempting to render: type='${targetType}', slot='${targetSlotName}'`
-      // );
-      // if (!canvasControls || canvasControls.length === 0) {
-      //   console.warn("[ChatCanvas] No canvas controls are registered in the store!");
-      // } else {
-      //   // Log details of all available canvas controls for debugging
-      //   const controlDetails = canvasControls.map(c => ({ id: c.id, type: c.type, targetSlot: c.targetSlot, hasRenderer: !!c.renderer }));
-      //   console.log("[ChatCanvas] Available canvasControls:", JSON.stringify(controlDetails, null, 2));
-      // }
-
       const filteredControls = canvasControls.filter((c) => {
         const typeMatch = c.type === targetType;
         const slotMatch = c.targetSlot === targetSlotName;
         const rendererExists = !!c.renderer;
         return typeMatch && slotMatch && rendererExists;
       });
-
-      // if (filteredControls.length === 0) {
-      //   console.warn(
-      //     `[ChatCanvas] No controls found after filtering for: type='${targetType}', slot='${targetSlotName}'`
-      //   );
-      // }
 
       return filteredControls
         .map((control) => {
@@ -202,78 +186,73 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
     [canvasControls]
   );
 
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+  // SIMPLIFIED SCROLL FUNCTION - ONLY USED IN 4 SPECIFIC CASES
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     if (!viewportRef.current) return;
-    // console.log('[ChatCanvas] scrollToBottom called. scrollTop:', viewportRef.current.scrollTop, 'scrollHeight:', viewportRef.current.scrollHeight, 'behavior:', behavior);
+    
     isAutoScrollingRef.current = true;
     
-    // Try the viewport reference first
-    if (viewportRef.current) {
-      
-      viewportRef.current.scrollTo({
-        top: viewportRef.current.scrollHeight,
-        behavior: behavior,
-      });
-      
-      setTimeout(() => { 
-        isAutoScrollingRef.current = false;
-      }, 100);
-      return;
-    }
+    viewportRef.current.scrollTo({
+      top: viewportRef.current.scrollHeight,
+      behavior: behavior,
+    });
     
-    // Fallback: try to find the viewport element directly
-    if (scrollAreaRef.current) {
-      const viewport = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]"
-      ) as HTMLDivElement | null;
-      if (viewport) {
-        viewportRef.current = viewport;
-        viewport.scrollTo({
-          top: viewport.scrollHeight,
-          behavior: behavior,
-        });
-        setTimeout(() => { isAutoScrollingRef.current = false; }, 100);
-        return;
-      }
-    }
-    
-    // Last resort: scroll the scroll area itself
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: behavior,
-      });
-      setTimeout(() => { isAutoScrollingRef.current = false; }, 100);
-    }
-  };
+    setTimeout(() => { 
+      isAutoScrollingRef.current = false;
+    }, 100);
+  }, []);
 
+  // 1. SCROLL ON CONVERSATION LOAD - When conversation changes, reset scroll flag
   useEffect(() => {
-    if (viewportRef.current) {
-      const { scrollHeight, clientHeight, scrollTop } = viewportRef.current;
-      const isAtBottom = scrollHeight - clientHeight <= scrollTop + 150;
-      const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
-      const userRecentlyScrolled = timeSinceUserScroll < 2000;
-      const isToCScrolling = (viewportRef.current as any)._isToCScrolling;
-      // console.log('[ChatCanvas] auto-scroll effect', {isAtBottom, status, userRecentlyScrolled, isToCScrolling, deps: {interactionGroupsLength: interactionGroups.length, status, streamingInteractionIds}});
-      if ((isAtBottom || status !== "streaming") && !userRecentlyScrolled && !isToCScrolling) {
-        requestAnimationFrame(() => {
-          scrollToBottom(status === "streaming" ? "smooth" : "auto");
-        });
-      }
+    if (lastConversationIdRef.current !== conversationId) {
+      lastConversationIdRef.current = conversationId;
+      hasScrolledForConversationRef.current = false; // Reset for new conversation
     }
-  }, [interactionGroups.length, status, streamingInteractionIds]);
+  }, [conversationId]);
 
+  // 2. SCROLL WHEN MESSAGES MOUNT - Simple MutationObserver approach
+  useEffect(() => {
+    if (!viewportRef.current || !conversationId || hasScrolledForConversationRef.current) return;
+    
+    const observer = new MutationObserver((mutations) => {
+      // Check if any interaction cards were added
+      const hasInteractionCards = mutations.some(mutation => 
+        Array.from(mutation.addedNodes).some(node => 
+          node instanceof Element && 
+          (node.querySelector('[data-interaction-id]') || node.hasAttribute('data-interaction-id'))
+        )
+      );
+      
+      if (hasInteractionCards && !hasScrolledForConversationRef.current) {
+        const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
+        const userRecentlyScrolled = timeSinceUserScroll < 2000;
+        
+        if (!userRecentlyScrolled) {
+          requestAnimationFrame(() => {
+            scrollToBottom("auto");
+            hasScrolledForConversationRef.current = true;
+          });
+        }
+      }
+    });
+
+    observer.observe(viewportRef.current, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [conversationId, scrollToBottom]);
+
+  // 3. AUTO FOLLOW DURING STREAMING - Every N ms when streaming
   useEffect(() => {
     if (status === "streaming" && enableAutoScrollOnStream) {
       if (autoScrollIntervalTimerRef.current) {
         clearInterval(autoScrollIntervalTimerRef.current);
       }
       autoScrollIntervalTimerRef.current = setInterval(() => {
-        // Don't auto-scroll if user manually scrolled recently
         const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
         const userRecentlyScrolled = timeSinceUserScroll < 2000;
         
-        // CRITICAL: Don't auto-scroll if ToC navigation is in progress
         const isToCScrolling = viewportRef.current && (viewportRef.current as any)._isToCScrolling;
                 
         if (!userRecentlyScrolled && !isToCScrolling) {
@@ -291,8 +270,9 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         clearInterval(autoScrollIntervalTimerRef.current);
       }
     };
-  }, [status, autoScrollInterval, enableAutoScrollOnStream]);
+  }, [status, autoScrollInterval, enableAutoScrollOnStream, scrollToBottom]);
 
+  // SCROLL TRACKING - Detect user scroll vs auto scroll
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
@@ -323,6 +303,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
     };
   }, []);
 
+  // VIEWPORT SETUP
   useEffect(() => {
     if (scrollAreaRef.current) {
       const viewport = scrollAreaRef.current.querySelector(
@@ -334,93 +315,34 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
     }
   }, []);
 
-  // --- NEW: Initial load scroll (runs after DOM is ready) ---
-  useLayoutEffect(() => {
-    if (
-      !initialScrollDone.current &&
-      interactionGroups.length > 0 &&
-      viewportRef.current
-    ) {
-      const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
-      const userRecentlyScrolled = timeSinceUserScroll < 2000;
-      if (!userRecentlyScrolled) {
-        requestAnimationFrame(() => {
-          scrollToBottom("auto");
-          initialScrollDone.current = true;
-        });
-      }
-    }
-  }, [interactionGroups.length, conversationId]);
-
-  // Add a second useLayoutEffect to catch late interaction updates
-  useLayoutEffect(() => {
-    if (
-      !initialScrollDone.current &&
-      interactionGroups.length > 0 &&
-      viewportRef.current
-    ) {
-      const timeSinceUserScroll = Date.now() - lastUserScrollTimeRef.current;
-      const userRecentlyScrolled = timeSinceUserScroll < 2000;
-      if (!userRecentlyScrolled) {
-        requestAnimationFrame(() => {
-          scrollToBottom("auto");
-          initialScrollDone.current = true;
-        });
-      }
-    }
-  }, [interactions, conversationId]);
-
   const renderedInteractionCards = useMemo(() => {
-    // console.log("[ChatCanvas] Full interactions array received by renderedInteractionCards:", JSON.parse(JSON.stringify(interactions))); // Log full interactions array
     const elements: React.ReactNode[] = [];
 
     const allSortedInteractions = [...interactions].sort((a, b) => {
-      if (a.index !== b.index) return a.index - b.index; // Main conversation flow index
-      if (a.parentId === null && b.parentId !== null) return -1; // Active (null parentId) comes before children
-      if (a.parentId !== null && b.parentId === null) return 1;  // Children after active
+      if (a.index !== b.index) return a.index - b.index;
+      if (a.parentId === null && b.parentId !== null) return -1;
+      if (a.parentId !== null && b.parentId === null) return 1;
       if (a.parentId !== null && b.parentId !== null && a.parentId === b.parentId) {
-        return a.index - b.index; // Sort children by their own index under the same parent
+        return a.index - b.index;
       }
-      // Fallback sort by time if structure is unusual, or for items at same main index but different parents (should not happen for display groups)
       return (a.startedAt?.getTime() ?? 0) - (b.startedAt?.getTime() ?? 0);
     });
 
-    // Identify active interactions on the main conversation spine
     const activeInteractionsOnSpine = allSortedInteractions.filter(
       i => i.parentId === null && !ChatCanvasHiddenInteractions.includes(i.type)
     );
-    // console.log("[ChatCanvas] Active interactions on spine:", JSON.parse(JSON.stringify(activeInteractionsOnSpine))); // Log active spine interactions
 
     activeInteractionsOnSpine.forEach(activeInteraction => {
-      // console.log("[ChatCanvas] Processing activeInteraction:", JSON.parse(JSON.stringify(activeInteraction))); // Log current active interaction being processed
       let userPromptToDisplay: PromptTurnObject | null = null;
       
-      // Determine the user prompt associated with this active interaction (turn)
       if (activeInteraction.type === "message.user_assistant" && activeInteraction.prompt) {
         userPromptToDisplay = activeInteraction.prompt;
       } else if (activeInteraction.type === "message.workflow_step" && activeInteraction.prompt) {
-        // Workflow steps have their own prompts
         userPromptToDisplay = activeInteraction.prompt;
       } else if (activeInteraction.type === "message.assistant_regen" && activeInteraction.metadata?.regeneratedFromId) {
-        // Find the original user_assistant interaction that this regen chain started from.
-        // This original interaction should be a child of the current activeInteraction or one of its ancestors in the regen chain.
-        // let originalInteractionForPrompt: Interaction | undefined = interactions.find(
-        //   i => i.id === activeInteraction.metadata?.regeneratedFromId
-        // );
-        // Walk up the chain if `regeneratedFromId` points to another regen.
-        // The true original `message.user_assistant` will be the one whose `regeneratedFromId` is the prompt provider.
-        // This logic might be complex if the direct `regeneratedFromId` isn't the one with the prompt.
-        // A simpler way: the interaction that was regenerated *into* this activeInteraction should hold the original prompt
-        // or be part of the chain that leads to it.
-
-        // The `ConversationService.regenerateInteraction` ensures that the `activeInteraction` (a regen)
-        // has its `regeneratedFromId` pointing to the interaction it replaced.
-        // That replaced interaction (now a child) should be type `message.user_assistant` or another `message.assistant_regen`.
-        // We need to find the ultimate `message.user_assistant` at the root of this particular regeneration branch.
-        
         let promptProviderInteraction: Interaction | undefined = undefined;
         let currentForPromptLookup: Interaction | undefined = activeInteraction;
-        const visitedInLookup = new Set<string>(); // Prevent infinite loops
+        const visitedInLookup = new Set<string>();
 
         while(currentForPromptLookup && !visitedInLookup.has(currentForPromptLookup.id)) {
             visitedInLookup.add(currentForPromptLookup.id);
@@ -431,7 +353,6 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
             if (currentForPromptLookup.metadata?.regeneratedFromId) {
                 currentForPromptLookup = interactions.find(i => i.id === currentForPromptLookup!.metadata!.regeneratedFromId);
             } else {
-                // If it's a regen but has no regeneratedFromId, or we hit a dead end.
                 break;
             }
         }
@@ -439,7 +360,6 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         if (promptProviderInteraction) {
             userPromptToDisplay = promptProviderInteraction.prompt;
         } else {
-             // Fallback: If this activeInteraction itself has a prompt (e.g. if a user_assistant was directly made parentId:null)
             if (activeInteraction.prompt) { 
                 userPromptToDisplay = activeInteraction.prompt;
             } else {
@@ -448,40 +368,32 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
         }
       }
 
-      // Only render the turn if we have a user prompt to show
       if (userPromptToDisplay) {
         elements.push(
           <UserPromptDisplay
-            key={`prompt-${activeInteraction.id}`} // Keyed with activeInteraction's ID
+            key={`prompt-${activeInteraction.id}`}
             turnData={userPromptToDisplay}
-            timestamp={activeInteraction.startedAt} // Timestamp from active interaction (latest in turn)
+            timestamp={activeInteraction.startedAt}
             isAssistantComplete={activeInteraction.status === "COMPLETED" || activeInteraction.status === "ERROR"}
             interactionId={activeInteraction.id}
           />
         );
       } else if (activeInteraction.type !== "message.user_assistant" && activeInteraction.type !== "message.assistant_regen" && activeInteraction.type !== "message.workflow_step") {
-        // If it's some other type of active interaction on the spine that doesn't have a typical prompt/response structure, 
-        // it might need its own renderer or be skipped. For now, we skip if no prompt found for assistant types.
-        // This case should be rare for visible chat messages.
         console.log("[ChatCanvas] Skipping active interaction on spine due to no user prompt and non-standard type:", activeInteraction.id, activeInteraction.type);
-        return; // Skip this iteration of forEach
+        return;
       }
 
-      // Historical versions are direct children of the current activeInteraction on the spine
       const historicalVersions = interactions 
         .filter(hist => hist.parentId === activeInteraction.id && 
                        !ChatCanvasHiddenInteractions.includes(hist.type))
         .sort((a, b) => a.index - b.index); 
-      // console.log(`[ChatCanvas] Historical versions found for activeInteraction ${activeInteraction.id}:`, JSON.parse(JSON.stringify(historicalVersions))); // Log historical versions found
 
       const interactionGroupForTabs = [activeInteraction, ...historicalVersions];
       
-      // Only render ResponseTabsContainer if there's an assistant part to show (the activeInteraction itself)
-      // or if there are historical versions implying an assistant part existed.
-      if (interactionGroupForTabs.length > 0) { // The activeInteraction is always present if we reach here for assistant types
+      if (interactionGroupForTabs.length > 0) {
          elements.push(
           <ResponseTabsContainer
-            key={`tabs-${activeInteraction.id}`} // CRUCIAL: Keyed by the ID of the *active* interaction for this turn
+            key={`tabs-${activeInteraction.id}`}
             interactionGroup={interactionGroupForTabs}
             renderSlot={(slotName, contextInteraction, overrideContext) =>
               renderSlotForCanvas(
@@ -552,32 +464,6 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
 
   const maxWidthClass = chatMaxWidth || "max-w-7xl";
 
-  useEffect(() => {
-    initialScrollDone.current = false;
-  }, [conversationId]);
-
-  // Add MutationObserver-based scroll-to-bottom on conversation switch
-  useEffect(() => {
-    if (!viewportRef.current) return;
-    if (initialScrollDone.current) return;
-
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-          scrollToBottom("auto");
-          initialScrollDone.current = true;
-          break;
-        }
-      }
-    });
-
-    observer.observe(viewportRef.current, { childList: true, subtree: true });
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [conversationId, interactionGroups.length]);
-
   return (
     <div className={cn("flex-grow relative", className)}>
       {showSetupState ? (
@@ -593,6 +479,7 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
               {renderContent()}
             </div>
           </ScrollArea>
+          {/* 3. SCROLL TO BOTTOM BUTTON - When clicked */}
           {showJumpToBottom && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
