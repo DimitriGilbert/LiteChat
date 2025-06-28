@@ -134,3 +134,25 @@ export async function compilePromptTemplate(
     selectedRules: selectedRules,
   };
 }
+
+/**
+ * Calculates the cost of prompt and completion tokens based on per-million pricing.
+ * @param promptTokens Number of prompt tokens
+ * @param completionTokens Number of completion tokens
+ * @param promptPrice Price per million prompt tokens (e.g., 3 = $3 per 1M tokens)
+ * @param completionPrice Price per million completion tokens (e.g., 15 = $15 per 1M tokens)
+ * @returns Object with cost and formula type (always 'per-million')
+ */
+export const calculateTokenCost = (
+  promptTokens: number,
+  completionTokens: number,
+  promptPrice: number,
+  completionPrice: number
+): { cost: number; formula: 'per-million' } => {
+  return {
+    cost:
+      promptTokens * promptPrice +
+      completionTokens * completionPrice,
+    formula: 'per-million',
+  };
+};

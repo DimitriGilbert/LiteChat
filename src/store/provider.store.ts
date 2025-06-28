@@ -644,7 +644,7 @@ export const useProviderStore = create(
         return {
           id: m.id,
           name: m.name,
-          created: Date.now(),
+          created: null, // Unknown creation date for default models
           context_length: 4096, // Default placeholder
           architecture: {
             modality,

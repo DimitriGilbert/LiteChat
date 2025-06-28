@@ -4,6 +4,8 @@
 import React, { useState, useMemo } from "react";
 import { useProviderStore } from "@/store/provider.store";
 import { PersistenceService } from "@/services/persistence.service";
+import { calculateTokenCost } from "@/lib/litechat/prompt-util";
+import { formatTokenCost } from "@/lib/litechat/ai-helpers";
 import {
   ChartContainer,
   ChartTooltip,
@@ -57,20 +59,6 @@ interface ModelUsage {
   interactions: number;
   fill: string;
 }
-
-// Replace formatCost with the one from UsageDisplayControl
-const formatCost = (cost: number): string => {
-  if (cost >= 1) {
-    return `$${cost.toFixed(2)}`;
-  } else {
-    const cents = cost * 100;
-    if (cents >= 0.01) {
-      return `${cents.toFixed(2)}¢`;
-    } else {
-      return `${(cents * 1000).toFixed(2)}‰`;
-    }
-  }
-};
 
 export const UsageDashboard: React.FC = () => {
   const [dateRange, setDateRange] = useState(30); // days
@@ -142,42 +130,37 @@ export const UsageDashboard: React.FC = () => {
     
     // Aggregate interaction data by day
     interactions.forEach(interaction => {
-      if (!interaction.startedAt || !interaction.prompt?.metadata?.modelId) return;
-      
+      if (!interaction.startedAt || !interaction.metadata?.modelId) return;
       const date = format(new Date(interaction.startedAt), "yyyy-MM-dd");
       const existing = dailyMap.get(date);
       if (!existing) return;
-      
-      const modelId = interaction.prompt.metadata.modelId;
-      const pricing = priceMap.get(modelId);
-      
-      if (pricing) {
-        const promptTokens = interaction.metadata?.promptTokens || 0;
-        const completionTokens = interaction.metadata?.completionTokens || 0;
-        const totalTokens = promptTokens + completionTokens;
-        let totalCost = 0;
-        let formula = '';
-        if (pricing.prompt < 0.01 || pricing.completion < 0.01) {
-          // Per-token pricing
-          totalCost = promptTokens * pricing.prompt + completionTokens * pricing.completion;
-          formula = 'per-token';
-        } else {
-          // Per-million pricing
-          totalCost = (promptTokens / 1_000_000) * pricing.prompt + (completionTokens / 1_000_000) * pricing.completion;
-          formula = 'per-million';
-        }
-        if (totalTokens > 0 && (pricing.prompt > 0 || pricing.completion > 0)) {
-          console.debug(`[USAGE DASHBOARD] Date: ${date}, Model: ${modelId}, PromptTokens: ${promptTokens}, CompletionTokens: ${completionTokens}, PricePrompt: ${pricing.prompt}, PriceCompletion: ${pricing.completion}, Cost: ${totalCost}, Formula: ${formula}`);
-        }
-        
-        existing.cost += totalCost;
-        existing.tokens += totalTokens;
-        existing.interactions += 1;
+      const modelId = interaction.metadata.modelId;
+      if (!modelId || !modelId.includes(":")) {
+        console.warn(`[UsageDashboard] Skipping interaction with missing or malformed modelId:`, interaction);
+        return;
       }
+      // Look up model pricing from dbProviderConfigs
+      const [providerId, specificModelId] = modelId.split(":");
+      const config = dbProviderConfigs.find(c => c.id === providerId);
+      const modelDef = config?.fetchedModels?.find(m => m.id === specificModelId);
+      const pricing = modelDef?.pricing;
+      const promptPrice = pricing?.prompt ? parseFloat(pricing.prompt) : null;
+      const completionPrice = pricing?.completion ? parseFloat(pricing.completion) : null;
+      if (promptPrice === null || completionPrice === null) {
+        console.warn(`[UsageDashboard] Missing pricing for modelId: ${modelId}`);
+        return;
+      }
+      const promptTokens = interaction.metadata?.promptTokens || 0;
+      const completionTokens = interaction.metadata?.completionTokens || 0;
+      const totalTokens = promptTokens + completionTokens;
+      const totalCost = calculateTokenCost(promptTokens, completionTokens, promptPrice, completionPrice).cost;
+      existing.cost += totalCost;
+      existing.tokens += totalTokens;
+      existing.interactions += 1;
     });
     
     return Array.from(dailyMap.values());
-  }, [interactions, dateRange, priceMap]);
+  }, [interactions, dateRange, dbProviderConfigs]);
 
   // Process data for model usage pie chart
   const modelUsageData = useMemo((): ModelUsage[] => {
@@ -191,55 +174,46 @@ export const UsageDashboard: React.FC = () => {
     ];
     
     interactions.forEach(interaction => {
-      if (!interaction.prompt?.metadata?.modelId) return;
-      
-      const modelId = interaction.prompt.metadata.modelId;
-      const pricing = priceMap.get(modelId);
-      
-      // Get model name for display
+      if (!interaction.metadata?.modelId) return;
+      const modelId = interaction.metadata.modelId;
+      if (!modelId || !modelId.includes(":")) {
+        return;
+      }
+      // Look up model pricing from dbProviderConfigs
       const [providerId, specificModelId] = modelId.split(":");
       const config = dbProviderConfigs.find(c => c.id === providerId);
       const modelDef = config?.fetchedModels?.find(m => m.id === specificModelId);
+      const pricing = modelDef?.pricing;
+      const promptPrice = pricing?.prompt ? parseFloat(pricing.prompt) : null;
+      const completionPrice = pricing?.completion ? parseFloat(pricing.completion) : null;
+      if (promptPrice === null || completionPrice === null) {
+        return;
+      }
+      // Get model name for display
       const modelName = modelDef?.name || specificModelId || "Unknown";
+      const promptTokens = interaction.metadata?.promptTokens || 0;
+      const completionTokens = interaction.metadata?.completionTokens || 0;
+      const totalTokens = promptTokens + completionTokens;
+      const totalCost = calculateTokenCost(promptTokens, completionTokens, promptPrice, completionPrice).cost;
       
-      if (pricing) {
-        const promptTokens = interaction.metadata?.promptTokens || 0;
-        const completionTokens = interaction.metadata?.completionTokens || 0;
-        const totalTokens = promptTokens + completionTokens;
-        let totalCost = 0;
-        let formula = '';
-        if (pricing.prompt < 0.01 || pricing.completion < 0.01) {
-          // Per-token pricing
-          totalCost = promptTokens * pricing.prompt + completionTokens * pricing.completion;
-          formula = 'per-token';
-        } else {
-          // Per-million pricing
-          totalCost = (promptTokens / 1_000_000) * pricing.prompt + (completionTokens / 1_000_000) * pricing.completion;
-          formula = 'per-million';
-        }
-        if (totalTokens > 0 && (pricing.prompt > 0 || pricing.completion > 0)) {
-          console.debug(`[USAGE DASHBOARD] Model: ${modelId}, PromptTokens: ${promptTokens}, CompletionTokens: ${completionTokens}, PricePrompt: ${pricing.prompt}, PriceCompletion: ${pricing.completion}, Cost: ${totalCost}, Formula: ${formula}`);
-        }
-        
-        const existing = modelMap.get(modelId);
-        if (existing) {
-          existing.cost += totalCost;
-          existing.tokens += totalTokens;
-          existing.interactions += 1;
-        } else {
-          modelMap.set(modelId, {
-            modelName,
-            cost: totalCost,
-            tokens: totalTokens,
-            interactions: 1,
-            fill: colors[modelMap.size % colors.length],
-          });
-        }
+      const existing = modelMap.get(modelId);
+      if (existing) {
+        existing.cost += totalCost;
+        existing.tokens += totalTokens;
+        existing.interactions += 1;
+      } else {
+        modelMap.set(modelId, {
+          modelName,
+          cost: totalCost,
+          tokens: totalTokens,
+          interactions: 1,
+          fill: colors[modelMap.size % colors.length],
+        });
       }
     });
     
     return Array.from(modelMap.values()).sort((a, b) => b.cost - a.cost);
-  }, [interactions, priceMap, dbProviderConfigs]);
+  }, [interactions, dbProviderConfigs]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -377,7 +351,7 @@ export const UsageDashboard: React.FC = () => {
                 <YAxis 
                   yAxisId="cost" 
                   orientation="left"
-                  tickFormatter={formatCost}
+                  tickFormatter={formatTokenCost}
                   stroke="var(--muted-foreground)"
                   fontSize={12}
                 />
@@ -389,7 +363,7 @@ export const UsageDashboard: React.FC = () => {
                   fontSize={12}
                 />
                 <ChartTooltip 
-                  content={<ChartTooltipContent formatter={(value, name) => name === "cost" ? formatCost(Number(value)) : Number(value).toLocaleString()} />} 
+                  content={<ChartTooltipContent formatter={(value, name) => name === "cost" ? formatTokenCost(Number(value)) : Number(value).toLocaleString()} />} 
                 />
                 <Bar 
                   yAxisId="cost" 
@@ -429,12 +403,12 @@ export const UsageDashboard: React.FC = () => {
                   outerRadius={140}
                   label={({ modelName, cost }) =>
                     typeof modelName === "string" && typeof cost === "number"
-                      ? `${modelName}: ${formatCost(cost)}`
+                      ? `${modelName}: ${formatTokenCost(cost)}`
                       : ""
                   }
                 />
                 <ChartTooltip 
-                  content={<ChartTooltipContent formatter={(value) => formatCost(Number(value))} />} 
+                  content={<ChartTooltipContent formatter={(value) => formatTokenCost(Number(value))} />} 
                 />
               </PieChart>
             </ChartContainer>

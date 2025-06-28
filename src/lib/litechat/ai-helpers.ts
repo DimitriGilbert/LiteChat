@@ -23,6 +23,39 @@ import type {
   ToolResultPart,
 } from "ai";
 import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
+import { nanoid } from "nanoid";
+import { useInputStore } from "@/store/input.store";
+import { usePromptStateStore } from "@/store/prompt.store";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
+import type { PromptTurnObject } from "@/types/litechat/prompt";
+
+/**
+ * Formats a token cost as a human-readable string:
+ *   - $X.XX for costs >= $1
+ *   - X.XX¢ for costs >= $0.01 and < $1
+ *   - X.XX‰ (per-mille) for costs < $0.01
+ * Handles edge cases (zero, negative, NaN, etc.).
+ * @param cost Cost in dollars
+ * @returns Formatted string
+ */
+export function formatTokenCost(cost: number): string {
+  if (typeof cost !== 'number' || isNaN(cost)) return '—';
+  if (cost === 0) return '0¢';
+  if (cost < 0) return `-${formatTokenCost(-cost)}`;
+  if (cost >= 1) {
+    return `$${cost.toFixed(2)}`;
+  } else {
+    const cents = cost * 100;
+    let fx = 2;
+    if (cents < 0.001) {
+      fx *= 3;
+    } else if (cents < 0.01) {
+      fx *= 2;
+    }
+    return `${cents.toFixed(fx)}¢`;
+  }
+}
 
 export async function runMiddleware<H extends ModMiddlewareHookName>(
   hookName: H,
@@ -271,4 +304,46 @@ export function buildHistoryMessages(
     }
     return msgs;
   });
+}
+
+export async function buildCurrentPromptTurnData(overrideContent?: string): Promise<PromptTurnObject> {
+  const registeredPromptControls = useControlRegistryStore.getState().promptControls;
+  const promptControls = Object.values(registeredPromptControls);
+  const currentAttachedFiles = useInputStore.getState().attachedFilesMetadata;
+  const currentModelIdFromPromptStore = usePromptStateStore.getState().modelId;
+  const valueFromRef = overrideContent ?? "";
+  const trimmedValue = valueFromRef.trim();
+
+  let parameters: Record<string, any> = {};
+  let metadata: Record<string, any> = {};
+
+  for (const control of promptControls) {
+    if (control.getParameters) {
+      const params = await control.getParameters();
+      if (params) parameters = { ...parameters, ...params };
+    }
+    if (control.getMetadata) {
+      const meta = await control.getMetadata();
+      if (meta) metadata = { ...metadata, ...meta };
+    }
+  }
+
+  if (currentAttachedFiles.length > 0) {
+    metadata.attachedFiles = [...currentAttachedFiles];
+  }
+
+  if (!metadata.modelId && currentModelIdFromPromptStore) {
+    metadata.modelId = currentModelIdFromPromptStore;
+  }
+
+  let turnData: PromptTurnObject = {
+    id: nanoid(),
+    content: trimmedValue,
+    parameters,
+    metadata,
+  };
+
+  emitter.emit(promptEvent.submitted, { turnData });
+
+  return turnData;
 }
