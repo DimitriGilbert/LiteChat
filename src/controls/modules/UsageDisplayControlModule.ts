@@ -347,7 +347,9 @@ export class UsageDisplayControlModule implements ControlModule {
         const modelDef = config.fetchedModels.find((m) => m.id === specificModelId);
         if (modelDef?.pricing) {
           const promptPrice = parseFloat(modelDef.pricing.prompt || '0');
-          cost = (tokens / 1_000_000) * promptPrice;
+          const completionPrice = parseFloat(modelDef.pricing.completion || '0');
+          const { cost: calculatedCost } = calculateTokenCost(tokens, 0, promptPrice, completionPrice);
+          cost = calculatedCost;
         }
       }
       return { tokens, cost };

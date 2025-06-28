@@ -67,25 +67,6 @@ export const UsageDashboard: React.FC = () => {
 
   const { dbProviderConfigs } = useProviderStore();
 
-  // Create price lookup map
-  const priceMap = useMemo(() => {
-    const map = new Map<string, { prompt: number; completion: number }>();
-    
-    dbProviderConfigs.forEach(config => {
-      if (config.fetchedModels) {
-        config.fetchedModels.forEach(model => {
-          const combinedId = `${config.id}:${model.id}`;
-          map.set(combinedId, {
-            prompt: parseFloat(model.pricing?.prompt || "0"),
-            completion: parseFloat(model.pricing?.completion || "0"),
-          });
-        });
-      }
-    });
-    
-    return map;
-  }, [dbProviderConfigs]);
-
   // Load interactions for the selected date range
   const loadUsageData = async () => {
     setLoading(true);

@@ -265,10 +265,10 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
                               <div>Context: {model.metadataSummary.context_length.toLocaleString()} tokens</div>
                             )}
                             {model.metadataSummary?.pricing?.prompt && (
-                              <div>Input Price: ${parseFloat(model.metadataSummary.pricing.prompt).toFixed(2)} / 1M tokens</div>
+                              <div>Input Price: {parseFloat(model.metadataSummary.pricing.prompt) * 1000000000} / 1M tokens</div>
                             )}
                             {model.metadataSummary?.pricing?.completion && (
-                              <div>Output Price: ${parseFloat(model.metadataSummary.pricing.completion).toFixed(2)} / 1M tokens</div>
+                              <div>Output Price: {parseFloat(model.metadataSummary.pricing.completion) * 1000000000} / 1M tokens</div>
                             )}
                           </TooltipContent>
                         </Tooltip>

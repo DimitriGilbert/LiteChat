@@ -1,6 +1,6 @@
 // src/controls/components/usage-display/UsageDisplayControl.tsx
 // FULL FILE
-import React, { useMemo, useEffect, useState } from "react";
+import React, {  useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,

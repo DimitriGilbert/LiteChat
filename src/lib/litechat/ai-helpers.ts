@@ -30,15 +30,7 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 
-/**
- * Formats a token cost as a human-readable string:
- *   - $X.XX for costs >= $1
- *   - X.XX¢ for costs >= $0.01 and < $1
- *   - X.XX‰ (per-mille) for costs < $0.01
- * Handles edge cases (zero, negative, NaN, etc.).
- * @param cost Cost in dollars
- * @returns Formatted string
- */
+
 export function formatTokenCost(cost: number): string {
   if (typeof cost !== 'number' || isNaN(cost)) return '—';
   if (cost === 0) return '0¢';
