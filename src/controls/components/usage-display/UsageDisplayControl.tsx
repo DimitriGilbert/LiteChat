@@ -37,21 +37,31 @@ export const UsageDisplayControl: React.FC<UsageDisplayControlProps> = ({
       setLiveTokens(null);
       setLiveCost(null);
       let timeout: NodeJS.Timeout | null = null;
+      let isCancelled = false;
       try {
         const estimationPromise = module.getLiveTokenEstimation();
         timeout = setTimeout(() => {
+          if (isCancelled) return;
           setError("Estimation timed out");
           setLoading(false);
         }, 2000);
         const result = await estimationPromise;
-        if (timeout) clearTimeout(timeout);
+        clearTimeout(timeout);
+        if (isCancelled) return;
         setLiveTokens(result.tokens);
         setLiveCost(result.cost);
         setLoading(false);
-      } catch (e) {
-        setError("Estimation error");
+      } catch (e: any) {
+        if (timeout) clearTimeout(timeout);
+        if (isCancelled) return;
+        setError(e instanceof Error ? e.message : "Estimation error");
         setLoading(false);
       }
+      // Return cleanup function
+      return () => {
+        isCancelled = true;
+        if (timeout) clearTimeout(timeout);
+      };
     } else {
       setLiveTokens(null);
       setLiveCost(null);
