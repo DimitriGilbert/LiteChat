@@ -23,6 +23,7 @@ import {
   Globe,
   Wrench,
   Palette,
+  ArrowUpDown,
 } from "lucide-react";
 import type { ModelListItem } from "@/types/litechat/provider";
 
@@ -35,7 +36,20 @@ interface ModelSelectorProps {
   isLoading?: boolean;
 }
 
-type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal" | "imageGeneration";
+type CapabilityFilter =
+  | "reasoning"
+  | "webSearch"
+  | "tools"
+  | "multimodal"
+  | "imageGeneration";
+
+type SortField =
+  | "name"
+  | "price_input"
+  | "price_output"
+  | "context_length"
+  | "created";
+type SortDirection = "asc" | "desc";
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({
   models: modelsFromSource,
@@ -47,6 +61,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [filterText, setFilterText] = useState("");
+  const [sortActive, setSortActive] = useState(false);
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [capabilityFilters, setCapabilityFilters] = useState<
     Record<CapabilityFilter, boolean>
   >({
@@ -56,6 +73,16 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     multimodal: false,
     imageGeneration: false,
   });
+
+  const getModelPrice = useCallback(
+    (model: ModelListItem, type: "input" | "output"): number => {
+      const pricing = model.metadataSummary?.pricing;
+      if (!pricing) return 0;
+      const priceField = type === "input" ? "prompt" : "completion";
+      return parseFloat(pricing[priceField] || "0");
+    },
+    []
+  );
 
   const filteredModels = useMemo(() => {
     let textFiltered = modelsFromSource;
@@ -68,43 +95,88 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           model.id.toLowerCase().includes(lowerFilter)
       );
     }
+
     const activeCapabilityFilters = Object.entries(capabilityFilters)
       .filter(([, isActive]) => isActive)
       .map(([key]) => key as CapabilityFilter);
-    if (activeCapabilityFilters.length === 0) {
+
+    if (activeCapabilityFilters.length > 0) {
+      textFiltered = textFiltered.filter((model: ModelListItem) => {
+        const supportedParams = new Set(
+          model.metadataSummary?.supported_parameters ?? []
+        );
+        const inputModalities = new Set(
+          model.metadataSummary?.input_modalities ?? []
+        );
+        const outputModalities = new Set(
+          model.metadataSummary?.output_modalities ?? []
+        );
+        return activeCapabilityFilters.every((filter) => {
+          switch (filter) {
+            case "reasoning":
+              return supportedParams.has("reasoning");
+            case "webSearch":
+              return (
+                supportedParams.has("web_search") ||
+                supportedParams.has("web_search_options")
+              );
+            case "tools":
+              return supportedParams.has("tools");
+            case "multimodal":
+              return Array.from(inputModalities).some((mod) => mod !== "text");
+            case "imageGeneration":
+              return outputModalities.has("image");
+            default:
+              return true;
+          }
+        });
+      });
+    }
+
+    if (!sortActive) {
       return textFiltered;
     }
-    return textFiltered.filter((model: ModelListItem) => {
-      const supportedParams = new Set(
-        model.metadataSummary?.supported_parameters ?? []
-      );
-      const inputModalities = new Set(
-        model.metadataSummary?.input_modalities ?? []
-      );
-      const outputModalities = new Set(
-        model.metadataSummary?.output_modalities ?? []
-      );
-      return activeCapabilityFilters.every((filter) => {
-        switch (filter) {
-          case "reasoning":
-            return supportedParams.has("reasoning");
-          case "webSearch":
-            return (
-              supportedParams.has("web_search") ||
-              supportedParams.has("web_search_options")
-            );
-          case "tools":
-            return supportedParams.has("tools");
-          case "multimodal":
-            return Array.from(inputModalities).some((mod) => mod !== "text");
-          case "imageGeneration":
-            return outputModalities.has("image");
-          default:
-            return true;
-        }
-      });
+    // Apply sorting
+    const sorted = [...textFiltered].sort((a, b) => {
+      let aValue: any, bValue: any;
+      switch (sortField) {
+        case "name":
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case "price_input":
+          aValue = getModelPrice(a, "input");
+          bValue = getModelPrice(b, "input");
+          break;
+        case "price_output":
+          aValue = getModelPrice(a, "output");
+          bValue = getModelPrice(b, "output");
+          break;
+        case "context_length":
+          aValue = a.metadataSummary?.context_length || 0;
+          bValue = b.metadataSummary?.context_length || 0;
+          break;
+        case "created":
+          aValue = a.metadataSummary?.created || 0;
+          bValue = b.metadataSummary?.created || 0;
+          break;
+        default:
+          return 0;
+      }
+      if (aValue === bValue) return 0;
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [modelsFromSource, filterText, capabilityFilters]);
+    return sorted;
+  }, [
+    modelsFromSource,
+    filterText,
+    capabilityFilters,
+    sortActive,
+    sortField,
+    sortDirection,
+    getModelPrice,
+  ]);
 
   const selectedModelDetails = useMemo(() => {
     return modelsFromSource.find((m: ModelListItem) => m.id === currentValue);
@@ -168,7 +240,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           maxHeight: "min(40vh, 400px)",
           overflow: "hidden",
           zIndex: 9999,
-          pointerEvents: 'auto'
+          pointerEvents: "auto",
         }}
         onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => e.stopPropagation()}
@@ -176,7 +248,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         onPointerDownCapture={(e) => e.stopPropagation()}
       >
         <Command shouldFilter={false}>
-          <div className="flex items-center border-b px-3">
+          <div className="flex items-center border-b px-3 gap-2">
             <SearchIconLucide className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <CommandInput
               placeholder="Search model..."
@@ -185,6 +257,55 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
             />
             <div className="flex items-center gap-0.5 ml-auto pl-2">
+              <Button
+                variant={sortActive ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 w-7 p-0"
+                title="Sort models"
+                aria-label="Sort models"
+                onClick={() => setSortActive((v) => !v)}
+              >
+                <ArrowUpDown className="h-4 w-4" />
+              </Button>
+              {sortActive && (
+                <select
+                  className="ml-2 h-8 text-xs border rounded px-1 bg-background"
+                  value={`${sortField}:${sortDirection}`}
+                  autoFocus
+                  onBlur={() => setSortActive(false)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    const [field, direction] = e.target.value.split(":");
+                    setSortField(field as SortField);
+                    setSortDirection(direction as SortDirection);
+                  }}
+                  style={{ minWidth: 120 }}
+                  aria-label="Sort models"
+                >
+                  <option value="name:asc">Name (A-Z)</option>
+                  <option value="name:desc">Name (Z-A)</option>
+                  <option value="price_input:asc">
+                    Input Price (Low-High)
+                  </option>
+                  <option value="price_input:desc">
+                    Input Price (High-Low)
+                  </option>
+                  <option value="price_output:asc">
+                    Output Price (Low-High)
+                  </option>
+                  <option value="price_output:desc">
+                    Output Price (High-Low)
+                  </option>
+                  <option value="context_length:desc">
+                    Context Length (High-Low)
+                  </option>
+                  <option value="context_length:asc">
+                    Context Length (Low-High)
+                  </option>
+                  <option value="created:desc">Release Date (Newest)</option>
+                  <option value="created:asc">Release Date (Oldest)</option>
+                </select>
+              )}
               <Button
                 variant={capabilityFilters.reasoning ? "secondary" : "ghost"}
                 size="sm"
@@ -238,7 +359,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 <ImageIcon className="h-4 w-4" />
               </Button>
               <Button
-                variant={capabilityFilters.imageGeneration ? "secondary" : "ghost"}
+                variant={
+                  capabilityFilters.imageGeneration ? "secondary" : "ghost"
+                }
                 size="sm"
                 className={cn(
                   "h-7 w-7 p-0",

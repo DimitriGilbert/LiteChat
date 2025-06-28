@@ -6,6 +6,7 @@ import type {
   ResolvedRuleContent,
 } from "@/types/litechat/prompt";
 import { InteractionService } from "./interaction.service";
+import { PromptCompilationService } from "./prompt-compilation.service";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useProjectStore } from "@/store/project.store";
 import { usePromptStateStore } from "@/store/prompt.store";
@@ -34,9 +35,6 @@ export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
     console.log("[ConversationService] submitPrompt called", turnData);
     const interactionStoreState = useInteractionStore.getState();
-    const projectStoreState = useProjectStore.getState();
-    const promptState = usePromptStateStore.getState();
-    const conversationStoreState = useConversationStore.getState();
     const settingsStoreState = useSettingsStore.getState();
 
     const conversationId = interactionStoreState.currentConversationId;
@@ -48,11 +46,6 @@ export const ConversationService = {
       return;
     }
 
-    const currentConversation =
-      conversationStoreState.getConversationById(conversationId);
-    const currentProjectId = currentConversation?.projectId ?? null;
-    const effectiveSettings =
-      projectStoreState.getEffectiveProjectSettings(currentProjectId);
 
     const isFirstInteraction =
       interactionStoreState.interactions.filter(
@@ -64,185 +57,11 @@ export const ConversationService = {
       turnData.metadata?.autoTitleEnabledForTurn === true &&
       settingsStoreState.autoTitleModelId;
 
-    // Correctly build history for the AI
-    const activeInteractionsOnSpine = interactionStoreState.interactions
-      .filter(
-        (i) =>
-          i.conversationId === conversationId &&
-          i.parentId === null &&
-          i.status === "COMPLETED"
-      )
-      .sort((a, b) => a.index - b.index);
-
-    const turnsForHistoryBuilder: Interaction[] = activeInteractionsOnSpine
-      .map((activeInteraction) => {
-        if (
-          activeInteraction.type === "message.assistant_regen" &&
-          activeInteraction.metadata?.regeneratedFromId
-        ) {
-          const originalInteraction = interactionStoreState.interactions.find(
-            (orig) => orig.id === activeInteraction.metadata!.regeneratedFromId
-          );
-          // Ensure the original interaction was a user_assistant type and had a prompt.
-          if (
-            originalInteraction &&
-            originalInteraction.prompt &&
-            originalInteraction.type === "message.user_assistant"
-          ) {
-            // Create a synthetic interaction for history: original prompt + regen's response & active status
-            return {
-              ...activeInteraction, // Includes regen's ID, response, status, parentId (null), index, etc.
-              prompt: originalInteraction.prompt, // Crucially, take the prompt from the original
-              type: "message.user_assistant", // Present it as a standard turn for buildHistoryMessages
-            } as Interaction;
-          }
-        }
-        // If it's already a user_assistant type with a prompt, or a regen whose original prompt couldn't be mapped cleanly,
-        // return it as is, but ensure it has a prompt if it's user_assistant type.
-        if (
-          activeInteraction.type === "message.user_assistant" &&
-          activeInteraction.prompt
-        ) {
-          return activeInteraction;
-        }
-        // Return null for types that don't fit the user_assistant structure for buildHistoryMessages or are incomplete
-        return null;
-      })
-      .filter(Boolean) as Interaction[]; // Filter out any nulls
-
-    const historyMessages: CoreMessage[] = buildHistoryMessages(
-      turnsForHistoryBuilder
+    // Use centralized prompt compilation service
+    const promptObject = await PromptCompilationService.compilePrompt(
+      turnData,
+      conversationId
     );
-
-    let userContent = turnData.content;
-    const userMessageContentParts: (TextPart | ImagePart)[] = [];
-
-    const effectiveRulesContent: ResolvedRuleContent[] =
-      turnData.metadata?.effectiveRulesContent ?? [];
-
-    // Debug logging to track rules extraction
-    // console.log("[ConversationService] Rules content extraction:", {
-    //   effectiveRulesContentCount: effectiveRulesContent.length,
-    //   effectiveRulesContent: effectiveRulesContent.map((rule) => ({
-    //     type: rule.type,
-    //     sourceRuleId: rule.sourceRuleId,
-    //     contentPreview: rule.content.substring(0, 100) + "...",
-    //   })),
-    // });
-
-    const systemRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "system" || r.type === "control")
-      .map((r) => r.content);
-    const beforeRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "before")
-      .map((r) => r.content);
-    const afterRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "after")
-      .map((r) => r.content);
-
-    if (beforeRulesContent.length > 0) {
-      userContent = `${beforeRulesContent.join(`
-`)}
-
-${userContent}`;
-    }
-    if (afterRulesContent.length > 0) {
-      userContent = `${userContent}
-
-    ${afterRulesContent.join(`
-`)}`;
-    }
-
-    if (userContent) {
-      userMessageContentParts.push({ type: "text", text: userContent });
-    }
-
-    const attachedFilesMeta = turnData.metadata?.attachedFiles ?? [];
-    if (attachedFilesMeta.length > 0) {
-      const fileContentParts = await this._processFilesForPrompt(
-        attachedFilesMeta,
-        conversationId
-      );
-      userMessageContentParts.unshift(...fileContentParts);
-    }
-
-    if (userMessageContentParts.length > 0) {
-      historyMessages.push({ role: "user", content: userMessageContentParts });
-    } else {
-      console.warn(
-        "[ConversationService] No user text or file content found in turnData. Submitting without user message."
-      );
-    }
-
-    const turnSystemPrompt = turnData.metadata?.turnSystemPrompt as
-      | string
-      | undefined;
-    let baseSystemPrompt =
-      turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
-
-    if (systemRulesContent.length > 0) {
-      // Debug logging to track system prompt construction
-      // console.log('[ConversationService] System prompt construction:', {
-      //   turnSystemPrompt: turnSystemPrompt?.substring(0, 200) + '...',
-      //   effectiveSystemPrompt: effectiveSettings.systemPrompt?.substring(0, 200) + '...',
-      //   baseSystemPromptBeforeRules: baseSystemPrompt?.substring(0, 200) + '...',
-      //   systemRulesContent: systemRulesContent.map(content => content.substring(0, 200) + '...'),
-      //   systemRulesContentCount: systemRulesContent.length
-      // });
-
-      baseSystemPrompt = `${
-        baseSystemPrompt
-          ? `${baseSystemPrompt}
-
-        `
-          : ""
-      }${systemRulesContent.join(`
-`)}`;
-
-      // console.log('[ConversationService] Final system prompt length:', baseSystemPrompt?.length);
-    }
-
-    const finalParameters = {
-      temperature: promptState.temperature,
-      max_tokens: promptState.maxTokens,
-      top_p: promptState.topP,
-      top_k: promptState.topK,
-      presence_penalty: promptState.presencePenalty,
-      frequency_penalty: promptState.frequencyPenalty,
-      ...(turnData.parameters ?? {}),
-    };
-    Object.keys(finalParameters).forEach((key) => {
-      if (
-        finalParameters[key as keyof typeof finalParameters] === null ||
-        finalParameters[key as keyof typeof finalParameters] === undefined
-      ) {
-        delete finalParameters[key as keyof typeof finalParameters];
-      }
-    });
-
-    const promptObject: PromptObject = {
-      system: baseSystemPrompt,
-      messages: historyMessages,
-      parameters: finalParameters,
-      metadata: {
-        ...(({
-          turnSystemPrompt: _turnSystemPrompt,
-          activeTagIds,
-          activeRuleIds,
-          effectiveRulesContent: _effectiveRulesContent,
-          autoTitleEnabledForTurn,
-          ...restMeta
-        }) => ({
-          ...restMeta,
-          effectivelyAppliedTagIds: activeTagIds,
-          effectivelyAppliedRuleIds: activeRuleIds,
-        }))(turnData.metadata ?? {}),
-        modelId: promptState.modelId ?? undefined,
-        attachedFiles: turnData.metadata.attachedFiles?.map(
-          ({ contentBase64, contentText, ...rest }) => rest
-        ),
-      },
-    };
 
     try {
       const mainInteractionPromise = InteractionService.startInteraction(

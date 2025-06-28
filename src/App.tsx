@@ -24,6 +24,7 @@ import { GlobalModelSelectorModule } from "@/controls/modules/GlobalModelSelecto
 import { SystemPromptControlModule } from "@/controls/modules/SystemPromptControlModule";
 import { StructuredOutputControlModule } from "@/controls/modules/StructuredOutputControlModule";
 import { UsageDisplayControlModule } from "@/controls/modules/UsageDisplayControlModule";
+import { UsageDashboardModule } from "@/controls/modules/UsageDashboardModule";
 import { ReasoningControlModule } from "@/controls/modules/ReasoningControlModule";
 import { WebSearchControlModule } from "@/controls/modules/WebSearchControlModule";
 import { RulesControlModule } from "@/controls/modules/RulesControlModule";
@@ -95,6 +96,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   GlobalModelSelectorModule,
   AutoTitleControlModule,
   UsageDisplayControlModule,
+  UsageDashboardModule,
   ReasoningControlModule,
   WebSearchControlModule,
   ImageGenerationControlModule,

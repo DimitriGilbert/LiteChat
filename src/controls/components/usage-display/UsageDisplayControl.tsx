@@ -15,6 +15,19 @@ interface UsageDisplayControlProps {
   module: UsageDisplayControlModule;
 }
 
+const formatCost = (cost: number): string => {
+  if (cost >= 1) {
+    return `$${cost.toFixed(2)}`;
+  } else {
+    const cents = cost * 100;
+    if (cents >= 0.01) {
+      return `${cents.toFixed(2)}¢`;
+    } else {
+      return `${(cents * 1000).toFixed(2)}‰`;
+    }
+  }
+};
+
 export const UsageDisplayControl: React.FC<UsageDisplayControlProps> = ({
   module,
 }) => {
@@ -44,7 +57,18 @@ export const UsageDisplayControl: React.FC<UsageDisplayControlProps> = ({
     return null;
   }
 
-  const tooltipText = `Context: ~${totalEstimatedTokens.toLocaleString()} / ${contextLength.toLocaleString()} tokens (${contextPercentage}%) [History: ${historyTokens}, Input: ${estimatedInputTokens}]`;
+  const estimatedCost = module.estimatedPromptCost;
+  const estimatedTokens = module.estimatedPromptTokens;
+  
+  const tooltipText = estimatedCost > 0 
+    ? `Context: ~${totalEstimatedTokens.toLocaleString()} / ${contextLength.toLocaleString()} tokens (${contextPercentage}%) [History: ${historyTokens}, Input: ${estimatedInputTokens}] | Est. Cost: ${formatCost(estimatedCost)} (~${estimatedTokens.toLocaleString()} tokens)`
+    : `Context: ~${totalEstimatedTokens.toLocaleString()} / ${contextLength.toLocaleString()} tokens (${contextPercentage}%) [History: ${historyTokens}, Input: ${estimatedInputTokens}]`;
+
+  useEffect(() => {
+    if (estimatedCost > 0) {
+      console.debug(`[USAGE DISPLAY] EstimatedCost: ${estimatedCost}, EstimatedTokens: ${estimatedTokens}, Format: ${formatCost(estimatedCost)}`);
+    }
+  }, [estimatedCost, estimatedTokens]);
 
   return (
     <TooltipProvider delayDuration={100}>

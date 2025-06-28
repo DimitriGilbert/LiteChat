@@ -17,12 +17,12 @@ import { useInteractionStore } from "@/store/interaction.store";
 import { PersistenceService } from "./persistence.service";
 import { usePromptStateStore } from "@/store/prompt.store";
 import { InteractionService } from "./interaction.service";
+import { PromptCompilationService } from "./prompt-compilation.service";
 import { useProjectStore } from "@/store/project.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useConversationStore } from "@/store/conversation.store";
-import type { CoreMessage } from "ai";
-import { buildHistoryMessages, getContextSnapshot } from "@/lib/litechat/ai-helpers";
+import { getContextSnapshot } from "@/lib/litechat/ai-helpers";
 import { WorkflowFlowGenerator } from "@/lib/litechat/workflow-flow-generator";
 import type { StepStatus } from "@/types/litechat/flow";
 import { CodeExecutionService } from "./code-execution.service";
@@ -651,7 +651,7 @@ export const WorkflowService = {
       },
     };
 
-    const { promptObject } = await WorkflowService.buildCompletePromptObject(
+    const { promptObject } = await PromptCompilationService.compilePromptWithControls(
       conversationId,
       initialPrompt,
       baseTurnData
@@ -952,7 +952,7 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
 
       // Build complete prompt object with all controls (like race system)
       const { promptObject: initialStepPrompt } =
-        await WorkflowService.buildCompletePromptObject(
+        await PromptCompilationService.compilePromptWithControls(
           run.conversationId,
           baseTurnData.content,
           initialStepTurnData
@@ -1349,7 +1349,7 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         selectedRules: compiled.selectedRules?.length || 0,
       });
 
-      // Template details will be handled by buildCompletePromptObject
+      // Template details will be handled by PromptCompilationService.compilePromptWithControls
 
       // Add structured output schema for the NEXT step if it exists and is not a transform step
       const nextStepIndex = stepIndex + 1;
@@ -1463,7 +1463,7 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
 
       // Build complete step prompt with all controls (like race system)
       const { promptObject: stepPrompt } =
-        await WorkflowService.buildCompletePromptObject(
+        await PromptCompilationService.compilePromptWithControls(
           run.conversationId,
           compiled.content,
           stepTurnData
@@ -1884,166 +1884,7 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
     });
   },
 
-  /**
-   * Extract and build complete PromptObject like ConversationService.submitPrompt does
-   * This ensures all prompt controls (structured output, tools, parameters) are included
-   */
-  async buildCompletePromptObject(
-    conversationId: string,
-    userContent: string,
-    baseTurnData: PromptTurnObject
-  ): Promise<{ promptObject: PromptObject; turnData: PromptTurnObject }> {
-    const interactionStoreState = useInteractionStore.getState();
-    const projectStoreState = useProjectStore.getState();
-    const promptState = usePromptStateStore.getState();
-    const conversationStoreState = useConversationStore.getState();
 
-    const controlRegistryState = useControlRegistryStore.getState();
-
-    // Get conversation and project settings
-    const currentConversation =
-      conversationStoreState.getConversationById(conversationId);
-    const currentProjectId = currentConversation?.projectId ?? null;
-    const effectiveSettings =
-      projectStoreState.getEffectiveProjectSettings(currentProjectId);
-
-    // Collect parameters and metadata from all prompt controls
-    const promptControls = Object.values(controlRegistryState.promptControls);
-    let parameters: Record<string, any> = {};
-    let metadata: Record<string, any> = { ...baseTurnData.metadata };
-
-    for (const control of promptControls) {
-      if (control.getParameters) {
-        const params = await control.getParameters();
-        if (params) parameters = { ...parameters, ...params };
-      }
-      if (control.getMetadata) {
-        const meta = await control.getMetadata();
-        if (meta) metadata = { ...metadata, ...meta };
-      }
-    }
-
-    // Build history from existing interactions
-    const activeInteractionsOnSpine = interactionStoreState.interactions
-      .filter(
-        (i) =>
-          i.conversationId === conversationId &&
-          i.parentId === null &&
-          i.status === "COMPLETED"
-      )
-      .sort((a, b) => a.index - b.index);
-
-    const turnsForHistoryBuilder: Interaction[] = activeInteractionsOnSpine
-      .map((activeInteraction) => {
-        if (
-          activeInteraction.type === "message.assistant_regen" &&
-          activeInteraction.metadata?.regeneratedFromId
-        ) {
-          const originalInteraction = interactionStoreState.interactions.find(
-            (orig) => orig.id === activeInteraction.metadata!.regeneratedFromId
-          );
-          if (
-            originalInteraction &&
-            originalInteraction.prompt &&
-            originalInteraction.type === "message.user_assistant"
-          ) {
-            return {
-              ...activeInteraction,
-              prompt: originalInteraction.prompt,
-              type: "message.user_assistant",
-            } as Interaction;
-          }
-        }
-        if (
-          activeInteraction.type === "message.user_assistant" &&
-          activeInteraction.prompt
-        ) {
-          return activeInteraction;
-        }
-        return null;
-      })
-      .filter(Boolean) as Interaction[];
-
-    const historyMessages: CoreMessage[] = buildHistoryMessages(
-      turnsForHistoryBuilder
-    );
-
-    // Add current user message
-    historyMessages.push({ role: "user", content: userContent });
-
-    // Build system prompt with rules if any
-    const turnSystemPrompt = metadata?.turnSystemPrompt as string | undefined;
-    let baseSystemPrompt =
-      turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
-
-    const effectiveRulesContent = metadata?.effectiveRulesContent ?? [];
-    const systemRulesContent = effectiveRulesContent
-      .filter((r: any) => r.type === "system" || r.type === "control")
-      .map((r: any) => r.content);
-
-    if (systemRulesContent.length > 0) {
-      baseSystemPrompt = `${
-        baseSystemPrompt ? `${baseSystemPrompt}\n\n` : ""
-      }${systemRulesContent.join("\n")}`;
-    }
-
-    // Build final parameters from prompt state + control parameters
-    const finalParameters = {
-      temperature: promptState.temperature,
-      max_tokens: promptState.maxTokens,
-      top_p: promptState.topP,
-      top_k: promptState.topK,
-      presence_penalty: promptState.presencePenalty,
-      frequency_penalty: promptState.frequencyPenalty,
-      ...parameters, // Control parameters override prompt state
-      ...(baseTurnData.parameters ?? {}), // Base turn data parameters have highest priority
-    };
-
-    // DEBUG: Log parameter building
-    // console.log(`[WorkflowService] Building prompt parameters:`, {
-    //   promptStateParams: {
-    //     temperature: promptState.temperature,
-    //     max_tokens: promptState.maxTokens,
-    //   },
-    //   controlParams: parameters,
-    //   baseTurnParams: baseTurnData.parameters,
-    //   finalParams: finalParameters,
-    // });
-
-    // Remove null/undefined parameters
-    Object.keys(finalParameters).forEach((key) => {
-      if (
-        finalParameters[key as keyof typeof finalParameters] === null ||
-        finalParameters[key as keyof typeof finalParameters] === undefined
-      ) {
-        delete finalParameters[key as keyof typeof finalParameters];
-      }
-    });
-
-    // Build complete metadata
-    const completeMetadata = {
-      ...metadata,
-      modelId: metadata.modelId || promptState.modelId || undefined,
-    };
-
-    // Build complete turn data
-    const completeTurnData: PromptTurnObject = {
-      ...baseTurnData,
-      content: userContent,
-      parameters: finalParameters,
-      metadata: completeMetadata,
-    };
-
-    // Build complete prompt object
-    const promptObject: PromptObject = {
-      system: baseSystemPrompt,
-      messages: historyMessages,
-      parameters: finalParameters,
-      metadata: completeMetadata,
-    };
-
-    return { promptObject, turnData: completeTurnData };
-  },
 
   /**
    * Create proper structured output schema and specification for workflow steps

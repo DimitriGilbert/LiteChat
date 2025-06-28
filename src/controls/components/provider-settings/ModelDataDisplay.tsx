@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { ExternalLinkIcon } from "lucide-react";
 
 interface ModelDataDisplayProps {
   modelId: string | null; // Combined ID
@@ -27,7 +29,9 @@ const formatPrice = (priceStr: string | null | undefined): string => {
   if (!priceStr) return "N/A";
   const priceNum = parseFloat(priceStr);
   if (isNaN(priceNum)) return "N/A";
-  return `$${(priceNum / 1000).toFixed(4)} / 1K tokens`;
+  // OpenRouter pricing is per token, so multiply by 1M to show price per 1M tokens
+  const pricePerMillion = priceNum * 1_000_000;
+  return `$${pricePerMillion.toFixed(2)} / 1M tokens`;
 };
 
 const renderDetailRow = (
@@ -184,12 +188,32 @@ export const ModelDataDisplay: React.FC<ModelDataDisplayProps> = ({
   return (
     <div className="space-y-4 p-1 h-full flex flex-col">
       <div className="flex items-center justify-between flex-shrink-0">
-        <h4 className="text-lg font-semibold text-card-foreground truncate">
-          {model.name}
-          <span className="text-sm text-muted-foreground ml-2">
-            ({model.providerName})
-          </span>
-        </h4>
+        <div className="flex items-center gap-2">
+          <h4 className="text-lg font-semibold text-card-foreground truncate">
+            {model.name}
+            <span className="text-sm text-muted-foreground ml-2">
+              ({model.providerName})
+            </span>
+          </h4>
+          {metadata.homepageUrl && (
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-xs"
+              asChild
+            >
+              <a
+                href={metadata.homepageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1"
+              >
+                View on Hub
+                <ExternalLinkIcon className="h-3 w-3" />
+              </a>
+            </Button>
+          )}
+        </div>
         <div className="flex items-center space-x-2">
           <Label
             htmlFor={`enable-details-${simpleModelId}`}

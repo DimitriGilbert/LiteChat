@@ -6,7 +6,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SearchIcon } from "lucide-react";
+import { SearchIcon, InfoIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -237,32 +237,43 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
                     }}
                     className="p-1"
                   >
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            className="w-full text-left p-1.5 rounded hover:bg-muted/50 flex flex-col"
-                            onClick={() => handleRowClick(model.id)}
-                          >
-                            <span className="text-sm font-medium truncate">
-                              {model.name}
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="flex-1 text-left p-1.5 rounded hover:bg-muted/50 flex flex-col"
+                        onClick={() => handleRowClick(model.id)}
+                      >
+                        <span className="text-sm font-medium truncate">
+                          {model.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {model.providerName}
+                        </span>
+                      </button>
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-pointer flex items-center">
+                              <InfoIcon className="h-4 w-4 text-muted-foreground" />
                             </span>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {model.providerName}
-                            </span>
-                          </button>
-                        </TooltipTrigger>
-                        {model.metadataSummary?.description && (
-                          <TooltipContent
-                            side="bottom"
-                            align="start"
-                            className="max-w-xs"
-                          >
-                            <p>{model.metadataSummary.description}</p>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" align="start" className="max-w-xs">
+                            <div className="text-xs font-semibold mb-1">{model.name}</div>
+                            {model.metadataSummary?.description && (
+                              <div className="mb-1">{model.metadataSummary.description}</div>
+                            )}
+                            {model.metadataSummary?.context_length && (
+                              <div>Context: {model.metadataSummary.context_length.toLocaleString()} tokens</div>
+                            )}
+                            {model.metadataSummary?.pricing?.prompt && (
+                              <div>Input Price: ${parseFloat(model.metadataSummary.pricing.prompt) * 1_000_000} / 1M tokens</div>
+                            )}
+                            {model.metadataSummary?.pricing?.completion && (
+                              <div>Output Price: ${parseFloat(model.metadataSummary.pricing.completion) * 1_000_000} / 1M tokens</div>
+                            )}
                           </TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
                 );
               })

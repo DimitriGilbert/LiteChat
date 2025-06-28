@@ -1,6 +1,12 @@
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { FilterIcon, BrainCircuitIcon, SearchIcon, WrenchIcon, ImageIcon, CheckIcon, BanIcon, DollarSignIcon } from "lucide-react";
+import { FilterIcon, BrainCircuitIcon, SearchIcon, WrenchIcon, ImageIcon, CheckIcon, BanIcon, DollarSignIcon, ArrowUpDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -13,6 +19,14 @@ import { DbProviderConfig } from "@/types/litechat/provider";
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 type EnabledFilterStatus = "all" | "enabled" | "disabled";
 
+type SortField = "name" | "price_input" | "price_output" | "context_length" | "created";
+type SortDirection = "asc" | "desc";
+
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
+
 interface ModelFilterControlsProps {
   // State from parent
   currentCapabilityFilters: Record<CapabilityFilter, boolean>;
@@ -23,9 +37,11 @@ interface ModelFilterControlsProps {
   currentMinOutputPrice?: string; // Optional, for price filter
   currentMaxOutputPrice?: string; // Optional, for price filter
   allProviders?: DbProviderConfig[]; // Optional, for provider filter
+  currentSort?: SortState; // Optional, for sorting
 
   // Callbacks to update parent state
   onCapabilityFilterChange: (filters: Record<CapabilityFilter, boolean>) => void;
+  onSortChange?: (sort: SortState) => void;
   onProviderFilterChange?: (selectedProviderIds: Set<string>) => void;
   onEnabledFilterChange?: (status: EnabledFilterStatus) => void;
   onPriceFilterChange?: (minIn: string, maxIn: string, minOut: string, maxOut: string) => void;
@@ -35,6 +51,7 @@ interface ModelFilterControlsProps {
   showProviderFilter?: boolean;
   showStatusFilter?: boolean;
   showPriceFilters?: boolean;
+  showSortControls?: boolean;
 
   disabled?: boolean;
   totalActiveFilters: number; // Calculated by parent
@@ -53,10 +70,13 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
   currentMaxOutputPrice,
   onPriceFilterChange,
   allProviders,
+  currentSort,
+  onSortChange,
   showCapabilityFilters = true,
   showProviderFilter = false,
   showStatusFilter = false,
   showPriceFilters = false,
+  showSortControls = false,
   disabled = false,
   totalActiveFilters,
 }) => {
@@ -91,23 +111,72 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
 
 
   return (
-    <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 px-3 relative"
-          disabled={disabled}
-        >
-          <FilterIcon className="h-4 w-4 mr-1" />
-          Filters
-          {totalActiveFilters > 0 && (
-            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
-              {totalActiveFilters}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+    <div className="flex items-center gap-2">
+      {showSortControls && currentSort && onSortChange && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 px-3"
+              disabled={disabled}
+            >
+              <ArrowUpDown className="h-4 w-4 mr-1" />
+              Sort
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => onSortChange({ field: "name", direction: "asc" })}>
+              Name (A-Z)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "name", direction: "desc" })}>
+              Name (Z-A)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "price_input", direction: "asc" })}>
+              Input Price (Low-High)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "price_input", direction: "desc" })}>
+              Input Price (High-Low)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "price_output", direction: "asc" })}>
+              Output Price (Low-High)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "price_output", direction: "desc" })}>
+              Output Price (High-Low)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "context_length", direction: "desc" })}>
+              Context Length (High-Low)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "context_length", direction: "asc" })}>
+              Context Length (Low-High)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "created", direction: "desc" })}>
+              Release Date (Newest)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "created", direction: "asc" })}>
+              Release Date (Oldest)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      
+      <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 px-3 relative"
+            disabled={disabled}
+          >
+            <FilterIcon className="h-4 w-4 mr-1" />
+            Filters
+            {totalActiveFilters > 0 && (
+              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
+                {totalActiveFilters}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
       <PopoverContent
         className="p-4 space-y-4 w-72 bg-popover shadow-lg relative"
         style={{ zIndex: 9999, pointerEvents: 'auto' }}
@@ -263,5 +332,6 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         )}
       </PopoverContent>
     </Popover>
+    </div>
   );
 }; 

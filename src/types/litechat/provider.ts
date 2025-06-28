@@ -37,6 +37,7 @@ export interface OpenRouterModel {
   top_provider?: OpenRouterTopProvider | null;
   per_request_limits?: Record<string, any> | null;
   supported_parameters?: string[] | null;
+  homepageUrl?: string | null;
 }
 // --- End OpenRouter Model Structure ---
 
@@ -54,6 +55,8 @@ export interface ModelListItem {
     output_modalities?: string[] | null;
     pricing?: OpenRouterModelPricing | null;
     description?: string | null;
+    created?: number | null;
+    homepageUrl?: string | null;
   };
 }
 // --- End Lighter Model Type ---

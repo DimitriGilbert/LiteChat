@@ -14,6 +14,8 @@ import { useInputStore } from "@/store/input.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { AttachedFileMetadata } from "@/store/input.store";
+import type { PromptTurnObject } from "@/types/litechat/prompt";
+import { PromptCompilationService } from "@/services/prompt-compilation.service";
 import {
   createAiModelConfig,
   splitModelId,
@@ -47,6 +49,9 @@ export class UsageDisplayControlModule implements ControlModule {
   public attachedFiles: AttachedFileMetadata[] = [];
   public selectedModelId: string | null = null;
   public contextLength = 0;
+  public estimatedPromptCost = 0;
+  public estimatedPromptTokens = 0;
+  private estimationDebounceTimer: NodeJS.Timeout | null = null;
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
@@ -56,12 +61,14 @@ export class UsageDisplayControlModule implements ControlModule {
     const unsubInput = modApi.on(promptEvent.inputChanged, (payload) => {
       if (typeof payload === "object" && payload && "value" in payload) {
         this.currentInputText = payload.value;
+        this._debouncedUpdateEstimation();
         this.notifyComponentUpdate?.();
       }
     });
     const unsubFiles = modApi.on(inputEvent.attachedFilesChanged, (payload) => {
       if (typeof payload === "object" && payload && "files" in payload) {
         this.attachedFiles = payload.files;
+        this._debouncedUpdateEstimation();
         this.notifyComponentUpdate?.();
       }
     });
@@ -176,6 +183,103 @@ export class UsageDisplayControlModule implements ControlModule {
     this.notifyComponentUpdate = cb;
   };
 
+  private _debouncedUpdateEstimation = () => {
+    if (this.estimationDebounceTimer) {
+      clearTimeout(this.estimationDebounceTimer);
+    }
+    this.estimationDebounceTimer = setTimeout(() => {
+      this._updateEstimation().catch(error => {
+        console.error("[UsageDisplayControlModule] Estimation error:", error);
+      });
+    }, 300); // 300ms debounce
+  };
+
+  private async _updateEstimation(): Promise<void> {
+    const interactionStore = useInteractionStore.getState();
+    const conversationId = interactionStore.currentConversationId;
+    
+    if (!conversationId || !this.selectedModelId) {
+      this.estimatedPromptCost = 0;
+      this.estimatedPromptTokens = 0;
+      return;
+    }
+
+    try {
+      // Construct a draft PromptTurnObject from current UI state
+      const draftTurnData: PromptTurnObject = {
+        id: "estimation",
+        content: this.currentInputText,
+        parameters: {},
+        metadata: {
+          attachedFiles: this.attachedFiles,
+        },
+      };
+
+      // Use centralized prompt compilation service
+      const promptObject = await PromptCompilationService.compilePrompt(
+        draftTurnData,
+        conversationId
+      );
+
+      // Count tokens for system prompt and all messages
+      let totalBytes = 0;
+      if (promptObject.system) {
+        totalBytes += new TextEncoder().encode(promptObject.system).length;
+      }
+      if (Array.isArray(promptObject.messages)) {
+        for (const msg of promptObject.messages) {
+          if (Array.isArray(msg.content)) {
+            for (const part of msg.content) {
+              if (part.type === "text" && part.text) {
+                totalBytes += new TextEncoder().encode(part.text).length;
+              }
+              // If part.type === "image", skip or count as 0 for now
+            }
+          } else if (typeof msg.content === "string") {
+            totalBytes += new TextEncoder().encode(msg.content).length;
+          }
+        }
+      }
+      this.estimatedPromptTokens = Math.ceil(totalBytes / BYTES_PER_TOKEN_ESTIMATE);
+
+      // Calculate cost using model pricing
+      const { providerId, modelId: specificModelId } = splitModelId(this.selectedModelId);
+      const { dbProviderConfigs } = useProviderStore.getState();
+      const config = dbProviderConfigs.find((p) => p.id === providerId);
+      
+      if (config?.fetchedModels) {
+        const modelDef = config.fetchedModels.find((m) => m.id === specificModelId);
+        if (modelDef?.pricing) {
+          const promptTokens = this.estimatedPromptTokens; // This is an approximation
+          const completionTokens = 0; // Not tracked separately here
+          let cost = 0;
+          let formula = '';
+          const promptPrice = parseFloat(modelDef.pricing.prompt || '0');
+          const completionPrice = parseFloat(modelDef.pricing.completion || '0');
+          if (promptPrice < 0.01 || completionPrice < 0.01) {
+            // Per-token pricing
+            cost = promptTokens * promptPrice + completionTokens * completionPrice;
+            formula = 'per-token';
+          } else {
+            // Per-million pricing
+            cost = (promptTokens / 1_000_000) * promptPrice + (completionTokens / 1_000_000) * completionPrice;
+            formula = 'per-million';
+          }
+          this.estimatedPromptCost = cost;
+          if (cost > 0) {
+            console.debug(`[USAGE DISPLAY MODULE] Model: ${specificModelId}, PromptTokens: ${promptTokens}, PricePrompt: ${promptPrice}, PriceCompletion: ${completionPrice}, Cost: ${cost}, Formula: ${formula}`);
+          }
+        }
+      }
+
+      this.notifyComponentUpdate?.();
+    } catch (error) {
+      console.error("[UsageDisplayControlModule] Error updating estimation:", error);
+      this.estimatedPromptCost = 0;
+      this.estimatedPromptTokens = 0;
+    }
+  };
+
   register(modApi: LiteChatModApi): void {
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
@@ -196,6 +300,10 @@ export class UsageDisplayControlModule implements ControlModule {
     if (this.unregisterCallback) {
       this.unregisterCallback();
       this.unregisterCallback = null;
+    }
+    if (this.estimationDebounceTimer) {
+      clearTimeout(this.estimationDebounceTimer);
+      this.estimationDebounceTimer = null;
     }
     this.notifyComponentUpdate = null;
     console.log(`[${this.id}] Destroyed.`);

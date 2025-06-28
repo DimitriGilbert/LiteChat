@@ -13,6 +13,13 @@ import { ModelFilterControls } from "@/controls/components/common/ModelFilterCon
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 type EnabledFilterStatus = "all" | "enabled" | "disabled";
+type SortField = "name" | "price_input" | "price_output" | "context_length" | "created";
+type SortDirection = "asc" | "desc";
+
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
 
 interface ModelEnablementListProps {
   providerId: string;
@@ -28,7 +35,7 @@ interface ModelEnablementListProps {
 const parsePrice = (priceStr: string | null | undefined): number | null => {
   if (!priceStr) return null;
   const priceNum = parseFloat(priceStr);
-  return isNaN(priceNum) ? null : priceNum / 1_000_000;
+  return isNaN(priceNum) ? null : priceNum;
 };
 
 export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
@@ -86,6 +93,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   const [maxInputPrice, setMaxInputPrice] = useState<string>("");
   const [minOutputPrice, setMinOutputPrice] = useState<string>("");
   const [maxOutputPrice, setMaxOutputPrice] = useState<string>("");
+  const [sort, setSort] = useState<SortState>({ field: "name", direction: "asc" });
 
   const filteredModels = useMemo(() => {
     let models = [...allAvailableModels];
@@ -163,7 +171,43 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
         return match;
       });
     }
-    return models;
+
+    // Apply sorting
+    const sorted = [...models].sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (sort.field) {
+        case "name":
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case "price_input":
+          aValue = parsePrice(a.pricing?.prompt) || 0;
+          bValue = parsePrice(b.pricing?.prompt) || 0;
+          break;
+        case "price_output":
+          aValue = parsePrice(a.pricing?.completion) || 0;
+          bValue = parsePrice(b.pricing?.completion) || 0;
+          break;
+        case "context_length":
+          aValue = a.context_length || 0;
+          bValue = b.context_length || 0;
+          break;
+        case "created":
+          aValue = a.created || 0;
+          bValue = b.created || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue === bValue) return 0;
+      
+      const comparison = aValue < bValue ? -1 : 1;
+      return sort.direction === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
   }, [
     allAvailableModels,
     searchQuery,
@@ -174,6 +218,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
     maxInputPrice,
     minOutputPrice,
     maxOutputPrice,
+    sort,
   ]);
 
   const rowVirtualizer = useVirtualizer({
@@ -196,6 +241,10 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
     setMaxInputPrice(maxIn);
     setMinOutputPrice(minOut);
     setMaxOutputPrice(maxOut);
+  }, []);
+
+  const handleSortChange = useCallback((newSort: SortState) => {
+    setSort(newSort);
   }, []);
 
   const activeFilterCount = useMemo(() => (
@@ -246,9 +295,12 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           currentMinOutputPrice={minOutputPrice}
           currentMaxOutputPrice={maxOutputPrice}
           onPriceFilterChange={handlePriceFilterChange}
+          currentSort={sort}
+          onSortChange={handleSortChange}
           showStatusFilter={true}
           showCapabilityFilters={true}
           showPriceFilters={true}
+          showSortControls={true}
           disabled={disabled}
           totalActiveFilters={activeFilterCount}
         />
