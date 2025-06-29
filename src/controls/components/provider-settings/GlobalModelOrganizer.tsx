@@ -13,6 +13,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -266,6 +267,12 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
         distance: 8, // Require 8px movement before drag starts
       },
     }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -325,13 +332,13 @@ export const GlobalModelOrganizer: React.FC<GlobalModelOrganizerProps> = ({
         <div className="w-full rounded-md border border-border p-3 bg-background/50">
           {filteredAndOrderedModelsForDisplay.length > 0 ? (
             <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragCancel={handleDragCancel}
-              modifiers={[]}
-            >
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+                modifiers={[]}
+              >
               <SortableContext
                 items={sortableItemIdsForDisplay}
                 strategy={verticalListSortingStrategy}

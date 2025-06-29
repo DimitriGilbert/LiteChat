@@ -11,6 +11,7 @@ import {
   ChevronUpIcon,
   ClipboardIcon,
   CheckIcon,
+  ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
@@ -20,6 +21,7 @@ import {
   useMarkdownParser,
 } from "@/lib/litechat/useMarkdownParser";
 import { UniversalBlockRenderer } from "@/components/LiteChat/common/UniversalBlockRenderer";
+import type { AttachedFileMetadata } from "@/store/input.store";
 
 interface UserPromptDisplayProps {
   turnData: Readonly<PromptTurnObject>;
@@ -28,6 +30,86 @@ interface UserPromptDisplayProps {
   isAssistantComplete?: boolean;
   interactionId?: string;
 }
+
+// Component to render files in a responsive grid
+const FileGridDisplay: React.FC<{
+  files: AttachedFileMetadata[];
+  isReadOnly: boolean;
+}> = ({ files, isReadOnly }) => {
+  const [modalImage, setModalImage] = useState<null | { src: string; name: string }>(null);
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+
+  const toggleFold = (id: string) => {
+    setFolded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  if (!files.length) return null;
+
+  return (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1">
+        {files.map((fileMeta) => {
+          const isImage = fileMeta.type?.startsWith("image/");
+          let previewUrl = undefined;
+          if (isImage && fileMeta.contentBase64) {
+            previewUrl = `data:${fileMeta.type};base64,${fileMeta.contentBase64}`;
+          }
+          const isFolded = folded.has(fileMeta.id);
+          return (
+            <div
+              key={fileMeta.id}
+              className="relative w-full h-32 sm:h-36 md:h-40 lg:h-48 xl:h-56 bg-muted/20 overflow-hidden rounded group flex items-center justify-center"
+            >
+              {/* Fold/Unfold button */}
+              <button
+                className="absolute top-1 right-1 z-10 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={e => { e.stopPropagation(); toggleFold(fileMeta.id); }}
+                tabIndex={0}
+                aria-label={isFolded ? "Unfold preview" : "Fold preview"}
+              >
+                {isFolded ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronUpIcon className="h-4 w-4" />}
+              </button>
+              {/* Preview area */}
+              {isImage && previewUrl ? (
+                isFolded ? (
+                  <div className="w-full h-full flex items-center justify-center bg-muted">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground opacity-60" />
+                  </div>
+                ) : (
+                  <img
+                    src={previewUrl}
+                    alt={fileMeta.name}
+                    className="w-full h-full object-cover rounded cursor-pointer"
+                    draggable={false}
+                    onClick={() => setModalImage({ src: previewUrl!, name: fileMeta.name })}
+                  />
+                )
+              ) : (
+                <div className="flex flex-col items-center justify-center w-full h-full text-muted-foreground">
+                  <FilePreviewRenderer fileMeta={fileMeta} isReadOnly={isReadOnly} compact={true} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {/* Modal for full image preview */}
+      {modalImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setModalImage(null)}>
+          <div className="max-w-3xl max-h-[90vh] p-4 bg-transparent flex flex-col items-center" onClick={e => e.stopPropagation()}>
+            <img src={modalImage.src} alt={modalImage.name} className="max-w-full max-h-[80vh] rounded shadow-lg" />
+            <div className="mt-2 text-white text-xs truncate w-full text-center">{modalImage.name}</div>
+            <button className="mt-4 px-4 py-2 bg-white/10 text-white rounded hover:bg-white/20" onClick={() => setModalImage(null)}>Close</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
 // Component to render parsed user content
 const UserContentView: React.FC<{ markdownContent: string | null, interactionId?: string }> = ({
@@ -183,14 +265,11 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
         {!isFolded && (
           <>
             {hasFiles && (
-              <div className="mb-2 space-y-1">
-                {turnData.metadata.attachedFiles?.map((fileMeta) => (
-                  <FilePreviewRenderer
-                    key={fileMeta.id}
-                    fileMeta={fileMeta}
-                    isReadOnly={true}
-                  />
-                ))}
+              <div className="mb-3">
+                <FileGridDisplay 
+                  files={turnData.metadata.attachedFiles || []}
+                  isReadOnly={true}
+                />
               </div>
             )}
             {/* Use the new UserContentView component */}

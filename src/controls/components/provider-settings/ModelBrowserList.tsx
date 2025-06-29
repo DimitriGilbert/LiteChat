@@ -16,6 +16,16 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ModelFilterControls } from "@/controls/components/common/ModelFilterControls";
 
+// Import the existing formatPrice utility
+const formatPrice = (priceStr: string | null | undefined): string => {
+  if (!priceStr) return "N/A";
+  const priceNum = parseFloat(priceStr);
+  if (isNaN(priceNum)) return "N/A";
+  // OpenRouter pricing is per token, so multiply by 1M to show price per 1M tokens
+  const pricePerMillion = priceNum * 1_000_000;
+  return `$${pricePerMillion.toFixed(2)} / 1M tokens`;
+};
+
 interface ModelBrowserListProps {
   onSelectModelForDetails: (combinedModelId: string | null) => void;
 }
@@ -265,10 +275,10 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
                               <div>Context: {model.metadataSummary.context_length.toLocaleString()} tokens</div>
                             )}
                             {model.metadataSummary?.pricing?.prompt && (
-                              <div>Input Price: {parseFloat(model.metadataSummary.pricing.prompt) * 1000000000} / 1M tokens</div>
+                              <div>Input Price: {formatPrice(model.metadataSummary.pricing.prompt)}</div>
                             )}
                             {model.metadataSummary?.pricing?.completion && (
-                              <div>Output Price: {parseFloat(model.metadataSummary.pricing.completion) * 1000000000} / 1M tokens</div>
+                              <div>Output Price: {formatPrice(model.metadataSummary.pricing.completion)}</div>
                             )}
                           </TooltipContent>
                         </Tooltip>

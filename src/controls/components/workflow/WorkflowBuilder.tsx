@@ -38,6 +38,7 @@ import {
   useSensor,
   useSensors,
   DragStartEvent,
+  DragEndEvent,
   DragOverlay,
 } from "@dnd-kit/core";
 import {
@@ -519,34 +520,17 @@ const StepsForm = React.forwardRef<
         setActiveStepId(event.active.id as string);
     }, []);
 
-    const handleDragEnd = useCallback((/*event: DragEndEvent*/) => {
-        // const { active, over } = event;
-        // console.log('🐛 [WorkflowBuilder] DragEnd:', {
-        //     activeId: active.id,
-        //     overId: over?.id,
-        //     over,
-        //     event
-        // });
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
         
-        // if (over && active.id !== over.id) {
-        //     const activeIndex = steps.findIndex(step => step.id === active.id);
-        //     const overIndex = steps.findIndex(step => step.id === over.id);
+        if (over && active.id !== over.id) {
+            const activeIndex = steps.findIndex(step => step.id === active.id);
+            const overIndex = steps.findIndex(step => step.id === over.id);
             
-        //     console.log('🐛 [WorkflowBuilder] Reordering:', {
-        //         activeIndex,
-        //         overIndex,
-        //         stepsLength: steps.length
-        //     });
-            
-        //     if (activeIndex !== -1 && overIndex !== -1) {
-        //         handleMoveStep(activeIndex, overIndex);
-        //         console.log('🐛 [WorkflowBuilder] Move executed');
-        //     } else {
-        //         console.log('🐛 [WorkflowBuilder] Move NOT executed - invalid indices');
-        //     }
-        // } else {
-        //     console.log('🐛 [WorkflowBuilder] No reordering - same position or no over target');
-        // }
+            if (activeIndex !== -1 && overIndex !== -1) {
+                handleMoveStep(activeIndex, overIndex);
+            }
+        }
         setActiveStepId(null);
     }, [steps, handleMoveStep]);
 
@@ -566,25 +550,13 @@ const StepsForm = React.forwardRef<
 
     return (
         <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
-            // onDragMove={(event) => {
-            //     console.log('🐛 [WorkflowBuilder] DragMove:', {
-            //         activeId: event.active.id,
-            //         overId: event.over?.id
-            //     });
-            // }}
-            // onDragOver={(event) => {
-            //     console.log('🐛 [WorkflowBuilder] DragOver:', {
-            //         activeId: event.active.id,
-            //         overId: event.over?.id
-            //     });
-            // }}
-            modifiers={[]}
-        >
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+                modifiers={[]}
+            >
             <div className="h-full flex flex-col border rounded-md p-3">
                 <div className="space-y-4">
                     <SortableContext
@@ -1295,7 +1267,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
             )}
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="!w-[95vw] !h-[95vh] !max-w-none flex flex-col p-0">
+                <DialogContent className="!w-[95vw] !h-[95vh] !max-w-none flex flex-col p-0" onPointerDownOutside={(e) => e.preventDefault()}>
                     <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
                         <DialogTitle className="p-2">Workflow Builder</DialogTitle>
                         <DialogDescription>

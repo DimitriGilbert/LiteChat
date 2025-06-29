@@ -102,6 +102,7 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             // "lg:w-[75vw]",
             // "min-h-[500px] max-h-[95vh]"
           )}
+          onPointerDownOutside={(e) => e.preventDefault()}
         >
           <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
             <DialogTitle className="p-2">Settings</DialogTitle>

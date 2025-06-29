@@ -208,58 +208,57 @@ const SettingsGeneralComponent: React.FC = () => {
 
         {storeValues.enableAdvancedSettings && (
           <div className="rounded-lg border p-3 shadow-sm space-y-2">
-            <SliderField
-              form={form}
-              name="streamingRenderFPS"
-              label="Streaming Update Rate"
-              min={3}
-              max={60}
-              step={1}
-              valueLabelSuffix=" FPS"
-            />
-            <NumberField
-              form={form}
-              name="streamingRenderFPS"
-              label="FPS Input" // Hidden or visually distinct label if SliderField shows value
-              min={3}
-              max={60}
-              step={1}
-              className="w-24 h-8 text-xs ml-auto" // Style to place it like original
-              aria-label="Streaming Render FPS Value"
-            />
-            {/* Original description was under a common Label. We can add it to SliderField or here explicitly */}
-            <p className={cn("text-sm text-muted-foreground")}>
-              Controls how frequently the UI updates during streaming (3-60 FPS).
-            </p>
+            <div className="flex items-center space-x-2">
+              <SliderField
+                form={form}
+                name="streamingRenderFPS"
+                label="Streaming Update Rate"
+                min={3}
+                max={60}
+                step={1}
+                valueLabelSuffix=" FPS"
+              />
+              <NumberField
+                form={form}
+                name="streamingRenderFPS"
+                label="FPS Input"
+                min={3}
+                max={60}
+                step={1}
+                className="w-24 h-8 text-xs ml-auto"
+                aria-label="Streaming Render FPS Value"
+              />
+            </div>
+            <p className={cn("text-sm text-muted-foreground")}>Controls how frequently the UI updates during streaming (3-60 FPS).</p>
           </div>
         )}
 
         {storeValues.enableAdvancedSettings && (
           <div className="rounded-lg border p-3 shadow-sm space-y-2">
-            <SliderField
-              form={form}
-              name="autoScrollInterval"
-              label="Auto-Scroll Interval"
-              min={50}
-              max={5000}
-              step={50}
-              valueLabelSuffix=" ms"
-              disabled={!form.state.values.enableAutoScrollOnStream}
-            />
-            <NumberField
-              form={form}
-              name="autoScrollInterval"
-              label="Interval Input (ms)" // Hidden or visually distinct label
-              min={50}
-              max={5000}
-              step={50}
-              className="w-24 h-8 text-xs ml-auto" // Style to place it like original
-              disabled={!form.state.values.enableAutoScrollOnStream}
-              aria-label="Auto Scroll Interval Value"
-            />
-            <p className={cn("text-sm text-muted-foreground")}>
-              How often to scroll to the bottom during streaming (50-5000 ms).
-            </p>
+            <div className="flex items-center space-x-2">
+              <SliderField
+                form={form}
+                name="autoScrollInterval"
+                label="Auto-Scroll Interval"
+                min={50}
+                max={5000}
+                step={50}
+                valueLabelSuffix=" ms"
+                disabled={!form.state.values.enableAutoScrollOnStream}
+              />
+              <NumberField
+                form={form}
+                name="autoScrollInterval"
+                label="Interval Input (ms)"
+                min={50}
+                max={5000}
+                step={50}
+                className="w-24 h-8 text-xs ml-auto"
+                disabled={!form.state.values.enableAutoScrollOnStream}
+                aria-label="Auto Scroll Interval Value"
+              />
+            </div>
+            <p className={cn("text-sm text-muted-foreground")}>How often to scroll to the bottom during streaming (50-5000 ms).</p>
           </div>
         )}
       </div>
