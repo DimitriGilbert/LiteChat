@@ -13,7 +13,9 @@
     "coverage": "DEBUG_PRINT_LIMIT=10000 vitest run --coverage",
     "deploy": "gh-pages -d dist --no-history --dotfiles --remove \".proompts/**/*\"",
     "to2web": "npm run build && bin/releaser && npm run deploy",
-    "mcp-proxy": "node bin/mcp-bridge.js"
+    "mcp-proxy": "node bin/mcp-bridge.js",
+    "serve": "npm run build && npx http-server dist --port ${LITECHAT_PORT:=5173}",
+    "update":"git pull ${LITECHAT_ORIGIN:=origin} ${LITECHAT_BRANCH:=main} && npm install && npm run serve"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.19",

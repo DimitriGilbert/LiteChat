@@ -92,72 +92,36 @@ export class JSONFlowParser implements FlowParser {
     if (!node.id) {
       return `Node ${index}: Missing required field: id`;
     }
-    
     if (typeof node.id !== 'string') {
       return `Node ${index}: Field 'id' must be a string`;
     }
-    
     if (!node.type) {
       return `Node ${index}: Missing required field: type`;
     }
-
     if (!node.label) {
       return `Node ${index}: Missing required field: label`;
     }
-
+    // Allow label to be HTML (including <img> and <svg>), not just plain text. Do not restrict or escape label content. // TRUSTED CONTENT
     // Position is optional - if not provided, auto-layout will handle it
     if (node.position && typeof node.position === 'object') {
       if (typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
         return `Node ${index}: Invalid position - must have x and y as numbers`;
       }
     }
-
     // Check for duplicate IDs
     const idCount = allNodes.filter(n => n.id === node.id).length;
     if (idCount > 1) {
       return `Node ${index}: Duplicate ID '${node.id}' - IDs must be unique`;
     }
-
-    // Check if type is valid
-    const validTypes = [
-      'trigger', 'prompt', 'agent-task', 'transform', 'human-in-the-loop', 'custom',
-      'input', 'output', 'default', 'group'
-    ];
-    if (!validTypes.includes(node.type) && !node.type.startsWith('custom-')) {
-      console.warn(`Node ${index}: Unrecognized type '${node.type}' - consider using standard types or prefixing with 'custom-'`);
-    }
-
-    if (node.status) {
-      const validStatuses: StepStatus[] = ['pending', 'running', 'success', 'error'];
-      if (!validStatuses.includes(node.status)) {
-        return `Node ${index}: Invalid status '${node.status}'. Must be one of: ${validStatuses.join(', ')}`;
-      }
-    }
-
-    // Validate styling options
+    // Allow any type for custom nodes; do not warn or restrict
+    // Allow any style keys for node.style, just require object type
     if (node.style && typeof node.style !== 'object') {
       return `Node ${index}: Style must be an object`;
     }
-
-    if (node.style) {
-      const validStyleKeys = [
-        'background', 'backgroundColor', 'color', 'border', 'borderColor', 'borderWidth', 'borderRadius',
-        'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
-        'padding', 'margin', 'fontSize', 'fontWeight', 'opacity', 'boxShadow'
-      ];
-      
-      for (const key in node.style) {
-        if (!validStyleKeys.includes(key)) {
-          return `Node ${index}: Invalid style property '${key}'. Valid properties: ${validStyleKeys.join(', ')}`;
-        }
-      }
-    }
-
     // Validate className
     if (node.className && typeof node.className !== 'string') {
       return `Node ${index}: className must be a string`;
     }
-
     return null;
   }
 
@@ -165,60 +129,32 @@ export class JSONFlowParser implements FlowParser {
     if (!edge.id) {
       return `Edge ${index}: Missing required field: id`;
     }
-
     if (!edge.source) {
       return `Edge ${index}: Missing required field: source`;
     }
-
     if (!edge.target) {
       return `Edge ${index}: Missing required field: target`;
     }
-
     if (!nodeIds.has(edge.source)) {
       return `Edge ${index}: Source node '${edge.source}' does not exist`;
     }
-
     if (!nodeIds.has(edge.target)) {
       return `Edge ${index}: Target node '${edge.target}' does not exist`;
     }
-
-    // Validate edge type
-    if (edge.type) {
-      const validEdgeTypes = ['default', 'straight', 'step', 'smoothstep', 'bezier', 'custom'];
-      if (!validEdgeTypes.includes(edge.type)) {
-        return `Edge ${index}: Invalid type '${edge.type}'. Must be one of: ${validEdgeTypes.join(', ')}`;
-      }
-    }
-
-    // Validate styling options
+    // Allow any edge type; do not restrict
+    // Allow any style keys for edge.style, just require object type
     if (edge.style && typeof edge.style !== 'object') {
       return `Edge ${index}: Style must be an object`;
     }
-
-    if (edge.style) {
-      const validStyleKeys = [
-        'stroke', 'strokeWidth', 'strokeDasharray', 'strokeOpacity',
-        'fill', 'color', 'opacity'
-      ];
-      
-      for (const key in edge.style) {
-        if (!validStyleKeys.includes(key)) {
-          return `Edge ${index}: Invalid style property '${key}'. Valid properties: ${validStyleKeys.join(', ')}`;
-        }
-      }
-    }
-
-    // Validate markers
+    // Validate markers as before
     if (edge.markerEnd) {
       const markerError = this.validateMarker(edge.markerEnd, `Edge ${index} markerEnd`);
       if (markerError) return markerError;
     }
-
     if (edge.markerStart) {
       const markerError = this.validateMarker(edge.markerStart, `Edge ${index} markerStart`);
       if (markerError) return markerError;
     }
-
     return null;
   }
 

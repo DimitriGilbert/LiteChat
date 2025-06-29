@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useCallback,
   memo,
+  ComponentType,
 } from "react";
 import {
   ReactFlow,
@@ -18,10 +19,10 @@ import {
   Handle,
   Position,
   ReactFlowProvider,
+  type NodeProps,
 } from '@xyflow/react';
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/shallow";
-import type { StepStatus } from "@/types/litechat/flow";
 import { JSONFlowParser } from "@/lib/litechat/flow-parser";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
@@ -31,6 +32,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getTreeLayout } from '@/lib/litechat/tree-layout';
 import { toPng } from 'html-to-image';
+import DOMPurify from 'dompurify';
 
 import '@xyflow/react/dist/style.css';
 
@@ -40,90 +42,120 @@ interface FlowBlockRendererProps {
 }
 
 // Flow step node component
-const FlowStepNode: React.FC<{ data: any }> = ({ data }) => {
-  // Type-safe access to node data
+const FlowStepNode: React.FC<NodeProps<any>> = ({ data }) => {
   const label = data.label || data.stepName || data.id || 'Unknown Step';
   const type = data.type || 'default';
-  const status = data.status as StepStatus;
+  const nodeStyle = data.style || {};
+  const nodeClassName = data.className || '';
+  const showIcon = !(type === 'custom' || (typeof type === 'string' && type.startsWith('custom-')));
+  const edges = data.edges || []; // Get edges from node data
 
-  const getNodeColor = (type: string, status?: StepStatus) => {
-    if (status) {
-      switch (status) {
-        case 'running':
-          return 'bg-[var(--card-foreground)] border-[var(--primary)] text-[var(--secondary)] shadow-lg shadow-[var(--primary)/20]';
-        case 'success':
-          return 'bg-[var(--card-foreground)] border-[var(--chart-2)] text-[var(--primary)] shadow-lg shadow-[var(--chart-2)/20]';
-        case 'error':
-          return 'bg-[var(--card-foreground)] border-[var(--destructive)] text-[var(--destructive)] shadow-lg shadow-[var(--destructive)/20]';
-        case 'pending':
-          return 'bg-[var(--card-foreground)] border-[var(--muted)] text-[var(--background)] shadow-lg shadow-[var(--muted)/20]';
+  // Get handle positions from node data
+  const sourcePosition = data.sourcePosition;
+  const targetPosition = data.targetPosition;
+
+  // Only allow <img> and <svg> tags in label HTML
+  const sanitizeLabel = (raw: string) => {
+    return DOMPurify.sanitize(raw, {
+      ALLOWED_TAGS: ['img', 'svg', 'path', 'circle', 'rect', 'g', 'line', 'ellipse', 'polygon', 'polyline', 'text', 'tspan', 'defs', 'linearGradient', 'stop', 'title', 'desc'],
+      ALLOWED_ATTR: ['src', 'alt', 'width', 'height', 'style', 'viewBox', 'fill', 'stroke', 'd', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'class', 'id', 'opacity', 'stop-color', 'stop-opacity', 'offset', 'xmlns'],
+      KEEP_CONTENT: false
+    });
+  };
+
+  // Helper to convert position strings to Position enum
+  const getPositionFromString = (pos: string): Position => {
+    switch (pos?.toLowerCase()) {
+      case 'top': return Position.Top;
+      case 'bottom': return Position.Bottom;
+      case 'left': return Position.Left;
+      case 'right': return Position.Right;
+      default: return Position.Bottom; // Default fallback
+    }
+  };
+
+  // Collect all handles needed for this node from edges
+  const handleDefs: { type: 'source' | 'target'; id: string; position: Position }[] = [];
+  const handleSet = new Set<string>();
+
+  // Find all edges where this node is involved
+  edges.forEach((edge: Edge) => {
+    if (edge.source === data.id) {
+      // Create unique handle ID based on edge handle or position
+      const edgeHandle = edge.sourceHandle;
+      const handleId = edgeHandle || 'output';
+      const key = `source:${handleId}`;
+      if (!handleSet.has(key)) {
+        // For source handles: use edge.sourceHandle to determine position, fallback to node.sourcePosition, then default
+        let position = Position.Bottom;
+        if (edgeHandle) {
+          position = getPositionFromString(edgeHandle);
+        } else if (sourcePosition) {
+          position = getPositionFromString(sourcePosition);
+        }
+        handleDefs.push({ type: 'source', id: handleId, position });
+        handleSet.add(key);
       }
     }
-    switch (type) {
-      case 'trigger':
-      case 'input':
-        return 'bg-[var(--card-foreground)] border-[var(--primary)] text-[var(--card)] shadow-sm';
-      case 'prompt':
-        return 'bg-[var(--card-foreground)] border-[var(--chart-1)] text-[var(--card)] shadow-sm';
-      case 'agent-task':
-        return 'bg-[var(--card-foreground)] border-[var(--chart-2)] text-[var(--card)] shadow-sm';
-      case 'transform':
-        return 'bg-[var(--card-foreground)] border-[var(--chart-3)] text-[var(--card)] shadow-sm';
-      case 'human-in-the-loop':
-        return 'bg-[var(--card-foreground)] border-[var(--chart-4)] text-[var(--card)] shadow-sm';
-      case 'output':
-        return 'bg-[var(--card-foreground)] border-[var(--chart-5)] text-[var(--card)] shadow-sm';
-      default:
-        return 'bg-[var(--card-foreground)] border-[var(--border)] text-[var(--card)] shadow-sm';
+    if (edge.target === data.id) {
+      // Create unique handle ID based on edge handle or position
+      const edgeHandle = edge.targetHandle;
+      const handleId = edgeHandle || 'input';
+      const key = `target:${handleId}`;
+      if (!handleSet.has(key)) {
+        // For target handles: use edge.targetHandle to determine position, fallback to node.targetPosition, then default
+        let position = Position.Top;
+        if (edgeHandle) {
+          position = getPositionFromString(edgeHandle);
+        } else if (targetPosition) {
+          position = getPositionFromString(targetPosition);
+        }
+        handleDefs.push({ type: 'target', id: handleId, position });
+        handleSet.add(key);
+      }
     }
-  };
+  });
 
-  const getTypeIcon = (type: string, status?: StepStatus) => {
-    if (status === 'running') return '⚡';
-    if (status === 'error') return '❌';
-    if (status === 'success') return '✅';
-    
-    switch (type) {
-      case 'trigger':
-      case 'input':
-        return '🚀';
-      case 'prompt':
-        return '💬';
-      case 'agent-task':
-        return '🤖';
-      case 'transform':
-        return '🔄';
-      case 'human-in-the-loop':
-        return '👤';
-      case 'output':
-        return '🎯';
-      default:
-        return '📋';
-    }
-  };
+  // Always ensure we have default handles if none are defined by edges
+  if (!handleSet.has('source:output')) {
+    const position = sourcePosition ? getPositionFromString(sourcePosition) : Position.Bottom;
+    handleDefs.push({ type: 'source', id: 'output', position });
+  }
+  if (!handleSet.has('target:input')) {
+    const position = targetPosition ? getPositionFromString(targetPosition) : Position.Top;
+    handleDefs.push({ type: 'target', id: 'input', position });
+  }
 
-  const colorClasses = getNodeColor(type, status);
-  const icon = getTypeIcon(type, status);
+  const mergedStyle = { ...nodeStyle };
 
   return (
     <div
       className={cn(
         'px-4 py-2 rounded-lg border-2 min-w-[180px] max-w-[220px]',
-        colorClasses
+        nodeClassName
       )}
+      style={mergedStyle}
     >
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="input"
-        className="w-3 h-3 !bg-gray-400 border-2 border-white"
-      />
+      {/* Render handles with correct positions */}
+      {handleDefs.map(h => (
+        <Handle
+          key={h.type + ':' + h.id}
+          type={h.type}
+          position={h.position}
+          id={h.id}
+          className="w-3 h-3 !bg-gray-400 border-2 border-white"
+        />
+      ))}
       
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-lg">{icon}</span>
+        {showIcon && <span className="text-lg">{data.icon}</span>}
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm leading-tight break-words">
-            {label}
+            {typeof label === 'string' && /<(img|svg)[\s>]/i.test(label) ? (
+              <span dangerouslySetInnerHTML={{ __html: sanitizeLabel(label) }} />
+            ) : (
+              label
+            )}
           </div>
           {data.templateName && (
             <div className="text-xs opacity-75 break-words">
@@ -137,26 +169,18 @@ const FlowStepNode: React.FC<{ data: any }> = ({ data }) => {
           )}
         </div>
       </div>
-      
       {data.description && (
         <div className="text-xs opacity-70 mt-1 break-words">
           {data.description}
         </div>
       )}
-      
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        id="output"
-        className="w-3 h-3 !bg-gray-400 border-2 border-white"
-      />
     </div>
   );
 };
 
 // Node types configuration
-const nodeTypes = {
-  flowStep: FlowStepNode,
+const nodeTypes: { [key: string]: ComponentType<any> } = {
+  flowStep: FlowStepNode as ComponentType<any>,
 };
 
 const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
@@ -298,14 +322,35 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
         markerEnd: edge.markerEnd || { type: XYMarkerType.ArrowClosed }
       })) as Edge[];
 
-      // Only apply auto-layout if nodes don't have positions
-      const needsLayout = reactFlowNodes.every(node => 
-        !node.position || (node.position.x === 0 && node.position.y === 0)
+      // Determine if we need auto-layout
+      const hasExplicitPositions = reactFlowNodes.some(node => 
+        node.position && (node.position.x !== 0 || node.position.y !== 0)
       );
       
-      if (needsLayout) {
-        // Use the tree layout that respects the actual edge connections
+      if (!hasExplicitPositions) {
+        // Use the tree layout for nodes without explicit positions
         reactFlowNodes = getTreeLayout(reactFlowNodes, reactFlowEdges, [220, 120]);
+      } else {
+        // Check if we have a mix of positioned and unpositioned nodes
+        const unpositionedNodes = reactFlowNodes.filter(node => 
+          !node.position || (node.position.x === 0 && node.position.y === 0)
+        );
+        
+        if (unpositionedNodes.length > 0) {
+          // Apply a simple grid layout to unpositioned nodes
+          const gridSpacing = 250;
+          const cols = Math.ceil(Math.sqrt(unpositionedNodes.length));
+          
+          unpositionedNodes.forEach((node, index) => {
+            const row = Math.floor(index / cols);
+            const col = index % cols;
+            // Position unpositioned nodes in a grid starting from (0, 0)
+            node.position = {
+              x: col * gridSpacing,
+              y: row * gridSpacing
+            };
+          });
+        }
       }
 
       setNodes(reactFlowNodes);
@@ -555,11 +600,8 @@ const FlowContent: React.FC<{
   edges: Edge[];
   onReady: () => void;
 }> = ({ nodes, edges, onReady }) => {
-
   useEffect(() => {
-    // Set ready when ReactFlow has mounted and has nodes
     if (nodes.length > 0) {
-      // Add a small delay to ensure ReactFlow has fully rendered
       const timeout = setTimeout(() => {
         onReady();
       }, 100);
@@ -567,14 +609,27 @@ const FlowContent: React.FC<{
     }
   }, [nodes.length, onReady]);
 
+  // Inject edges into each node's data so FlowStepNode can access them
+  const nodesWithEdges = useMemo(() => 
+    nodes.map(node => ({
+      ...node,
+      data: { ...node.data, edges }
+    })), [nodes, edges]
+  );
+
   return (
     <div className="flow-container h-96 bg-background border rounded-md">
       <ReactFlow
-        nodes={nodes}
+        nodes={nodesWithEdges}
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-left"
+        fitViewOptions={{
+          padding: 0.2,
+          minZoom: 0.1,
+          maxZoom: 1.5
+        }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls />

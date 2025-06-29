@@ -29,12 +29,12 @@ The content inside the \`flow\` block must be a valid JSON object containing:
 **Node Structure:**
 Each node requires:
 - \`id\`: Unique identifier for the node
-- \`type\`: Node type ('trigger', 'prompt', 'agent-task', 'transform', 'human-in-the-loop', 'custom', 'input', 'output', 'default', 'group')
-- \`label\`: Display label for the node
-- \`position\`: (Optional) Object with \`x\` and \`y\` coordinates (optional, as positioning is automatic if not specified and preferred)
+- \`type\`: Node type ('trigger', 'prompt', 'agent-task', 'transform', 'human-in-the-loop', 'custom', 'input', 'output', 'default', 'group') use custom for most you use case !
+- \`label\`: Display label for the node (**can be plain text or HTML, including <img> and <svg> for rich content; will be rendered as HTML**)
 - \`style\`: (Optional) Styling object
 - \`status\`: (Optional) Current status ("pending", "running", "success", "error")
 - \`data\`: (Optional) Additional data like \`templateName\`, \`modelName\`, etc.
+- \`position\`: (Optional) Object with \`x\` and \`y\` coordinates (optional, automatic layout is prefered)
 
 **Edge Structure:**
 Each edge requires:
@@ -157,123 +157,201 @@ Organizational flowchart:
 \`\`\`flow
 {
   "type": "flowchart",
-  "name": "Decision Making Process",
-  "description": "Company decision approval workflow",
+  "name": "LiteChat Ecosystem",
+  "description": "LiteChat as the central hub connecting AI capabilities",
   "background": {
-    "variant": "lines",
-    "gap": [40, 40],
-    "color": "#f3f4f6"
+    "variant": "dots",
+    "color": "#f0f8ff",
+    "gap": 25
   },
   "nodes": [
     {
-      "id": "proposal",
-      "type": "input",
-      "label": "New Proposal",
+      "id": "litechat",
+      "type": "custom",
+      "label": "<img src=\"https://litechat.dbuild.dev/icons/128.png\" />",
       "style": {
-        "backgroundColor": "#eff6ff",
-        "borderColor": "#2563eb",
+        "backgroundColor": "#FFF2CC",
+        "borderColor": "#FFD700",
+        "borderWidth": 3,
+        "width": 160,
+        "height": 160,
+        "fontSize": 24,
+        "color": "#FF6B00",
+        "borderRadius": "50%",
+        "boxShadow": "0 0 20px rgba(255,215,0,0.7)"
+      },
+      "position": { "x": 400, "y": 400 },
+      "targetPosition": "left"
+    },
+    {
+      "id": "models",
+      "type": "default",
+      "label": "300+ AI Models",
+      "style": {
+        "backgroundColor": "#FFD6E7",
+        "borderColor": "#FF1493",
+        "color": "#C71585",
         "borderWidth": 2,
-        "borderRadius": 8
-      }
+        "borderRadius": 10,
+        "padding": 15
+      },
+      "position": { "x": 700, "y": 200 },
+      "sourcePosition": "right"
     },
     {
-      "id": "review",
+      "id": "ui",
       "type": "default",
-      "label": "Team Review",
+      "label": "Rich AI UI",
       "style": {
-        "backgroundColor": "#fef2f2",
-        "borderColor": "#dc2626"
-      }
+        "backgroundColor": "#D1ECFF",
+        "borderColor": "#1E90FF",
+        "color": "#0066CC",
+        "borderWidth": 2,
+        "borderRadius": 10,
+        "padding": 15
+      },
+      "position": { "x": 800, "y": 450 },
+      "sourcePosition": "right"
     },
     {
-      "id": "approve",
+      "id": "tools",
       "type": "default",
-      "label": "Manager Approval",
+      "label": "Tools & MCP",
       "style": {
-        "backgroundColor": "#f0fdf4",
-        "borderColor": "#16a34a"
-      }
+        "backgroundColor": "#D5F5E3",
+        "borderColor": "#2ECC71",
+        "color": "#1E8449",
+        "borderWidth": 2,
+        "borderRadius": 10,
+        "padding": 15
+      },
+      "position": { "x": 700, "y": 700 },
+      "sourcePosition": "top"
     },
     {
-      "id": "reject",
+      "id": "library",
       "type": "default",
-      "label": "Needs Revision",
+      "label": "Prompt & Agents Library",
       "style": {
-        "backgroundColor": "#fef2f2",
-        "borderColor": "#dc2626"
-      }
+        "backgroundColor": "#EBDEF0",
+        "borderColor": "#9B59B6",
+        "color": "#6C3483",
+        "borderWidth": 2,
+        "borderRadius": 10,
+        "padding": 15
+      },
+      "position": { "x": 100, "y": 700 },
+      "sourcePosition": "top"
     },
     {
-      "id": "implement",
-      "type": "output",
-      "label": "Implementation",
-      "style": {
-        "backgroundColor": "#ecfdf5",
-        "borderColor": "#059669"
-      }
-    },
-    {
-      "id": "revise",
+      "id": "ai-race",
       "type": "default",
-      "label": "Back to Team",
+      "label": "AI Race",
       "style": {
-        "backgroundColor": "#fffbeb",
-        "borderColor": "#d97706"
-      }
+        "backgroundColor": "#FDEBD0",
+        "borderColor": "#F39C12",
+        "color": "#D35400",
+        "borderWidth": 2,
+        "borderRadius": 10,
+        "padding": 15
+      },
+      "position": { "x": 0, "y": 450 },
+      "sourcePosition": "left"
+    },
+    {
+      "id": "workflow",
+      "type": "default",
+      "label": "Workflow Engine",
+      "style": {
+        "backgroundColor": "#FFE0E0",
+        "borderColor": "#E74C3C",
+        "color": "#C0392B",
+        "borderWidth": 2,
+        "borderRadius": 10,
+        "padding": 15
+      },
+      "position": { "x": 100, "y": 200 },
+      "sourcePosition": "left"
     }
   ],
   "edges": [
     {
       "id": "e1",
-      "source": "proposal",
-      "target": "review",
-      "type": "straight",
-      "markerEnd": { "type": "ArrowClosed" }
+      "target": "litechat",
+      "source": "models",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#FF69B4",
+        "strokeWidth": 3
+      },
+      "sourceHandle": "left",
+      "targetHandle": "top"
     },
     {
       "id": "e2",
-      "source": "review",
-      "target": "approve",
+      "target": "litechat",
+      "source": "ui",
       "type": "smoothstep",
-      "label": "Approved",
-      "style": { "stroke": "#16a34a" },
-      "markerEnd": { "type": "ArrowClosed", "color": "#16a34a" }
+      "animated": true,
+      "style": {
+        "stroke": "#1E90FF",
+        "strokeWidth": 3
+      },
+      "sourceHandle": "left",
+      "targetHandle": "right"
     },
     {
       "id": "e3",
-      "source": "review",
-      "target": "reject",
+      "target": "litechat",
+      "source": "tools",
       "type": "smoothstep",
-      "label": "Rejected",
-      "style": { "stroke": "#dc2626" },
-      "markerEnd": { "type": "ArrowClosed", "color": "#dc2626" }
+      "animated": true,
+      "style": {
+        "stroke": "#27AE60",
+        "strokeWidth": 3
+      },
+      "sourceHandle": "top",
+      "targetHandle": "bottom"
     },
     {
       "id": "e4",
-      "source": "approve",
-      "target": "implement",
-      "type": "straight",
-      "style": { "stroke": "#059669" },
-      "markerEnd": { "type": "ArrowClosed", "color": "#059669" }
+      "target": "litechat",
+      "source": "library",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#9B59B6",
+        "strokeWidth": 3
+      },
+      "sourceHandle": "top",
+      "targetHandle": "bottom"
     },
     {
       "id": "e5",
-      "source": "reject",
-      "target": "revise",
-      "type": "straight",
-      "style": { "stroke": "#d97706" },
-      "markerEnd": { "type": "ArrowClosed", "color": "#d97706" }
+      "target": "litechat",
+      "source": "ai-race",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#F39C12",
+        "strokeWidth": 3
+      },
+      "sourceHandle": "right",
+      "targetHandle": "left"
     },
     {
       "id": "e6",
-      "source": "revise",
-      "target": "review",
-      "type": "bezier",
-      "style": { 
-        "stroke": "#6b7280",
-        "strokeDasharray": "5,5"
+      "target": "litechat",
+      "source": "workflow",
+      "type": "smoothstep",
+      "animated": true,
+      "style": {
+        "stroke": "#E74C3C",
+        "strokeWidth": 3
       },
-      "markerEnd": { "type": "Arrow", "color": "#6b7280" }
+      "sourceHandle": "right",
+      "targetHandle": "top"
     }
   ]
 }
