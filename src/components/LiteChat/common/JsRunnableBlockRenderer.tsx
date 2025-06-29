@@ -816,6 +816,45 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     }
   }, [showPreview, hasRun]);
 
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+
+    // Make sure the div is focusable
+    el.tabIndex = 0;
+
+    // Handler to prevent default for navigation keys
+    const preventKeys = (e: KeyboardEvent) => {
+      // Only block if this element is focused
+      if (document.activeElement !== el) return;
+      const keys = [
+        "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+        " ", // Space
+        "Tab", // Optional: Tab
+        "PageUp", "PageDown", "Home", "End"
+      ];
+      if (keys.includes(e.key)) {
+        e.preventDefault();
+        // Optionally: e.stopPropagation();
+      }
+    };
+
+    // On focus, add listener
+    const onFocus = () => window.addEventListener("keydown", preventKeys, { capture: true });
+    // On blur, remove listener
+    const onBlur = () => window.removeEventListener("keydown", preventKeys, { capture: true });
+
+    el.addEventListener("focus", onFocus);
+    el.addEventListener("blur", onBlur);
+
+    // Clean up
+    return () => {
+      el.removeEventListener("focus", onFocus);
+      el.removeEventListener("blur", onBlur);
+      window.removeEventListener("keydown", preventKeys, { capture: true });
+    };
+  }, [previewRef]);
+
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
       {/* Header */}

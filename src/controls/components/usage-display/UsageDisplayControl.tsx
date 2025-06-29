@@ -1,6 +1,6 @@
 // src/controls/components/usage-display/UsageDisplayControl.tsx
 // FULL FILE
-import React, {  useState } from "react";
+import React, {  useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -23,6 +23,9 @@ export const UsageDisplayControl: React.FC<UsageDisplayControlProps> = ({
   const [liveCost, setLiveCost] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isCancelledRef = useRef(false);
 
   const contextLength = module.contextLength;
   const contextPercentage = module.getContextPercentage();
@@ -30,43 +33,64 @@ export const UsageDisplayControl: React.FC<UsageDisplayControlProps> = ({
 
   const isVisible = selectedModelId !== null && contextLength > 0;
 
+  useEffect(() => {
+    // Cleanup on unmount or when tooltip closes
+    return () => {
+      isCancelledRef.current = true;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!tooltipOpen) {
+      isCancelledRef.current = true;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      setLiveTokens(null);
+      setLiveCost(null);
+      setLoading(false);
+      setError(null);
+    }
+  }, [tooltipOpen]);
+
   const handleTooltipOpenChange = async (open: boolean) => {
+    setTooltipOpen(open);
     if (open) {
       setLoading(true);
       setError(null);
       setLiveTokens(null);
       setLiveCost(null);
-      let timeout: NodeJS.Timeout | null = null;
-      let isCancelled = false;
+      isCancelledRef.current = false;
       try {
         const estimationPromise = module.getLiveTokenEstimation();
-        timeout = setTimeout(() => {
-          if (isCancelled) return;
+        timeoutRef.current = setTimeout(() => {
+          if (isCancelledRef.current) return;
           setError("Estimation timed out");
           setLoading(false);
         }, 2000);
         const result = await estimationPromise;
-        clearTimeout(timeout);
-        if (isCancelled) return;
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        if (isCancelledRef.current) return;
         setLiveTokens(result.tokens);
         setLiveCost(result.cost);
         setLoading(false);
       } catch (e: any) {
-        if (timeout) clearTimeout(timeout);
-        if (isCancelled) return;
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        if (isCancelledRef.current) return;
         setError(e instanceof Error ? e.message : "Estimation error");
         setLoading(false);
       }
-      // Return cleanup function
-      return () => {
-        isCancelled = true;
-        if (timeout) clearTimeout(timeout);
-      };
-    } else {
-      setLiveTokens(null);
-      setLiveCost(null);
-      setLoading(false);
-      setError(null);
     }
   };
 
