@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { LandPlot } from "lucide-react";
 import { toast } from "sonner";
@@ -13,10 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+// import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   SearchIcon,
@@ -96,54 +96,54 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
     }
   }, [module]);
 
-  const filteredModels = useMemo(() => {
-    let textFiltered = module.globallyEnabledModels;
-    if (filterText.trim()) {
-      const lowerFilter = filterText.toLowerCase();
-      textFiltered = module.globallyEnabledModels.filter(
-        (model) =>
-          model.name.toLowerCase().includes(lowerFilter) ||
-          model.providerName.toLowerCase().includes(lowerFilter) ||
-          model.id.toLowerCase().includes(lowerFilter)
-      );
-    }
-    const activeCapabilityFilters = Object.entries(capabilityFilters)
-      .filter(([, isActive]) => isActive)
-      .map(([key]) => key as CapabilityFilter);
-    if (activeCapabilityFilters.length === 0) {
-      return textFiltered;
-    }
-    return textFiltered.filter((model: ModelListItem) => {
-      const supportedParams = new Set(
-        model.metadataSummary?.supported_parameters ?? []
-      );
-      const inputModalities = new Set(
-        model.metadataSummary?.input_modalities ?? []
-      );
-      const outputModalities = new Set(
-        model.metadataSummary?.output_modalities ?? []
-      );
-      return activeCapabilityFilters.every((filter) => {
-        switch (filter) {
-          case "reasoning":
-            return supportedParams.has("reasoning");
-          case "webSearch":
-            return (
-              supportedParams.has("web_search") ||
-              supportedParams.has("web_search_options")
-            );
-          case "tools":
-            return supportedParams.has("tools");
-          case "multimodal":
-            return Array.from(inputModalities).some((mod) => mod !== "text");
-          case "imageGeneration":
-            return outputModalities.has("image");
-          default:
-            return true;
-        }
-      });
-    });
-  }, [module.globallyEnabledModels, filterText, capabilityFilters]);
+  // const filteredModels = useMemo(() => {
+  //   let textFiltered = module.globallyEnabledModels;
+  //   if (filterText.trim()) {
+  //     const lowerFilter = filterText.toLowerCase();
+  //     textFiltered = module.globallyEnabledModels.filter(
+  //       (model) =>
+  //         model.name.toLowerCase().includes(lowerFilter) ||
+  //         model.providerName.toLowerCase().includes(lowerFilter) ||
+  //         model.id.toLowerCase().includes(lowerFilter)
+  //     );
+  //   }
+  //   const activeCapabilityFilters = Object.entries(capabilityFilters)
+  //     .filter(([, isActive]) => isActive)
+  //     .map(([key]) => key as CapabilityFilter);
+  //   if (activeCapabilityFilters.length === 0) {
+  //     return textFiltered;
+  //   }
+  //   return textFiltered.filter((model: ModelListItem) => {
+  //     const supportedParams = new Set(
+  //       model.metadataSummary?.supported_parameters ?? []
+  //     );
+  //     const inputModalities = new Set(
+  //       model.metadataSummary?.input_modalities ?? []
+  //     );
+  //     const outputModalities = new Set(
+  //       model.metadataSummary?.output_modalities ?? []
+  //     );
+  //     return activeCapabilityFilters.every((filter) => {
+  //       switch (filter) {
+  //         case "reasoning":
+  //           return supportedParams.has("reasoning");
+  //         case "webSearch":
+  //           return (
+  //             supportedParams.has("web_search") ||
+  //             supportedParams.has("web_search_options")
+  //           );
+  //         case "tools":
+  //           return supportedParams.has("tools");
+  //         case "multimodal":
+  //           return Array.from(inputModalities).some((mod) => mod !== "text");
+  //         case "imageGeneration":
+  //           return outputModalities.has("image");
+  //         default:
+  //           return true;
+  //       }
+  //     });
+  //   });
+  // }, [module.globallyEnabledModels, filterText, capabilityFilters]);
 
   const toggleCapabilityFilter = (filter: CapabilityFilter) => {
     setCapabilityFilters((prev) => ({
@@ -156,11 +156,11 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
     Object.values(capabilityFilters).filter(Boolean).length;
   const totalActiveFilters = activeCapabilityFilterCount;
 
-  const handleModelToggle = (modelId: string, checked: boolean) => {
-    setSelectedModelIds((prev) =>
-      checked ? [...prev, modelId] : prev.filter((id) => id !== modelId)
-    );
-  };
+  // const handleModelToggle = (modelId: string, checked: boolean) => {
+  //   setSelectedModelIds((prev) =>
+  //     checked ? [...prev, modelId] : prev.filter((id) => id !== modelId)
+  //   );
+  // };
 
   const handleStartRace = () => {
     if (selectedModelIds.length < 1) {

@@ -551,7 +551,10 @@ export class JsRunnableBlockRendererModule implements ControlModule {
             script.src = src;
             script.async = true;
             script.onload = () => resolve();
-            script.onerror = (e) => reject(new Error(`Failed to load script: ${src}`));
+            script.onerror = (e) => {
+              const errorMessage = e instanceof Error ? e.message : String(e);
+              reject(new Error(`Failed to load script: ${src} - ${errorMessage}`));
+            };
             document.head.appendChild(script);
             customLitechatApi.utils.loadedScriptElements.push(script);
           });
