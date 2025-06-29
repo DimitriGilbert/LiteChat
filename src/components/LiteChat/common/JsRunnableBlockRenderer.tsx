@@ -25,6 +25,7 @@ import {
   ShieldCheckIcon,
   MonitorSpeakerIcon,
   DownloadIcon,
+  SquareIcon,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -149,6 +150,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   // Refs
   const codeRef = useRef<HTMLElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const previewContentRef = useRef<HTMLDivElement>(null);
 
   // Canvas controls integration
   const canvasControls = useControlRegistryStore(
@@ -187,6 +189,41 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       setEditedCode(code);
     }
   }, [code, isEditing]);
+
+  // Move preview target to correct position based on preview visibility
+  useEffect(() => {
+    if (previewRef.current && previewContentRef.current) {
+      if (!isFolded && showPreview) {
+        // Move target into preview content area
+        if (previewRef.current.parentNode !== previewContentRef.current) {
+          previewContentRef.current.appendChild(previewRef.current);
+        }
+        // Reset positioning for normal flow
+        previewRef.current.style.position = 'relative';
+        previewRef.current.style.top = '0';
+        previewRef.current.style.left = '0';
+        previewRef.current.style.width = '100%';
+        previewRef.current.style.height = '100%';
+        previewRef.current.style.visibility = 'visible';
+        previewRef.current.style.pointerEvents = 'auto';
+        previewRef.current.style.zIndex = '1';
+      } else {
+        // Move target to hidden position
+        if (previewRef.current.parentNode === previewContentRef.current) {
+          document.body.appendChild(previewRef.current);
+        }
+        // Hide the target
+        previewRef.current.style.position = 'absolute';
+        previewRef.current.style.top = '-9999px';
+        previewRef.current.style.left = '-9999px';
+        previewRef.current.style.width = '1px';
+        previewRef.current.style.height = '1px';
+        previewRef.current.style.visibility = 'hidden';
+        previewRef.current.style.pointerEvents = 'none';
+        previewRef.current.style.zIndex = '-1';
+      }
+    }
+  }, [showPreview, isFolded]);
 
   // Reset security state when code changes
   useEffect(() => {
@@ -516,6 +553,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       const wrappedCode = `
         (async () => { 
           const litechat = window.litechat;
+          console.log('litechat.target in execution context:', litechat.target);
           ${codeToRun} 
         })()
       `;
@@ -579,23 +617,25 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 
       // Always show preview first in unsafe mode, then check for content
       if (!useSafeMode) {
+        // Force preview mode immediately for unsafe execution
         setShowPreview(true);
         setShowOutput(false);
         
         // Check for content after a brief delay to allow DOM manipulation
         setTimeout(() => {
           const hasPreviewContent = previewRef.current && 
-            (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim());
+            (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim().length > 0);
           
+          // Only switch to console if there's truly no preview content AND there are logs
           if (!hasPreviewContent && capturedLogs.length > 0) {
             setShowOutput(true);
             setShowPreview(false);
           }
-        }, 100);
+        }, 200); // Increased delay to allow for async operations
       } else {
         // Safe mode - check content immediately
         const hasPreviewContent = previewRef.current && 
-          (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim());
+          (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim().length > 0);
         
         if (hasPreviewContent) {
           setShowPreview(true);
@@ -708,8 +748,73 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     return "Run";
   };
 
-  const hasPreviewContent = hasRun && previewRef.current && 
-    (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim().length > 0);
+  // Stop/Clear function
+  const handleStop = useCallback(() => {
+    // Clear preview content
+    if (previewRef.current) {
+      previewRef.current.innerHTML = '';
+    }
+    
+    // Clear output
+    setOutput([]);
+    setHasRun(false);
+    
+    // Reset view to code
+    setShowOutput(false);
+    setShowPreview(false);
+    
+    // Try to clean up any loaded modules (best effort)
+    try {
+      // Remove any script tags that might have been added
+      const scripts = document.querySelectorAll('script[src*="unpkg.com"], script[src*="jsdelivr.net"], script[src*="cdnjs.cloudflare.com"]');
+      scripts.forEach(script => {
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      });
+      
+      // Clear any global modules that might have been set
+      ['THREE', 'OrbitControls', 'D3', 'moment', 'lodash'].forEach(moduleName => {
+        if ((window as any)[moduleName]) {
+          delete (window as any)[moduleName];
+        }
+      });
+    } catch (error) {
+      console.warn('Error during cleanup:', error);
+    }
+    
+    toast.success('Preview cleared and modules unloaded');
+  }, []);
+
+  // State for tracking preview content
+  const [hasPreviewContent, setHasPreviewContent] = useState(false);
+
+  // Check for preview content whenever preview is shown
+  useEffect(() => {
+    if (showPreview && previewRef.current) {
+      const checkContent = () => {
+        const hasContent = previewRef.current ? 
+          (previewRef.current.children.length > 0 || previewRef.current.innerHTML.trim().length > 0) : false;
+        setHasPreviewContent(hasContent);
+      };
+
+      // Check immediately
+      checkContent();
+
+      // Set up a MutationObserver to watch for changes in the preview target
+      const observer = new MutationObserver(checkContent);
+      observer.observe(previewRef.current, {
+        childList: true,
+        subtree: true,
+        attributes: false,
+        characterData: true
+      });
+
+      return () => observer.disconnect();
+    } else {
+      setHasPreviewContent(false);
+    }
+  }, [showPreview, hasRun]);
 
   return (
     <div className="code-block-container group/codeblock my-4 max-w-full">
@@ -806,6 +911,12 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
                 className="text-xs h-7"
                 icon={<EyeIcon className="h-3 w-3 mr-1" />}
               />
+              <ActionTooltipButton
+                tooltipText="Stop & Clear"
+                onClick={handleStop}
+                className="text-xs h-7"
+                icon={<SquareIcon className="h-3 w-3 mr-1" />}
+              />
             </>
           )}
           
@@ -889,7 +1000,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         </div>
       )}
 
-      {/* Preview - always render but hidden when not shown */}
+      {/* Preview Container with embedded target */}
       <div
         className={
           !isFolded && showPreview
@@ -908,16 +1019,13 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
             <div className="preview-header text-muted-foreground mb-2 text-xs font-semibold">
               PREVIEW:
             </div>
-            <div className="preview-content min-h-[100px] border border-dashed border-muted-foreground/20 rounded p-2">
-              {/* WRAPPER DIV - React never manages this, unsafe code can fuck with it */}
-              <div
-                ref={previewRef}
-                className="unsafe-code-target"
-                style={{ width: "100%", height: "100%" }}
-                suppressHydrationWarning={true}
-              />
+            <div 
+              ref={previewContentRef}
+              className="preview-content min-h-[100px] border border-dashed border-muted-foreground/20 rounded p-2 relative"
+              id={`preview-content-${blockUniqueId}`}
+            >
               {!hasPreviewContent && (
-                <div className="text-muted-foreground text-sm italic">
+                <div className="text-muted-foreground text-sm italic absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                   No preview content. Use DOM manipulation or <code>litechat.target</code> to add elements here.
                 </div>
               )}
@@ -925,6 +1033,23 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           </>
         )}
       </div>
+      
+      {/* ALWAYS-MOUNTED PREVIEW TARGET - Initially hidden, moved by useEffect */}
+      <div
+        ref={previewRef}
+        className="unsafe-code-target"
+        style={{ 
+          position: "absolute",
+          top: "-9999px",
+          left: "-9999px",
+          width: "1px",
+          height: "1px",
+          visibility: "hidden",
+          pointerEvents: "none",
+          zIndex: "-1"
+        }}
+        suppressHydrationWarning={true}
+      />
 
       {/* Folded view */}
       {isFolded && (
