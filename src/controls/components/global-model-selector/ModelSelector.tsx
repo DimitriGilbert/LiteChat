@@ -246,6 +246,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerDownCapture={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
       >
         <Command shouldFilter={false}>
           <div className="flex items-center border-b px-3 gap-2">
