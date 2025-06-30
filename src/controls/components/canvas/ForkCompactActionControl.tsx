@@ -6,6 +6,7 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { canvasEvent } from "@/types/litechat/events/canvas.events";
 import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector";
 import type { ModelListItem } from "@/types/litechat/provider";
+import { useTranslation } from "react-i18next";
 
 interface ForkCompactActionControlProps {
   module: {
@@ -20,6 +21,7 @@ interface ForkCompactActionControlProps {
 export const ForkCompactActionControl: React.FC<
   ForkCompactActionControlProps
 > = ({ module, interactionId, disabled }) => {
+  const { t } = useTranslation('canvas');
   const [showSelector, setShowSelector] = useState(false);
   const [, forceUpdate] = useState({});
 
@@ -49,7 +51,7 @@ export const ForkCompactActionControl: React.FC<
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled) {
-      toast.info("Fork compact is currently disabled.");
+      toast.info(t('actions.forkCompactDisabled', 'Fork compact is currently disabled.'));
       return;
     }
     setShowSelector(!showSelector);
@@ -70,9 +72,9 @@ export const ForkCompactActionControl: React.FC<
 
   return (
     <ActionTooltipButton
-      tooltipText="Summarize"
+      tooltipText={t('actions.summarize', 'Summarize')}
       onClick={handleClick}
-      aria-label="Fork Conversation with Compact Summary"
+      aria-label={t('actions.forkCompactAriaLabel', 'Fork Conversation with Compact Summary')}
       disabled={disabled}
       icon={<Axe className="h-4 w-4" />}
       className="h-5 w-5 md:h-6 md:w-6"

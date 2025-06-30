@@ -3,6 +3,7 @@
 import React from "react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface FoldInteractionControlProps {
   isFolded: boolean;
@@ -15,6 +16,7 @@ export const FoldInteractionControl: React.FC<FoldInteractionControlProps> = ({
   toggleFold,
   canFold,
 }) => {
+  const { t } = useTranslation('canvas');
   if (!canFold) {
     return null;
   }
@@ -26,9 +28,9 @@ export const FoldInteractionControl: React.FC<FoldInteractionControlProps> = ({
 
   return (
     <ActionTooltipButton
-      tooltipText={isFolded ? "Unfold" : "Fold"}
+      tooltipText={isFolded ? t('actions.unfold', 'Unfold') : t('actions.fold', 'Fold')}
       onClick={handleClick}
-      aria-label={isFolded ? "Unfold response" : "Fold response"}
+      aria-label={isFolded ? t('actions.unfoldAriaLabel', 'Unfold response') : t('actions.foldAriaLabel', 'Fold response')}
       icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
       iconClassName="h-3.5 w-3.5"
       className="h-5 w-5"

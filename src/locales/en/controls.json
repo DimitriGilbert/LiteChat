@@ -44,5 +44,49 @@
     "failedToAutoSelectRules": "Failed to auto-select rules.",
     "rulesAutoSelectedSuccessfully": "Rules auto-selected successfully.",
     "noRulesOrTagsConfigured": "No rules or tags configured."
+  },
+  "sidebar": {
+    "title": "LiteChat Menu",
+    "close": "Close menu",
+    "open": "Open menu",
+    "loading": "Loading menu..."
+  },
+  "autoTitle": {
+    "disableForChat": "Disable Auto-Title for this Chat",
+    "enableForChat": "Enable Auto-Title for this Chat",
+    "enabledTooltip": "Auto-Title Enabled (Click to Disable)",
+    "disabledTooltip": "Auto-Title Disabled (Click to Enable)",
+    "updating": "Updating...",
+    "updateTitle": "Update Title"
+  },
+  "modelFilter": {
+    "sort": "Sort",
+    "nameAsc": "Name (A-Z)",
+    "nameDesc": "Name (Z-A)",
+    "inputPriceAsc": "Input Price (Low-High)",
+    "inputPriceDesc": "Input Price (High-Low)",
+    "outputPriceAsc": "Output Price (Low-High)",
+    "outputPriceDesc": "Output Price (High-Low)",
+    "contextLengthAsc": "Context Length (Low-High)",
+    "contextLengthDesc": "Context Length (High-Low)",
+    "releaseDateAsc": "Release Date (Oldest)",
+    "releaseDateDesc": "Release Date (Newest)",
+    "filters": "Filters",
+    "status": "Status",
+    "all": "All",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "providers": "Providers",
+    "capabilities": "Capabilities",
+    "reasoning": "Reasoning",
+    "webSearch": "Web Search",
+    "tools": "Tools",
+    "multimodal": "Image Input",
+    "inputPrice": "Input Price",
+    "outputPrice": "Output Price",
+    "min": "Min",
+    "max": "Max",
+    "perMillion": "($/1M)",
+    "apply": "Apply"
   }
 }

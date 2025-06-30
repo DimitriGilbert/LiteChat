@@ -43,5 +43,49 @@
     "failedToAutoSelectRules": "Échec de la sélection automatique des règles.",
     "rulesAutoSelectedSuccessfully": "Règles sélectionnées automatiquement avec succès.",
     "noRulesOrTagsConfigured": "Aucune règle ou tag configuré."
+  },
+  "sidebar": {
+    "title": "Menu LiteChat",
+    "close": "Fermer le menu",
+    "open": "Ouvrir le menu",
+    "loading": "Chargement du menu..."
+  },
+  "autoTitle": {
+    "disableForChat": "Désactiver le titre automatique pour ce chat",
+    "enableForChat": "Activer le titre automatique pour ce chat",
+    "enabledTooltip": "Titre automatique activé (cliquer pour désactiver)",
+    "disabledTooltip": "Titre automatique désactivé (cliquer pour activer)",
+    "updating": "Mise à jour...",
+    "updateTitle": "Mettre à jour le titre"
+  },
+  "modelFilter": {
+    "sort": "Trier",
+    "nameAsc": "Nom (A-Z)",
+    "nameDesc": "Nom (Z-A)",
+    "inputPriceAsc": "Prix d'entrée (Bas-Haut)",
+    "inputPriceDesc": "Prix d'entrée (Haut-Bas)",
+    "outputPriceAsc": "Prix de sortie (Bas-Haut)",
+    "outputPriceDesc": "Prix de sortie (Haut-Bas)",
+    "contextLengthAsc": "Taille du contexte (Bas-Haut)",
+    "contextLengthDesc": "Taille du contexte (Haut-Bas)",
+    "releaseDateAsc": "Date de sortie (Plus ancien)",
+    "releaseDateDesc": "Date de sortie (Plus récent)",
+    "filters": "Filtres",
+    "status": "Statut",
+    "all": "Tous",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "providers": "Fournisseurs",
+    "capabilities": "Capacités",
+    "reasoning": "Raisonnement",
+    "webSearch": "Recherche Web",
+    "tools": "Outils",
+    "multimodal": "Entrée d'image",
+    "inputPrice": "Prix d'entrée",
+    "outputPrice": "Prix de sortie",
+    "min": "Min",
+    "max": "Max",
+    "perMillion": "($/1M)",
+    "apply": "Appliquer"
   }
 }

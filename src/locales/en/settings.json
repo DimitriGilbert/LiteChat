@@ -1,8 +1,66 @@
 {
+  "tabs": {
+    "general": "General",
+    "assistant": "Assistant",
+    "providers": "Providers",
+    "rules": "Rules & Tags",
+    "data": "Data",
+    "git": "Git",
+    "mcp": "MCP"
+  },
   "modelBrowser": {
     "notApplicable": "N/A",
-    "perMillionTokens": "/ 1M tokens",
+    "perMillionTokens": "per 1M tokens",
     "filterPlaceholder": "Filter models by name or provider...",
-    "noModelsMatchFilters": "No models match your filters."
+    "noModelsMatchFilters": "No models match the current filters.",
+    "context": "Context",
+    "inputPrice": "Input Price",
+    "outputPrice": "Output Price",
+    "releaseDate": "Release Date",
+    "capabilities": "Capabilities",
+    "modalities": "Modalities",
+    "input": "Input",
+    "output": "Output",
+    "selectModel": "Select a model from the list to see details",
+    "noModelSelected": "No model selected"
+  },
+  "providerSettings": {
+    "title": "Provider Configuration",
+    "description": "Add, remove, or configure connections to AI providers. Enable models within each provider's edit section. Click a model name to view its details.",
+    "addProvider": "Add Provider Configuration",
+    "noProviders": "No providers configured yet. Click \"Add Provider Configuration\" above.",
+    "tabs": {
+      "config": "Configuration",
+      "order": "Model Order",
+      "apiKeys": "API Keys",
+      "selectedModel": "Selected Model",
+      "browse": "Browse Models"
+    }
+  },
+  "modelEnablement": {
+    "searchPlaceholder": "Filter models by name...",
+    "noModelsAvailable": "No models available for this provider. Try fetching models.",
+    "noModelsMatchFilters": "No models match the current filters.",
+    "initializingList": "Initializing list...",
+    "filter": {
+      "all": "All",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "sort": {
+      "name": "Name",
+      "inputPrice": "Input Price",
+      "outputPrice": "Output Price",
+      "contextLength": "Context Length",
+      "created": "Created"
+    },
+    "capabilities": {
+      "reasoning": "Reasoning",
+      "webSearch": "Web Search",
+      "tools": "Tools",
+      "multimodal": "Multimodal"
+    },
+    "yes": "Yes",
+    "no": "No"
   }
 }

@@ -255,37 +255,36 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
                         className="flex-1 text-left p-1.5 rounded hover:bg-muted/50 flex flex-col"
                         onClick={() => handleRowClick(model.id)}
                       >
-                        <span className="text-sm font-medium truncate">
-                          {model.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {model.providerName}
-                        </span>
+                        <div className="flex flex-col items-start text-sm font-normal truncate">
+                          <p>{model.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {t('modelBrowser.byProvider', 'by {{providerName}}', { providerName: model.providerName })}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end text-xs w-28 flex-shrink-0">
+                          <p>
+                            <span className="font-semibold">{t('modelBrowser.inputAbbr', 'In:')}</span>{" "}
+                            {formatPrice(model.metadataSummary?.pricing?.prompt)}
+                          </p>
+                          <p>
+                            <span className="font-semibold">{t('modelBrowser.outputAbbr', 'Out:')}</span>{" "}
+                            {formatPrice(model.metadataSummary?.pricing?.completion)}
+                          </p>
+                        </div>
                       </button>
-                      <TooltipProvider delayDuration={300}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-pointer flex items-center">
+                      <div className="flex items-center w-12 flex-shrink-0 justify-end">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
                               <InfoIcon className="h-4 w-4 text-muted-foreground" />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" align="start" className="max-w-xs">
-                            <div className="text-xs font-semibold mb-1">{model.name}</div>
-                            {model.metadataSummary?.description && (
-                              <div className="mb-1">{model.metadataSummary.description}</div>
-                            )}
-                            {model.metadataSummary?.context_length && (
-                              <div>Context: {model.metadataSummary.context_length.toLocaleString()} tokens</div>
-                            )}
-                            {model.metadataSummary?.pricing?.prompt && (
-                              <div>Input Price: {formatPrice(model.metadataSummary.pricing.prompt)}</div>
-                            )}
-                            {model.metadataSummary?.pricing?.completion && (
-                              <div>Output Price: {formatPrice(model.metadataSummary.pricing.completion)}</div>
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{t('modelBrowser.context', 'Context')}: {model.metadataSummary?.context_length ?? t('modelBrowser.notApplicable', 'N/A')}</p>
+                              <p>{t('modelBrowser.releaseDate', 'Release Date')}: {model.metadataSummary?.created ? new Date(model.metadataSummary.created * 1000).toLocaleDateString() : t('modelBrowser.notApplicable', 'N/A')}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </div>
                   </div>
                 );

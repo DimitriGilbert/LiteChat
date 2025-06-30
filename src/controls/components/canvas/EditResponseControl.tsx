@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { canvasEvent } from "@/types/litechat/events/canvas.events";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 interface EditResponseControlProps {
   interactionId: string;
@@ -20,13 +21,14 @@ export const EditResponseControl: React.FC<EditResponseControlProps> = ({
   response,
   disabled 
 }) => {
+  const { t } = useTranslation('canvas');
   const [open, setOpen] = useState(false);
   const [editedContent, setEditedContent] = useState("");
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled) {
-      toast.info("Response editing is currently disabled.");
+      toast.info(t('actions.editResponseDisabled', 'Response editing is currently disabled.'));
       return;
     }
     
@@ -37,7 +39,7 @@ export const EditResponseControl: React.FC<EditResponseControlProps> = ({
 
   const handleSave = () => {
     if (editedContent.trim() === "") {
-      toast.error("Response cannot be empty");
+      toast.error(t('actions.responseCannotBeEmpty', 'Response cannot be empty'));
       return;
     }
 
@@ -48,7 +50,7 @@ export const EditResponseControl: React.FC<EditResponseControlProps> = ({
     });
 
     setOpen(false);
-    toast.success("Response edited successfully");
+    toast.success(t('actions.responseEditedSuccessfully', 'Response edited successfully'));
   };
 
   const handleCancel = () => {
@@ -59,9 +61,9 @@ export const EditResponseControl: React.FC<EditResponseControlProps> = ({
   return (
     <>
       <ActionTooltipButton
-        tooltipText="Edit Response"
+        tooltipText={t('actions.editResponse', 'Edit Response')}
         onClick={handleClick}
-        aria-label="Edit Assistant Response"
+        aria-label={t('actions.editResponseAriaLabel', 'Edit Assistant Response')}
         disabled={disabled}
         icon={<NotebookPenIcon />}
         className="h-5 max-w-7xl md:h-6 md:max-w-6xl"
@@ -70,17 +72,17 @@ export const EditResponseControl: React.FC<EditResponseControlProps> = ({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="!w-[80vw] !h-[85vh] !max-w-none flex flex-col">
           <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
-            <DialogTitle className="p-2">Edit Assistant Response</DialogTitle>
+            <DialogTitle className="p-2">{t('actions.editResponse', 'Edit Assistant Response')}</DialogTitle>
           </DialogHeader>
 
           <div className="flex-1 space-y-4 overflow-hidden">
             <div className="space-y-2 h-full">
-              <Label htmlFor="response-edit">Response Content</Label>
+              <Label htmlFor="response-edit">{t('actions.responseContent', 'Response Content')}</Label>
               <Textarea
                 id="response-edit"
                 value={editedContent}
                 onChange={(e) => setEditedContent(e.target.value)}
-                placeholder="Edit the assistant's response..."
+                placeholder={t('actions.editResponsePlaceholder', "Edit the assistant's response...")}
                 className="min-h-[60vh] h-full resize-none text-sm leading-relaxed"
               />
             </div>
@@ -88,10 +90,10 @@ export const EditResponseControl: React.FC<EditResponseControlProps> = ({
 
           <DialogFooter className="flex-shrink-0 p-2 md:p-3 pt-1 md:pt-2">
             <Button variant="outline" onClick={handleCancel}>
-              Cancel
+              {t('actions.cancel', 'Cancel')}
             </Button>
             <Button onClick={handleSave}>
-              Save Changes
+              {t('actions.save', 'Save Changes')}
             </Button>
           </DialogFooter>
         </DialogContent>

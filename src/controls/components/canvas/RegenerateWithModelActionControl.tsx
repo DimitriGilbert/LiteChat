@@ -6,6 +6,7 @@ import { canvasEvent } from "@/types/litechat/events/canvas.events";
 import { toast } from "sonner";
 import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector";
 import type { RegenerateWithModelActionControlModule } from "@/controls/modules/canvas/RegenerateWithModelActionControlModule";
+import { useTranslation } from "react-i18next";
 
 interface RegenerateWithModelActionControlProps {
   module: RegenerateWithModelActionControlModule;
@@ -16,6 +17,7 @@ interface RegenerateWithModelActionControlProps {
 export const RegenerateWithModelActionControl: React.FC<
   RegenerateWithModelActionControlProps
 > = ({ module, interactionId, disabled }) => {
+  const { t } = useTranslation('canvas');
   const [showSelector, setShowSelector] = useState(false);
   const [, forceUpdate] = useState({});
 
@@ -45,7 +47,7 @@ export const RegenerateWithModelActionControl: React.FC<
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled) {
-      toast.info("Regeneration is currently disabled.");
+      toast.info(t('actions.regenerateDisabled', 'Regeneration is currently disabled.'));
       return;
     }
     setShowSelector(!showSelector);
@@ -66,9 +68,9 @@ export const RegenerateWithModelActionControl: React.FC<
 
   return (
     <ActionTooltipButton
-      tooltipText="Regenerate with Model"
+      tooltipText={t('actions.regenerateWithModel', 'Regenerate with Model')}
       onClick={handleClick}
-      aria-label="Regenerate Response with Model Selection"
+      aria-label={t('actions.regenerateWithModelAriaLabel', 'Regenerate Response with Model Selection')}
       disabled={disabled}
       icon={<ListRestartIcon />}
       className="h-5 w-5 md:h-6 md:w-6"

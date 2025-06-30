@@ -2,6 +2,7 @@ import React, { useCallback } from "react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { DownloadIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 interface DownloadCodeBlockControlProps {
   interactionId?: string;
@@ -20,6 +21,7 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
   filepath,
   disabled,
 }) => {
+  const { t } = useTranslation('canvas');
   const handleDownload = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -63,13 +65,13 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
         // Clean up
         URL.revokeObjectURL(url);
         
-        toast.success(`Downloaded ${filename}`);
+        toast.success(t('actions.downloaded', `Downloaded {{filename}}`, { filename }));
       } catch (error) {
         console.error('Download failed:', error);
-        toast.error('Failed to download file');
+        toast.error(t('actions.downloadFailed', 'Failed to download file'));
       }
     },
-    [interactionId, codeBlockId, language, codeToDownload, filepath, disabled]
+    [interactionId, codeBlockId, language, codeToDownload, filepath, disabled, t]
   );
 
   // Only show download button if there's a filepath or if the code is substantial
@@ -81,9 +83,9 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
 
   return (
     <ActionTooltipButton
-      tooltipText="Download File"
+      tooltipText={t('actions.downloadFile', 'Download File')}
       onClick={handleDownload}
-      aria-label="Download code as file"
+      aria-label={t('actions.downloadFileAriaLabel', 'Download code as file')}
       disabled={disabled || !codeToDownload}
       icon={<DownloadIcon />}
       iconClassName="h-3.5 w-3.5"

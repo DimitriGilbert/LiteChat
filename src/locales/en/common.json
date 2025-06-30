@@ -20,5 +20,30 @@
     "saveButtonText": "Save",
     "saving": "Saving...",
     "syntaxHighlightingError": "Syntax highlighting error:"
+  },
+  "theme": {
+    "toggle": "Toggle theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "app": {
+    "initializationError": "Application failed to initialize. Please refresh the page.",
+    "initializationErrorDetails": "Initialization Error",
+    "initializing": "Initializing...",
+    "noConversationSelected": "No conversation selected",
+    "startNewConversation": "Start a new conversation or select one from the sidebar.",
+    "newConversation": "New Conversation",
+    "createConversationError": "Failed to create conversation",
+    "loadConversationError": "Failed to load conversation",
+    "loadInteractionsError": "Failed to load interactions",
+    "runningWorkflow": "Running workflow...",
+    "workflowAborted": "Workflow aborted",
+    "workflowError": "Workflow execution failed",
+    "workflowCompleted": "Workflow completed",
+    "updateError": "Update failed",
+    "noInteractions": "No interactions yet",
+    "startTyping": "Start typing to begin the conversation.",
+    "genericError": "An unexpected error occurred. Please try again."
   }
 }

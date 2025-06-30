@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import type { AutoTitleControlModule } from "@/controls/modules/AutoTitleControlModule";
+import { useTranslation } from "react-i18next";
 
 interface AutoTitleControlTriggerProps {
   module: AutoTitleControlModule;
@@ -24,6 +25,7 @@ interface AutoTitleControlTriggerProps {
 export const AutoTitleControlTrigger: React.FC<
   AutoTitleControlTriggerProps
 > = ({ module }) => {
+  const { t } = useTranslation('controls');
   const [, forceUpdate] = useState({});
 
   useEffect(() => {
@@ -74,8 +76,8 @@ export const AutoTitleControlTrigger: React.FC<
                 disabled={isStreaming}
                 aria-label={
                   localAutoTitleEnabled
-                    ? "Disable Auto-Title for this Chat"
-                    : "Enable Auto-Title for this Chat"
+                    ? t('autoTitle.disableForChat', 'Disable Auto-Title for this Chat')
+                    : t('autoTitle.enableForChat', 'Enable Auto-Title for this Chat')
                 }
               >
                 <Captions
@@ -90,8 +92,8 @@ export const AutoTitleControlTrigger: React.FC<
             </TooltipTrigger>
             <TooltipContent side="top">
               {localAutoTitleEnabled
-                ? "Auto-Title Enabled (Click to Disable)"
-                : "Auto-Title Disabled (Click to Enable)"}
+                ? t('autoTitle.enabledTooltip', 'Auto-Title Enabled (Click to Disable)')
+                : t('autoTitle.disabledTooltip', 'Auto-Title Disabled (Click to Enable)')}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -119,7 +121,7 @@ export const AutoTitleControlTrigger: React.FC<
                 onClick={handleUpdateTitle}
                 disabled={isUpdatingTitle}
               >
-                {isUpdatingTitle ? "Updating..." : "Update Title"}
+                {isUpdatingTitle ? t('autoTitle.updating', 'Updating...') : t('autoTitle.updateTitle', 'Update Title')}
               </Button>
             </div>
           </HoverCardContent>

@@ -20,5 +20,30 @@
     "saveButtonText": "Enregistrer",
     "saving": "Enregistrement...",
     "syntaxHighlightingError": "Erreur de coloration syntaxique :"
+  },
+  "theme": {
+    "toggle": "Changer de thème",
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système"
+  },
+  "app": {
+    "initializationError": "L'application n'a pas pu s'initialiser. Veuillez rafraîchir la page.",
+    "initializationErrorDetails": "Erreur d'initialisation",
+    "initializing": "Initialisation...",
+    "noConversationSelected": "Aucune conversation sélectionnée",
+    "startNewConversation": "Commencez une nouvelle conversation ou sélectionnez-en une dans la barre latérale.",
+    "newConversation": "Nouvelle conversation",
+    "createConversationError": "Échec de la création de la conversation",
+    "loadConversationError": "Échec du chargement de la conversation",
+    "loadInteractionsError": "Échec du chargement des interactions",
+    "runningWorkflow": "Exécution du workflow...",
+    "workflowAborted": "Workflow annulé",
+    "workflowError": "L'exécution du workflow a échoué",
+    "workflowCompleted": "Workflow terminé",
+    "updateError": "La mise à jour a échoué",
+    "noInteractions": "Aucune interaction pour le moment",
+    "startTyping": "Commencez à taper pour démarrer la conversation.",
+    "genericError": "Une erreur inattendue est survenue. Veuillez réessayer."
   }
 }

@@ -1,8 +1,66 @@
 {
+  "tabs": {
+    "general": "Général",
+    "assistant": "Assistant",
+    "providers": "Fournisseurs",
+    "rules": "Règles & Tags",
+    "data": "Données",
+    "git": "Git",
+    "mcp": "MCP"
+  },
   "modelBrowser": {
     "notApplicable": "N/A",
-    "perMillionTokens": "/ 1M jetons",
+    "perMillionTokens": "par 1M de jetons",
     "filterPlaceholder": "Filtrer les modèles par nom ou fournisseur...",
-    "noModelsMatchFilters": "Aucun modèle ne correspond à vos filtres."
+    "noModelsMatchFilters": "Aucun modèle ne correspond aux filtres actuels.",
+    "context": "Contexte",
+    "inputPrice": "Prix d'entrée",
+    "outputPrice": "Prix de sortie",
+    "releaseDate": "Date de sortie",
+    "capabilities": "Capacités",
+    "modalities": "Modalités",
+    "input": "Entrée",
+    "output": "Sortie",
+    "selectModel": "Sélectionnez un modèle dans la liste pour voir les détails",
+    "noModelSelected": "Aucun modèle sélectionné"
+  },
+  "providerSettings": {
+    "title": "Configuration des fournisseurs",
+    "description": "Ajoutez, supprimez ou configurez les connexions aux fournisseurs d'IA. Activez les modèles dans la section d'édition de chaque fournisseur. Cliquez sur le nom d'un modèle pour voir ses détails.",
+    "addProvider": "Ajouter une configuration de fournisseur",
+    "noProviders": "Aucun fournisseur configuré pour le moment. Cliquez sur \"Ajouter une configuration de fournisseur\" ci-dessus.",
+    "tabs": {
+      "config": "Configuration",
+      "order": "Ordre des modèles",
+      "apiKeys": "Clés API",
+      "selectedModel": "Modèle sélectionné",
+      "browse": "Parcourir les modèles"
+    }
+  },
+  "modelEnablement": {
+    "searchPlaceholder": "Filtrer les modèles par nom...",
+    "noModelsAvailable": "Aucun modèle disponible pour ce fournisseur. Essayez de récupérer les modèles.",
+    "noModelsMatchFilters": "Aucun modèle ne correspond aux filtres actuels.",
+    "initializingList": "Initialisation de la liste...",
+    "filter": {
+      "all": "Tous",
+      "enabled": "Activés",
+      "disabled": "Désactivés"
+    },
+    "sort": {
+      "name": "Nom",
+      "inputPrice": "Prix d'entrée",
+      "outputPrice": "Prix de sortie",
+      "contextLength": "Longueur du contexte",
+      "created": "Créé"
+    },
+    "capabilities": {
+      "reasoning": "Raisonnement",
+      "webSearch": "Recherche Web",
+      "tools": "Outils",
+      "multimodal": "Multimodal"
+    },
+    "yes": "Oui",
+    "no": "Non"
   }
 }

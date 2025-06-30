@@ -6,6 +6,7 @@ import { RefreshCwIcon } from "lucide-react";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { canvasEvent } from "@/types/litechat/events/canvas.events";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 interface RegenerateActionControlProps {
   interactionId: string;
@@ -15,19 +16,20 @@ interface RegenerateActionControlProps {
 export const RegenerateActionControl: React.FC<
   RegenerateActionControlProps
 > = ({ interactionId, disabled }) => {
+  const { t } = useTranslation('canvas');
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled) {
-      toast.info("Regeneration is currently disabled.");
+      toast.info(t('actions.regenerateDisabled', 'Regeneration is currently disabled.'));
       return;
     }
     emitter.emit(canvasEvent.regenerateInteractionRequest, { interactionId });
   };
   return (
     <ActionTooltipButton
-      tooltipText="Regenerate"
+      tooltipText={t('actions.regenerate', 'Regenerate')}
       onClick={handleClick}
-      aria-label="Regenerate Response"
+      aria-label={t('actions.regenerateAriaLabel', 'Regenerate Response')}
       disabled={disabled}
       icon={<RefreshCwIcon />}
       className="h-5 w-5 md:h-6 md:w-6"
