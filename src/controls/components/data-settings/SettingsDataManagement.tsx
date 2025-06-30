@@ -35,7 +35,6 @@ import {
 } from "@/services/import-export.service";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "react-i18next";
 
 // Define Zod schemas for import and export options
@@ -72,10 +71,11 @@ const fullExportOptionsSchema = z.object({
 const SettingsDataManagementComponent: React.FC = () => {
   const { t } = useTranslation('settings');
   // --- Fetch actions from stores ---
-  const { importConversation, exportAllConversations } = useConversationStore(
+  const { importConversation, exportAllConversations, clearAllConversations } = useConversationStore(
     useShallow((state) => ({
       importConversation: state.importConversation,
       exportAllConversations: state.exportAllConversations,
+      clearAllConversations: state.clearAllConversations,
     })),
   );
 
@@ -85,6 +85,7 @@ const SettingsDataManagementComponent: React.FC = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isClearingConversations, setIsClearingConversations] = useState(false);
   const [isFullExporting, setIsFullExporting] = useState(false);
   const [isFullImporting, setIsFullImporting] = useState(false);
 
@@ -203,6 +204,30 @@ const SettingsDataManagementComponent: React.FC = () => {
     }
   }, [exportAllConversations]);
 
+  const handleClearConversationsClick = useCallback(async () => {
+    if (
+      !window.confirm(
+        t('dataManagement.clearConversationsConfirmation', 'Are you sure you want to delete ALL conversations? This action cannot be undone.')
+      )
+    ) {
+      return;
+    }
+
+    setIsClearingConversations(true);
+    try {
+      await clearAllConversations(true);
+      toast.success(t('dataManagement.conversationsClearedSuccess', 'All conversations have been deleted. Reloading...'));
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      const errorMsg = t('dataManagement.conversationsClearedError', 'Failed to clear conversations');
+      console.error(errorMsg, error);
+      toast.error(
+        `${errorMsg}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      setIsClearingConversations(false);
+    }
+  }, [clearAllConversations, t]);
+
   const handleFullExportClick = useCallback(async () => {
     setIsFullExporting(true);
     try {
@@ -250,26 +275,31 @@ const SettingsDataManagementComponent: React.FC = () => {
     optionKey: keyof FullImportOptions, // Assuming keys are same for FullExportOptions
     label: string,
     Icon: React.ElementType,
+    isDisabled: boolean,
     typePrefix: 'import' | 'export' // Added to differentiate IDs
   ) => {
-    const fieldId = `${typePrefix}-${optionKey}-checkbox`; // Made ID unique
+    const uniqueId = `${typePrefix}-${optionKey}`;
     return (
       <formInstance.Field
-        key={optionKey}
         name={optionKey}
-        children={(field: AnyFieldApi) => (
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        children={(fieldApi: AnyFieldApi) => (
           <div className="flex items-center space-x-2">
             <Checkbox
-              id={fieldId}
-              checked={field.state.value}
-              onCheckedChange={(checked) => field.handleChange(!!checked)}
+              id={uniqueId}
+              checked={fieldApi.state.value as boolean}
+              onCheckedChange={(checked) => fieldApi.setValue(!!checked)}
+              onBlur={fieldApi.handleBlur}
+              disabled={isDisabled}
+              aria-label={label}
             />
             <Label
-              htmlFor={fieldId}
-              className="text-sm font-normal flex items-center gap-1.5"
+              htmlFor={uniqueId}
+              className="text-sm font-normal flex items-center gap-2 cursor-pointer"
             >
               <Icon className="h-4 w-4 text-muted-foreground" />
-              <span>{label}</span>
+              {label}
             </Label>
           </div>
         )}
@@ -278,167 +308,196 @@ const SettingsDataManagementComponent: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-8">
-      {/* --- Page Header --- */}
-      <div>
-        <h2 className="text-2xl font-bold">{t('dataManagement.title', 'Data Management')}</h2>
-        <p className="text-muted-foreground mt-1">
-          {t('dataManagement.description', 'Import, export, or clear your application data. Use full import/export for backups or migrations.')}
-        </p>
-      </div>
-
-      <Separator />
-
+    <div className="space-y-6 p-1">
       {/* --- Legacy Import/Export --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <h3 className="font-semibold">{t('dataManagement.importConversationsTitle', 'Import Conversations (Legacy)')}</h3>
-          <p className="text-sm text-muted-foreground">
-            {t('dataManagement.importConversationsDescription', 'Import conversations from a previously exported JSON file. This only imports chat history.')}
-          </p>
-          <Button
-            onClick={handleImportClick}
-            disabled={isImporting}
-            variant="outline"
-          >
-            {isImporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <FileUpIcon className="mr-2 h-4 w-4" />
-            )}
-            {t('dataManagement.importConversationsButton', 'Import from File')}
-          </Button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            className="hidden"
-            accept=".json"
-          />
-        </div>
-        <div className="space-y-2">
-          <h3 className="font-semibold">{t('dataManagement.exportConversationsTitle', 'Export All Conversations (Legacy)')}</h3>
-          <p className="text-sm text-muted-foreground">
-            {t('dataManagement.exportConversationsDescription', 'Export all your conversations into a single JSON file. This only includes chat history.')}
-          </p>
-          <Button
-            onClick={handleExportAllClick}
-            disabled={isExporting}
-            variant="outline"
-          >
-            {isExporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <FileDownIcon className="mr-2 h-4 w-4" />
-            )}
-            {t('dataManagement.exportConversationsButton', 'Export All to JSON')}
-          </Button>
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Import Conversations */}
+          <div className="border p-3 rounded-md space-y-2 flex flex-col justify-between">
+            <div>
+              <Label className="font-semibold">{t('dataManagement.legacyImportTitle', "Import Conversations (Legacy)")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t('dataManagement.legacyImportDescription', "Import conversations from a previously exported JSON file.")}
+              </p>
+            </div>
+            <Button
+              onClick={handleImportClick}
+              variant="outline"
+              size="sm"
+              disabled={isImporting}
+              className="w-full sm:w-auto"
+            >
+              {isImporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileUpIcon className="mr-2 h-4 w-4" />
+              )}
+              {isImporting ? t('dataManagement.importingButton', "Importing...") : t('dataManagement.importButton', "Import from File...")}
+            </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              accept=".json"
+              disabled={isImporting}
+            />
+          </div>
+
+          {/* Export Conversations */}
+          <div className="border p-3 rounded-md space-y-2 flex flex-col justify-between">
+            <div>
+              <Label className="font-semibold">{t('dataManagement.legacyExportTitle', "Export Conversations (Legacy)")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t('dataManagement.legacyExportDescription', "Export all conversations to a single JSON file as a backup.")}
+              </p>
+            </div>
+            <Button
+              onClick={handleExportAllClick}
+              variant="outline"
+              size="sm"
+              disabled={isExporting}
+              className="w-full sm:w-auto"
+            >
+              {isExporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileDownIcon className="mr-2 h-4 w-4" />
+              )}
+              {isExporting ? t('dataManagement.exportingButton', "Exporting...") : t('dataManagement.exportAllButton', "Export All to File")}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <Separator />
 
-      {/* --- Full Import/Export --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Full Export Section */}
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold">{t('dataManagement.fullExportTitle', 'Full Export')}</h3>
-            <p className="text-sm text-muted-foreground">
-              {t('dataManagement.fullExportDescription', 'Select the data to include in your full backup file.')}
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            {renderOptionCheckbox(exportOptionsForm, 'importSettings', t('dataManagement.options.settings', 'Settings'), SettingsIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importApiKeys', t('dataManagement.options.apiKeys', 'API Keys'), KeyIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importProviderConfigs', t('dataManagement.options.providerConfigs', 'Provider Configs'), ServerIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importProjects', t('dataManagement.options.projects', 'Projects'), FolderTreeIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importConversations', t('dataManagement.options.conversations', 'Conversations'), MessageSquareIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importRulesAndTags', t('dataManagement.options.rulesAndTags', 'Rules & Tags'), TagsIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importMods', t('dataManagement.options.mods', 'Mods'), PuzzleIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importSyncRepos', t('dataManagement.options.syncRepos', 'Git Sync Repos'), GitBranchIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importMcpServers', t('dataManagement.options.mcpServers', 'MCP Servers'), PlugIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importPromptTemplates', t('dataManagement.options.promptTemplates', 'Prompt Templates'), FileTextIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importAgents', t('dataManagement.options.agents', 'Agents'), BotIcon, 'export')}
-            {renderOptionCheckbox(exportOptionsForm, 'importWorkflows', t('dataManagement.options.workflows', 'Workflows'), WorkflowIcon, 'export')}
-          </div>
-          <Button onClick={handleFullExportClick} disabled={isFullExporting}>
-            {isFullExporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <DownloadIcon className="mr-2 h-4 w-4" />
-            )}
-            {t('dataManagement.exportButton', 'Export Full Backup')}
-          </Button>
-        </div>
+      {/* --- Full Backup/Restore --- */}
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Import */}
+          <div className="border p-4 rounded-md space-y-4">
+            <div className="space-y-1">
+              <Label className="font-semibold text-base">{t('dataManagement.fullImportTitle', 'Full Import / Restore')}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t('dataManagement.fullImportDescription', 'Restore a full configuration backup from a file. This will overwrite existing data for the selected categories.')}
+              </p>
+            </div>
 
-        {/* Full Import Section */}
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold">{t('dataManagement.fullImportTitle', 'Full Import')}</h3>
-            <p className="text-sm text-muted-foreground">
-              {t('dataManagement.fullImportDescription', 'Import a full backup file. This will overwrite existing data for selected categories.')}
-            </p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2">
+              {renderOptionCheckbox(importOptionsForm, 'importSettings', t('dataManagement.options.settings', 'Settings'), SettingsIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importApiKeys', t('dataManagement.options.apiKeys', 'API Keys'), KeyIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importProviderConfigs', t('dataManagement.options.providerConfigs', 'Provider Configs'), ServerIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importProjects', t('dataManagement.options.projects', 'Projects'), FolderTreeIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importConversations', t('dataManagement.options.conversations', 'Conversations'), MessageSquareIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importRulesAndTags', t('dataManagement.options.rulesAndTags', 'Rules & Tags'), TagsIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importMods', t('dataManagement.options.mods', 'Mods'), PuzzleIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importSyncRepos', t('dataManagement.options.syncRepos', 'Git Sync Repos'), GitBranchIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importMcpServers', t('dataManagement.options.mcpServers', 'MCP Servers'), PlugIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importPromptTemplates', t('dataManagement.options.promptTemplates', 'Prompt Templates'), FileTextIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importAgents', t('dataManagement.options.agents', 'Agents'), BotIcon, isFullImporting, 'import')}
+              {renderOptionCheckbox(importOptionsForm, 'importWorkflows', t('dataManagement.options.workflows', 'Workflows'), WorkflowIcon, isFullImporting, 'import')}
+            </div>
+
+            <Button onClick={handleFullImportClick} variant="secondary" size="sm" disabled={isFullImporting}>
+              {isFullImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUpIcon className="mr-2 h-4 w-4" />}
+              {isFullImporting ? t('dataManagement.importingButton', "Importing...") : t('dataManagement.fullImportButton', "Select Backup File...")}
+            </Button>
+            <input
+              type="file"
+              ref={fullImportInputRef}
+              onChange={handleFullImportFileChange}
+              className="hidden"
+              id="full-import-file-input"
+              disabled={isFullImporting}
+            />
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            {renderOptionCheckbox(importOptionsForm, 'importSettings', t('dataManagement.options.settings', 'Settings'), SettingsIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importApiKeys', t('dataManagement.options.apiKeys', 'API Keys'), KeyIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importProviderConfigs', t('dataManagement.options.providerConfigs', 'Provider Configs'), ServerIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importProjects', t('dataManagement.options.projects', 'Projects'), FolderTreeIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importConversations', t('dataManagement.options.conversations', 'Conversations'), MessageSquareIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importRulesAndTags', t('dataManagement.options.rulesAndTags', 'Rules & Tags'), TagsIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importMods', t('dataManagement.options.mods', 'Mods'), PuzzleIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importSyncRepos', t('dataManagement.options.syncRepos', 'Git Sync Repos'), GitBranchIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importMcpServers', t('dataManagement.options.mcpServers', 'MCP Servers'), PlugIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importPromptTemplates', t('dataManagement.options.promptTemplates', 'Prompt Templates'), FileTextIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importAgents', t('dataManagement.options.agents', 'Agents'), BotIcon, 'import')}
-            {renderOptionCheckbox(importOptionsForm, 'importWorkflows', t('dataManagement.options.workflows', 'Workflows'), WorkflowIcon, 'import')}
+
+          {/* Export */}
+          <div className="border p-4 rounded-md space-y-4">
+            <div className="space-y-1">
+              <Label className="font-semibold text-base">{t('dataManagement.fullExportTitle', 'Full Export / Backup')}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t('dataManagement.fullExportDescription', 'Export all settings, conversations, etc., into a single backup file. Select which data types to include.')}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2">
+              {renderOptionCheckbox(exportOptionsForm, "importSettings", t('dataManagement.options.settings', 'Settings'), SettingsIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importApiKeys", t('dataManagement.options.apiKeys', 'API Keys'), KeyIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importProviderConfigs", t('dataManagement.options.providerConfigs', 'Provider Configs'), ServerIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importProjects", t('dataManagement.options.projects', 'Projects'), FolderTreeIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importConversations", t('dataManagement.options.conversations', 'Conversations'), MessageSquareIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importRulesAndTags", t('dataManagement.options.rulesAndTags', 'Rules & Tags'), TagsIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importMods", t('dataManagement.options.mods', 'Mods'), PuzzleIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importSyncRepos", t('dataManagement.options.syncRepos', 'Git Sync Repos'), GitBranchIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importMcpServers", t('dataManagement.options.mcpServers', 'MCP Servers'), PlugIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importPromptTemplates", t('dataManagement.options.promptTemplates', 'Prompt Templates'), FileTextIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importAgents", t('dataManagement.options.agents', 'Agents'), BotIcon, isFullExporting, 'export')}
+              {renderOptionCheckbox(exportOptionsForm, "importWorkflows", t('dataManagement.options.workflows', 'Workflows'), WorkflowIcon, isFullExporting, 'export')}
+            </div>
+            <Button
+              onClick={handleFullExportClick}
+              variant="secondary"
+              size="sm"
+              disabled={isFullExporting}
+            >
+              {isFullExporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileDownIcon className="mr-2 h-4 w-4" />
+              )}
+              {isFullExporting ? t('dataManagement.exportingButton', "Exporting...") : t('dataManagement.exportButton', "Export Configuration")}
+            </Button>
           </div>
-          <Button onClick={handleFullImportClick} disabled={isFullImporting}>
-            {isFullImporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <UploadIcon className="mr-2 h-4 w-4" />
-            )}
-            {t('dataManagement.importButton', 'Import from Backup')}
-          </Button>
-          <input
-            type="file"
-            ref={fullImportInputRef}
-            onChange={handleFullImportFileChange}
-            className="hidden"
-            accept=".json"
-          />
         </div>
       </div>
 
-      <Separator />
 
-      {/* --- Danger Zone --- */}
-      <div className="p-4 rounded-lg border border-destructive/50 bg-destructive/5 space-y-3">
-        <div className="space-y-1">
-          <h3 className="text-lg font-semibold text-destructive">
-            {t('dataManagement.dangerZoneTitle', 'Danger Zone')}
-          </h3>
-          <p className="text-sm text-destructive/80">
-            {t('dataManagement.dangerZoneDescription', 'These actions are destructive and cannot be undone. Proceed with caution.')}
-          </p>
-        </div>
-        <Button
-          variant="destructive"
-          onClick={handleClearAllDataClick}
-          disabled={isClearing}
-        >
+      {/* Danger Zone */}
+      <div className="border-t pt-6 mt-6 border-destructive/50">
+        <h3 className="text-lg font-medium text-destructive mb-2">
+          {t('dataManagement.dangerZoneTitle', 'Danger Zone')}
+        </h3>
+        <p className="text-sm text-destructive/90 mb-4">
+          {t('dataManagement.dangerZoneDescription', 'These actions are destructive and cannot be undone. Proceed with caution.')}
+        </p>
+        <div className="flex flex-wrap gap-2">
           {isClearing ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Button disabled variant="destructive">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {t('dataManagement.clearing', 'Clearing...')}
+            </Button>
           ) : (
-            <Trash2Icon className="mr-2 h-4 w-4" />
+            <Button
+              variant="destructive"
+              onClick={handleClearAllDataClick}
+              aria-label={t('dataManagement.clearData', 'Clear All Data')}
+            >
+              <Trash2Icon className="mr-2 h-4 w-4" />
+              {t('dataManagement.clearData', 'Clear All Data')}
+            </Button>
           )}
-          {t('dataManagement.clearAllDataButton', 'Clear All Local Data')}
-        </Button>
+          {isClearingConversations ? (
+            <Button disabled variant="destructive" className="bg-red-700 hover:bg-red-800">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {t('dataManagement.clearingConversations', 'Clearing Conversations...')}
+            </Button>
+          ) : (
+            <Button
+              variant="destructive"
+              className="bg-red-700 hover:bg-red-800"
+              onClick={handleClearConversationsClick}
+              aria-label={t('dataManagement.clearConversations', 'Clear All Conversations')}
+            >
+              <MessageSquareIcon className="mr-2 h-4 w-4" />
+              {t('dataManagement.clearConversations', 'Clear All Conversations')}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-export default SettingsDataManagementComponent;
+export const SettingsDataManagement = React.memo(
+  SettingsDataManagementComponent,
+);

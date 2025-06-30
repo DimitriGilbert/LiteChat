@@ -119,6 +119,6 @@ export interface ControlTranslations {
 }
 
 export interface ControlModuleConstructor {
-  new (modApi: LiteChatModApi): ControlModule;
+  new (): ControlModule;
   translations?: ControlTranslations;
 }

@@ -73,6 +73,7 @@ interface ConversationActions {
   ) => Promise<void>;
   exportProject: (projectId: string) => Promise<void>;
   exportAllConversations: () => Promise<void>;
+  clearAllConversations: (force?: boolean) => Promise<void>;
   loadSyncRepos: () => Promise<void>;
   addSyncRepo: (
     repoData: Omit<SyncRepo, "id" | "createdAt" | "updatedAt">
@@ -586,6 +587,59 @@ export const useConversationStore = create(
     },
     exportAllConversations: async () => {
       await ImportExportService.exportAllConversations();
+    },
+
+    clearAllConversations: async (_force?: boolean) => {
+      set({ isLoading: true, error: null });
+      try {
+        // Also delete any associated files in VFS for synced conversations
+        const { syncRepos, conversations } = get();
+        if (conversations.some(c => c.syncRepoId)) {
+          const syncVfs = await get()._ensureSyncVfsReady();
+          for (const convo of conversations) {
+            if (convo.syncRepoId) {
+              const repo = syncRepos.find((r) => r.id === convo.syncRepoId);
+              if (repo) {
+                const conversationDir = normalizePath(
+                  `${SYNC_REPO_BASE_DIR}/${repo.id}/${convo.id}`,
+                );
+                try {
+                  // Check if directory exists before trying to delete
+                  try {
+                    await VfsOps.stat(conversationDir, { fsInstance: syncVfs });
+                    await VfsOps.rmdirRecursive(conversationDir, { fsInstance: syncVfs });
+                    console.log(`[ConversationStore] Deleted VFS directory: ${conversationDir}`);
+                  } catch (statError) {
+                    // Directory doesn't exist, which is fine.
+                  }
+                } catch (e) {
+                  console.warn(`[ConversationStore] Could not delete VFS dir ${conversationDir}`, e);
+                }
+              }
+            }
+          }
+        }
+
+        await PersistenceService.clearTable('conversations');
+        await PersistenceService.clearTable('interactions');
+
+        set({
+          conversations: [],
+          selectedItemId: null,
+          selectedItemType: null,
+          conversationSyncStatus: {},
+          isLoading: false,
+        });
+
+        emitter.emit(conversationEvent.conversationsCleared, undefined);
+        // The UI component will show the toast and reload the page
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('[ConversationStore] Failed to clear conversations:', error);
+        set({ isLoading: false, error: errorMessage });
+        // Re-throw so the UI can catch it and show a toast
+        throw error;
+      }
     },
 
     loadSyncRepos: async () => {

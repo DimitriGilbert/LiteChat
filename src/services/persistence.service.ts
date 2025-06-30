@@ -886,4 +886,20 @@ export class PersistenceService {
       throw error;
     }
   }
+
+  static async clearTable(tableName: keyof typeof db): Promise<void> {
+    try {
+      if (db.table(tableName)) {
+        await db.table(tableName).clear();
+        console.log(`PersistenceService: Table "${tableName}" cleared.`);
+      } else {
+        const errMsg = `PersistenceService: Table "${tableName}" does not exist.`;
+        console.error(errMsg);
+        throw new Error(errMsg);
+      }
+    } catch (error) {
+      console.error(`PersistenceService: Error clearing table "${tableName}":`, error);
+      throw error;
+    }
+  }
 }

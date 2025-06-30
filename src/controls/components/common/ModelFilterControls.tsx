@@ -250,104 +250,90 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         {showCapabilityFilters && (
           <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
             <Label className="text-xs font-semibold">{t('modelFilter.capabilities', 'Capabilities')}</Label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1">
               <ActionTooltipButton
                 tooltipText={t('modelFilter.reasoning', 'Reasoning')}
-                onClick={() => toggleCapabilityFilter("reasoning")}
-                aria-label="Filter by reasoning capability"
+                aria-label="Reasoning"
                 icon={<BrainCircuitIcon />}
-                className={cn(
-                  "h-8 w-8",
-                  currentCapabilityFilters.reasoning ? "bg-primary text-primary-foreground" : "bg-muted"
-                )}
+                onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("reasoning"); }}
+                variant={currentCapabilityFilters.reasoning ? "secondary" : "outline"}
+                className={cn(currentCapabilityFilters.reasoning && "text-primary")}
               />
               <ActionTooltipButton
                 tooltipText={t('modelFilter.webSearch', 'Web Search')}
-                onClick={() => toggleCapabilityFilter("webSearch")}
-                aria-label="Filter by web search capability"
+                aria-label="Web Search"
                 icon={<SearchIcon />}
-                className={cn(
-                  "h-8 w-8",
-                  currentCapabilityFilters.webSearch ? "bg-primary text-primary-foreground" : "bg-muted"
-                )}
+                onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("webSearch"); }}
+                variant={currentCapabilityFilters.webSearch ? "secondary" : "outline"}
+                className={cn(currentCapabilityFilters.webSearch && "text-primary")}
               />
               <ActionTooltipButton
                 tooltipText={t('modelFilter.tools', 'Tools')}
-                onClick={() => toggleCapabilityFilter("tools")}
-                aria-label="Filter by tool use capability"
+                aria-label="Tools"
                 icon={<WrenchIcon />}
-                className={cn(
-                  "h-8 w-8",
-                  currentCapabilityFilters.tools ? "bg-primary text-primary-foreground" : "bg-muted"
-                )}
+                onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("tools"); }}
+                variant={currentCapabilityFilters.tools ? "secondary" : "outline"}
+                className={cn(currentCapabilityFilters.tools && "text-primary")}
               />
               <ActionTooltipButton
-                tooltipText={t('modelFilter.multimodal', 'Image Input')}
-                onClick={() => toggleCapabilityFilter("multimodal")}
-                aria-label="Filter by multimodal capability"
+                tooltipText={t('modelFilter.multimodal', 'Multimodal')}
+                aria-label="Multimodal"
                 icon={<ImageIcon />}
-                className={cn(
-                  "h-8 w-8",
-                  currentCapabilityFilters.multimodal ? "bg-primary text-primary-foreground" : "bg-muted"
-                )}
+                onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("multimodal"); }}
+                variant={currentCapabilityFilters.multimodal ? "secondary" : "outline"}
+                className={cn(currentCapabilityFilters.multimodal && "text-primary")}
               />
             </div>
           </div>
         )}
 
-        {showPriceFilters && onPriceFilterChange && (
-          <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold flex items-center">
-                <DollarSignIcon className="h-3 w-3 mr-1" />
-                {t('modelFilter.inputPrice', 'Input Price')} <span className="text-muted-foreground ml-1">{t('modelFilter.perMillion', '($/1M)')}</span>
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder={t('modelFilter.min', 'Min')}
-                  value={currentMinInputPrice}
-                  onChange={(e) => handlePriceInputChange('minInput', e.target.value)}
-                  className="h-8 text-xs"
-                />
-                <Input
-                  type="number"
-                  placeholder={t('modelFilter.max', 'Max')}
-                  value={currentMaxInputPrice}
-                  onChange={(e) => handlePriceInputChange('maxInput', e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold flex items-center">
-                <DollarSignIcon className="h-3 w-3 mr-1" />
-                {t('modelFilter.outputPrice', 'Output Price')} <span className="text-muted-foreground ml-1">{t('modelFilter.perMillion', '($/1M)')}</span>
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder={t('modelFilter.min', 'Min')}
-                  value={currentMinOutputPrice}
-                  onChange={(e) => handlePriceInputChange('minOutput', e.target.value)}
-                  className="h-8 text-xs"
-                />
-                <Input
-                  type="number"
-                  placeholder={t('modelFilter.max', 'Max')}
-                  value={currentMaxOutputPrice}
-                  onChange={(e) => handlePriceInputChange('maxOutput', e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
+        {showPriceFilters && currentMinInputPrice !== undefined && onPriceFilterChange && (
+          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+            <Label className="text-xs font-semibold flex items-center gap-1">
+              <DollarSignIcon className="h-3 w-3" /> {t('modelFilter.priceRange', 'Price Range ($ / 1M Tokens)')}
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={t('modelFilter.minInput', 'Min Input')}
+                value={currentMinInputPrice}
+                onChange={(e) => { e.stopPropagation(); handlePriceInputChange('minInput', e.target.value); }}
+                className="h-8 text-xs"
+              />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={t('modelFilter.maxInput', 'Max Input')}
+                value={currentMaxInputPrice}
+                onChange={(e) => { e.stopPropagation(); handlePriceInputChange('maxInput', e.target.value); }}
+                className="h-8 text-xs"
+              />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={t('modelFilter.minOutput', 'Min Output')}
+                value={currentMinOutputPrice}
+                onChange={(e) => { e.stopPropagation(); handlePriceInputChange('minOutput', e.target.value); }}
+                className="h-8 text-xs"
+              />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={t('modelFilter.maxOutput', 'Max Output')}
+                value={currentMaxOutputPrice}
+                onChange={(e) => { e.stopPropagation(); handlePriceInputChange('maxOutput', e.target.value); }}
+                className="h-8 text-xs"
+              />
             </div>
           </div>
         )}
-        <div className="flex justify-end pt-2">
-          <Button size="sm" onClick={() => setFilterPopoverOpen(false)}>{t('modelFilter.apply', 'Apply')}</Button>
-        </div>
       </PopoverContent>
-      </Popover>
+    </Popover>
     </div>
   );
-}; 
+};

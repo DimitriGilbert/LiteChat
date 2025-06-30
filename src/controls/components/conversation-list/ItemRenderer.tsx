@@ -42,8 +42,7 @@ interface ConversationItemProps {
   conversationSyncStatus: Record<string, SyncStatus>;
   repoNameMap: Map<string, string>;
   onSelectItem: (id: string, type: SidebarItemType) => void;
-  onDeleteConversation: (id: string, e: React.MouseEvent) => void;
-  onDeleteProject: (id: string, e: React.MouseEvent) => void;
+  onDeleteItem: (item: SidebarItem, e: React.MouseEvent) => void;
   onExportConversation: (
     id: string,
     format: "json" | "md",
@@ -74,8 +73,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     conversationSyncStatus,
     repoNameMap,
     onSelectItem,
-    onDeleteConversation,
-    onDeleteProject,
+    onDeleteItem,
     onExportConversation,
     onExportProject,
     expandedProjects,
@@ -163,17 +161,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
 
     const handleDeleteClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (isProject) {
-        if (
-          window.confirm(
-            t('itemRenderer.deleteProjectConfirm', { name: (item as Project).name })
-          )
-        ) {
-          onDeleteProject(item.id, e);
-        }
-      } else {
-        onDeleteConversation(item.id, e);
-      }
+      onDeleteItem(item, e);
     };
 
     const startLocalEditingWrapper = (e: React.MouseEvent) => {
@@ -399,11 +387,11 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 </Popover>
               )}
               <ActionTooltipButton
-                tooltipText={t('itemRenderer.delete')}
+                tooltipText={t('itemRenderer.delete', 'Delete')}
                 onClick={handleDeleteClick}
-                aria-label={t('itemRenderer.deleteItem', { name: displayName })}
+                aria-label={t('itemRenderer.delete', 'Delete')}
                 icon={<Trash2Icon />}
-                className="h-5 w-5 text-destructive hover:text-destructive/80"
+                className="hover:bg-destructive/20 hover:text-destructive"
               />
             </>
           )}

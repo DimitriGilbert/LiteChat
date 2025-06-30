@@ -241,6 +241,28 @@ export const ConversationListControlComponent: React.FC<
     });
   }, []);
 
+  const handleDeleteItem = useCallback((item: SidebarItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const itemName = item.itemType === 'project' ? (item as Project).name : (item as Conversation).title;
+    if (window.confirm(t('confirmDelete', {
+      defaultValue: `Are you sure you want to delete "${itemName}"?`,
+      itemName,
+    }))) {
+      if (item.itemType === "project") {
+        deleteProject(item.id);
+      } else {
+        deleteConversation(item.id);
+      }
+    }
+  }, [deleteProject, deleteConversation, t]);
+
+  const handleSelectItem = useCallback(
+    (id: string | null, type: SidebarItemType | null) => {
+      selectItem(id, type);
+    },
+    [selectItem]
+  );
+
   const getParentProjectId = useCallback(() => {
     if (selectedItemType === "project") {
       return selectedItemId;
@@ -297,50 +319,6 @@ export const ConversationListControlComponent: React.FC<
     handleStartEditing,
     t,
   ]);
-
-  const handleSelectItem = useCallback(
-    (id: string, type: SidebarItemType) => {
-      if (id === editingItemId && type === editingItemType) return;
-      if (editingItemId && (id !== editingItemId || type !== editingItemType)) {
-        handleCancelEdit();
-      }
-      if (id !== selectedItemId || type !== selectedItemType) {
-        selectItem(id, type);
-      }
-    },
-    [
-      editingItemId,
-      editingItemType,
-      selectedItemId,
-      selectedItemType,
-      handleCancelEdit,
-      selectItem,
-    ]
-  );
-
-  const handleDeleteConversation = useCallback(
-    (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (window.confirm(t('conversationList.confirmDeleteConversation'))) {
-        deleteConversation(id).catch((error) => {
-          console.error("Failed to delete conversation:", error);
-          toast.error(t('conversationList.deleteConversationError'));
-        });
-      }
-    },
-    [deleteConversation, t]
-  );
-
-  const handleDeleteProject = useCallback(
-    (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
-      deleteProject(id).catch((error) => {
-        console.error("Failed to delete project:", error);
-        toast.error(t('conversationList.deleteProjectError'));
-      });
-    },
-    [deleteProject, t]
-  );
 
   const handleExportConversation = useCallback(
     async (id: string, format: "json" | "md", e: React.MouseEvent) => {
@@ -579,17 +557,19 @@ export const ConversationListControlComponent: React.FC<
           )}
           {!isLoading &&
             rowVirtualizer.getVirtualItems().map((virtualItem) => {
-              const itemData = flattenedVisibleItems[virtualItem.index];
-              if (!itemData) return null;
+              const item = flattenedVisibleItems[virtualItem.index];
+              if (!item) return null;
 
+              // Reconstruct the SidebarItem to include the itemType property, which the
+              // VirtualListItem's `data` object lacks.
               const itemForRenderer: SidebarItem = {
-                ...(itemData.data as any),
-                itemType: itemData.type,
+                ...(item.data as any), // Use as any to bypass intermediate type checking
+                itemType: item.type,
               };
 
               return (
                 <div
-                  key={itemData.id}
+                  key={item.id}
                   style={{
                     position: "absolute",
                     top: 0,
@@ -602,15 +582,12 @@ export const ConversationListControlComponent: React.FC<
                 >
                   <ConversationItemRenderer
                     item={itemForRenderer}
-                    level={itemData.level}
+                    level={item.level}
                     selectedItemId={selectedItemId}
                     conversationSyncStatus={conversationSyncStatus}
                     repoNameMap={repoNameMap}
-                    onSelectItem={() =>
-                      handleSelectItem(itemData.originalId, itemData.type)
-                    }
-                    onDeleteConversation={handleDeleteConversation}
-                    onDeleteProject={handleDeleteProject}
+                    onSelectItem={handleSelectItem}
+                    onDeleteItem={handleDeleteItem}
                     onExportConversation={handleExportConversation}
                     onExportProject={handleExportProject}
                     expandedProjects={expandedProjects}

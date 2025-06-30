@@ -3,16 +3,14 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import {
-  FolderIcon,
-  UploadCloudIcon,
   FolderUpIcon,
+  FileUpIcon,
   RefreshCwIcon,
-  FileArchiveIcon,
+  ArchiveIcon,
   HomeIcon,
   FolderPlusIcon,
   Loader2Icon,
   GitBranchIcon,
-  ArchiveIcon,
 } from "lucide-react";
 import type { VfsNode } from "@/types/litechat/vfs";
 import { useTranslation } from "react-i18next";
@@ -205,7 +203,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (
-              <UploadCloudIcon className="h-4 w-4 mr-1" />
+              <FileUpIcon className="h-4 w-4 mr-1" />
             )}
             <span className="hidden sm:inline">{t("toolbar.files")}</span>{" "}
             {/* Hide text on small screens */}
@@ -227,7 +225,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (
-              <FolderIcon className="h-4 w-4 mr-1" />
+              <FolderUpIcon className="h-4 w-4 mr-1" />
             )}
             <span className="hidden sm:inline">{t("toolbar.folder")}</span>{" "}
             {/* Hide text on small screens */}
@@ -298,7 +296,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             title={t("toolbar.downloadAll")}
             type="button"
           >
-            <FileArchiveIcon className="h-4 w-4 mr-1" />
+            <ArchiveIcon className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">{t("toolbar.downloadAll")}</span>{" "}
           </Button>
         </div>

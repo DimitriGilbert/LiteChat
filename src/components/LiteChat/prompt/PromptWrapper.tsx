@@ -28,6 +28,7 @@ interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
   onSubmit: (turnData: PromptTurnObject) => Promise<void>;
   className?: string;
+  placeholder?: string;
   inputAreaRef: React.RefObject<InputAreaRef | null>;
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
@@ -37,6 +38,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   InputAreaRenderer,
   onSubmit,
   className,
+  placeholder,
   inputAreaRef,
   selectedItemId,
   selectedItemType,
@@ -222,7 +224,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         <InputAreaRenderer
           ref={inputAreaRef}
           onSubmit={handleSubmit}
-          placeholder={translatedPlaceholder}
+          placeholder={placeholder || translatedPlaceholder}
           onValueChange={handleInputValueChange}
           disabled={isStreaming || isSubmitting}
           className="flex-grow"

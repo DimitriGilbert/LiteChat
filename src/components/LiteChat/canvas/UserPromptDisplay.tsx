@@ -216,54 +216,61 @@ export const UserPromptDisplay: React.FC<UserPromptDisplayProps> = React.memo(
     return (
       <div
         className={cn(
-          "group/prompt relative rounded-lg border bg-secondary/50 p-3 md:p-4 shadow-sm",
+          "user-prompt relative group/user mb-4", // Main container
           "overflow-wrap-anywhere",
           className
         )}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-semibold text-secondary-foreground">
-            <UserIcon className="h-4 w-4" />
-            <span>{timeAgo}</span>
+        {/* Header section */}
+        <div className={cn(
+          "flex flex-col sm:flex-row items-start justify-between gap-x-4",
+        )}>
+          {/* Left group: Icon, Name, Actions */}
+          <div className="flex items-center gap-2 text-sm font-semibold text-secondary-foreground mb-2 sm:mb-0">
+            <UserIcon className="h-5 w-5" />
+            <span>{t('userPromptLabel', 'You')}</span>
+            <div className="flex items-center gap-1 opacity-0 group-hover/user:opacity-100 focus-within:opacity-100 transition-opacity">
+              <ActionTooltipButton
+                tooltipText={isFolded ? t('unfoldPreview') : t('foldPreview')}
+                onClick={toggleFold}
+                aria-label={isFolded ? t('unfoldPreview') : t('foldPreview')}
+                icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+              />
+              <ActionTooltipButton
+                tooltipText={t('copyPrompt')}
+                onClick={handleCopy}
+                aria-label={t('copyPrompt')}
+                icon={isCopied ? <CheckIcon className="text-green-500" /> : <ClipboardIcon />}
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover/prompt:opacity-100 focus-within:opacity-100 transition-opacity">
-            <ActionTooltipButton
-              tooltipText={isFolded ? t('unfoldPreview') : t('foldPreview')}
-              onClick={toggleFold}
-              aria-label={isFolded ? t('unfoldPreview') : t('foldPreview')}
-              icon={isFolded ? <ChevronDownIcon /> : <ChevronUpIcon />}
-            />
-            <ActionTooltipButton
-              tooltipText={t('copyPrompt')}
-              onClick={handleCopy}
-              aria-label={t('copyPrompt')}
-              icon={isCopied ? <CheckIcon className="text-green-500" /> : <ClipboardIcon />}
-            />
+          {/* Right group: Timestamp */}
+          <div className="text-xs text-muted-foreground self-start sm:self-center">
+            {timeAgo}
           </div>
         </div>
-        {!isFolded ? (
-          <div className="mt-3 pt-3 border-t border-border/50">
-            {hasContent && (
-              <UserContentView
-                markdownContent={turnData.content}
-                interactionId={interactionId}
-              />
-            )}
-            {hasFiles && (
+
+        {/* Content section */}
+        <div className={cn("pl-7 mt-1", { 'sr-only': isFolded })}>
+          {hasFiles && (
+            <div className="mb-2">
               <FileGridDisplay
-                files={turnData.metadata?.attachedFiles || []}
-                isReadOnly={true}
+                files={turnData.metadata!.attachedFiles!}
+                isReadOnly={!isAssistantComplete}
               />
-            )}
-            {!hasContent && !hasFiles && (
-              <p className="text-muted-foreground text-sm italic">{t('noContent')}</p>
-            )}
-          </div>
-        ) : (
-          <div
-            className="mt-2 text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20 p-1 rounded"
-            onClick={toggleFold}
-          >
+            </div>
+          )}
+          {hasContent && (
+            <UserContentView
+              markdownContent={turnData.content}
+              interactionId={interactionId}
+            />
+          )}
+        </div>
+
+        {/* Folded Summary View */}
+        {isFolded && (
+          <div className="pl-7 mt-1 text-sm text-muted-foreground italic truncate">
             {foldedSummaryText}
           </div>
         )}

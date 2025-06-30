@@ -177,7 +177,7 @@ export async function initializeControlModules(
   console.log(
     "[Init] Control Modules: Instantiation & Dependency Resolution START"
   );
-  const moduleInstances = moduleConstructors.map((Ctor) => new Ctor(modApi));
+  const moduleInstances = moduleConstructors.map((Ctor) => new Ctor());
 
   // After module instantiation, register translations
   for (const Module of moduleConstructors) {
