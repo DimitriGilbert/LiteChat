@@ -5,8 +5,6 @@ import { useForm, type AnyFieldApi } from "@tanstack/react-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
-  UploadIcon,
-  DownloadIcon,
   Trash2Icon,
   Loader2,
   FileUpIcon,

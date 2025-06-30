@@ -2,7 +2,7 @@
 // FULL FILE
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import SettingsDataManagement from "@/controls/components/data-settings/SettingsDataManagement";
+import { SettingsDataManagement } from "@/controls/components/data-settings/SettingsDataManagement";
 import i18next from "i18next";
 
 export class DataSettingsModule implements ControlModule {
