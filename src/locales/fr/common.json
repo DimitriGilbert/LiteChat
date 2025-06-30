@@ -1,1 +1,24 @@
-{}
+{
+  "initializingLiteChat": "Initialisation de LiteChat...",
+  "liteChatMenu": "Menu LiteChat",
+  "closeMenu": "Fermer le menu",
+  "openMenu": "Ouvrir le menu",
+  "loadingMenu": "Chargement du menu...",
+  "pleaseWaitInitialization": "Veuillez patienter pendant l'initialisation de l'application.",
+  "footerControlsLoading": "Chargement des contrôles de pied de page...",
+  "applicationCoreNotReady": "Noyau de l'application non prêt. Veuillez réessayer.",
+  "failedToStartNewChat": "Échec du démarrage d'une nouvelle conversation.",
+  "failedToSendMessage": "Échec de l'envoi du message.",
+  "modalManager": {
+    "noProvider": "Aucun fournisseur pour modalId : {{id}}"
+  },
+  "universalBlockRenderer": {
+    "code": "CODE",
+    "renderError": "Erreur de rendu"
+  },
+  "codeEditor": {
+    "saveButtonText": "Enregistrer",
+    "saving": "Enregistrement...",
+    "syntaxHighlightingError": "Erreur de coloration syntaxique :"
+  }
+}

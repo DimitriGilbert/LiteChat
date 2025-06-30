@@ -8,5 +8,17 @@
   "footerControlsLoading": "Footer controls loading...",
   "applicationCoreNotReady": "Application core not ready. Please try again.",
   "failedToStartNewChat": "Failed to start new chat.",
-  "failedToSendMessage": "Failed to send message."
+  "failedToSendMessage": "Failed to send message.",
+  "modalManager": {
+    "noProvider": "No provider for modalId: {{id}}"
+  },
+  "universalBlockRenderer": {
+    "code": "CODE",
+    "renderError": "Render Error"
+  },
+  "codeEditor": {
+    "saveButtonText": "Save",
+    "saving": "Saving...",
+    "syntaxHighlightingError": "Syntax highlighting error:"
+  }
 }

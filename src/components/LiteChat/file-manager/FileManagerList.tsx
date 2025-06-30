@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import type { VfsNode } from "@/types/litechat/vfs";
 import { NewFolderRow } from "./NewFolderRow";
+import { useTranslation } from "react-i18next";
 
 interface FileManagerListProps {
   entries: VfsNode[];
@@ -90,6 +91,8 @@ export const FileManagerList: React.FC<FileManagerListProps> = ({
   handleGitPush,
   handleGitStatus,
 }) => {
+  const { t } = useTranslation("vfs");
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleRename();
@@ -101,7 +104,7 @@ export const FileManagerList: React.FC<FileManagerListProps> = ({
   if (isOperationLoading && entries.length === 0 && !creatingFolder) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground p-4">
-        Loading...
+        {t("table.loading")}
       </div>
     );
   }

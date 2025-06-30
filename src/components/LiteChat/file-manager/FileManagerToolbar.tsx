@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import {
   FolderIcon,
   UploadCloudIcon,
-  ArchiveIcon,
   FolderUpIcon,
   RefreshCwIcon,
   FileArchiveIcon,
@@ -13,8 +12,10 @@ import {
   FolderPlusIcon,
   Loader2Icon,
   GitBranchIcon,
+  ArchiveIcon,
 } from "lucide-react";
 import type { VfsNode } from "@/types/litechat/vfs";
+import { useTranslation } from "react-i18next";
 
 interface FileManagerToolbarProps {
   currentPath: string;
@@ -37,6 +38,7 @@ interface FileManagerToolbarProps {
   archiveInputRef: React.RefObject<HTMLInputElement | null>;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleArchiveChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  gitRepoStatus: Record<string, boolean>;
 }
 
 export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
@@ -60,7 +62,9 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
   archiveInputRef,
   handleFileChange,
   handleArchiveChange,
+  gitRepoStatus,
 }) => {
+  const { t } = useTranslation("vfs");
   return (
     <>
       {/* Hidden Inputs */}
@@ -106,7 +110,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               handleNavigateHome();
             }}
             disabled={currentPath === "/" || isAnyLoading}
-            title="Go to root directory"
+            title={t("toolbar.goToRootDir")}
             className="h-8 w-8"
             type="button"
           >
@@ -121,7 +125,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               handleNavigateUp();
             }}
             disabled={currentPath === "/" || isAnyLoading}
-            title="Go up one level"
+            title={t("toolbar.goUpOneLevel")}
             className="h-8 w-8"
             type="button"
           >
@@ -151,7 +155,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               handleRefresh();
             }}
             disabled={isAnyLoading} // Disable on any loading
-            title="Refresh current directory"
+            title={t("toolbar.refreshCurrentDir")}
             className="h-8 w-8"
             type="button"
           >
@@ -172,7 +176,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading || creatingFolder || !!editingPath}
             className="h-8"
-            title="Create New Folder"
+            title={t("toolbar.createNewFolder")}
             type="button"
           >
             {/* Spinner logic remains the same */}
@@ -181,7 +185,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <FolderPlusIcon className="h-4 w-4 mr-1" />
             )}
-            <span className="hidden sm:inline">Folder</span>{" "}
+            <span className="hidden sm:inline">{t("toolbar.folder")}</span>{" "}
             {/* Hide text on small screens */}
           </Button>
           <Button
@@ -194,7 +198,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading}
             className="h-8"
-            title="Upload Files"
+            title={t("toolbar.uploadFiles")}
             type="button"
           >
             {/* Spinner logic remains the same */}
@@ -203,7 +207,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <UploadCloudIcon className="h-4 w-4 mr-1" />
             )}
-            <span className="hidden sm:inline">Files</span>{" "}
+            <span className="hidden sm:inline">{t("toolbar.files")}</span>{" "}
             {/* Hide text on small screens */}
           </Button>
           <Button
@@ -216,7 +220,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading}
             className="h-8"
-            title="Upload Folder"
+            title={t("toolbar.uploadFolder")}
             type="button"
           >
             {/* Spinner logic remains the same */}
@@ -225,7 +229,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <FolderIcon className="h-4 w-4 mr-1" />
             )}
-            <span className="hidden sm:inline">Folder</span>{" "}
+            <span className="hidden sm:inline">{t("toolbar.folder")}</span>{" "}
             {/* Hide text on small screens */}
           </Button>
           <Button
@@ -238,16 +242,16 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading}
             className="h-8"
-            title="Upload & Extract ZIP"
+            title={t("toolbar.uploadAndExtractZip")}
             type="button"
           >
             {/* Spinner logic remains the same */}
             {isOperationLoading ? (
               <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
             ) : (
-              <FileArchiveIcon className="h-4 w-4 mr-1" />
+              <ArchiveIcon className="h-4 w-4 mr-1" />
             )}
-            <span className="hidden sm:inline">ZIP</span>{" "}
+            <span className="hidden sm:inline">{t("toolbar.zip")}</span>{" "}
             {/* Hide text on small screens */}
           </Button>
           <Button
@@ -258,20 +262,29 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               e.stopPropagation();
               handleCloneClick();
             }}
-            disabled={isAnyLoading} // Disable on any loading
+            disabled={isAnyLoading}
             className="h-8"
-            title="Clone Git Repository"
+            title={t("toolbar.cloneRepository")}
             type="button"
           >
-            {/* Spinner logic remains the same */}
-            {isOperationLoading ? (
-              <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <GitBranchIcon className="h-4 w-4 mr-1" />
-            )}
-            <span className="hidden sm:inline">Clone</span>{" "}
-            {/* Hide text on small screens */}
+            <GitBranchIcon className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">{t("toolbar.cloneRepository")}</span>{" "}
           </Button>
+          {/* Git Operations Button (conditionally rendered) */}
+          {entries.some((entry) => gitRepoStatus[entry.path]) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => e.preventDefault()} // Placeholder, actual menu in dropdown
+              disabled={isAnyLoading}
+              className="h-8"
+              title={t("toolbar.gitOperations")}
+              type="button"
+            >
+              <GitBranchIcon className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">{t("toolbar.gitOperations")}</span>{" "}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -282,17 +295,11 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading || entries.length === 0}
             className="h-8"
-            title="Download Current Directory as ZIP"
+            title={t("toolbar.downloadAll")}
             type="button"
           >
-            {/* Spinner logic remains the same */}
-            {isOperationLoading ? (
-              <Loader2Icon className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <ArchiveIcon className="h-4 w-4 mr-1" />
-            )}
-            <span className="hidden sm:inline">Export</span>{" "}
-            {/* Hide text on small screens */}
+            <FileArchiveIcon className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">{t("toolbar.downloadAll")}</span>{" "}
           </Button>
         </div>
       </div>

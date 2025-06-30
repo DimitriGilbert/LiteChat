@@ -3,6 +3,8 @@
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsTheme } from "@/controls/components/theme-settings/SettingsTheme";
+import i18next from 'i18next';
+import type { ControlModuleConstructor } from '@/types/litechat/control';
 
 export class ThemeSettingsControlModule implements ControlModule {
   readonly id = "core-settings-theme";
@@ -19,7 +21,7 @@ export class ThemeSettingsControlModule implements ControlModule {
     }
     this.unregisterCallback = modApi.registerSettingsTab({
       id: "theme",
-      title: "Theme",
+      title: i18next.t("controls:settings.tabs.theme"),
       component: SettingsTheme,
       order: 20,
     });
@@ -34,3 +36,16 @@ export class ThemeSettingsControlModule implements ControlModule {
     console.log(`[${this.id}] Destroyed.`);
   }
 }
+
+(ThemeSettingsControlModule as ControlModuleConstructor).translations = {
+  en: {
+    controls: {
+      "settings.tabs.theme": "Theme"
+    }
+  },
+  fr: {
+    controls: {
+      "settings.tabs.theme": "Thème"
+    }
+  }
+};

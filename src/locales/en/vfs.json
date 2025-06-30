@@ -1,1 +1,56 @@
-{}
+{
+  "fileManager": {
+    "foldersCannotBeAttached": "Folders cannot be attached to the prompt.",
+    "warningDeleteFolder": "WARNING: This will delete all contents inside",
+    "pullingDefaultBranch": "Pulling default branch (auth not implemented yet)...",
+    "pushingDefaultBranch": "Pushing default branch (auth not implemented yet)...",
+    "repositoryUrlEmpty": "Repository URL cannot be empty.",
+    "deleteConfirmation": "Delete {{type}} \"{{name}}\"?",
+    "commitMessageEmpty": "Commit message cannot be empty.",
+    "initializingFilesystem": "Initializing filesystem: {{key}}",
+    "loadingFilesystem": "Loading filesystem...",
+    "errorLoadingFilesystem": "Error loading filesystem: {{error}}",
+    "errorPrefix": "Error: ",
+    "retry": "Retry",
+    "toolbar": {
+      "goToRootDir": "Go to root directory",
+      "goUpOneLevel": "Go up one level",
+      "refreshCurrentDir": "Refresh current directory",
+      "createNewFolder": "Create New Folder",
+      "folder": "Folder",
+      "uploadFiles": "Upload Files",
+      "files": "Files",
+      "uploadFolder": "Upload Folder",
+      "uploadAndExtractZip": "Upload & Extract ZIP",
+      "zip": "ZIP",
+      "cloneRepository": "Clone Repository",
+      "gitOperations": "Git Operations",
+      "downloadAll": "Download All"
+    },
+    "table": {
+      "loading": "Loading...",
+      "name": "Name",
+      "size": "Size",
+      "modified": "Modified",
+      "actions": "Actions",
+      "folderIsEmpty": "Folder is empty"
+    },
+    "fileList": {
+      "selectFile": "Select {{name}}",
+      "gitRepository": "Git Repository",
+      "folder": "Folder",
+      "saveName": "Save name",
+      "cancelEdit": "Cancel edit",
+      "moreActions": "More actions",
+      "download": "Download",
+      "rename": "Rename",
+      "delete": "Delete",
+      "initializeGitRepo": "Initialize Git Repo",
+      "pull": "Pull",
+      "commit": "Commit",
+      "push": "Push",
+      "status": "Status",
+      "filePreview": "File Preview"
+    }
+  }
+}

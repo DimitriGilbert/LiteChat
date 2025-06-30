@@ -1,1 +1,56 @@
-{}
+{
+  "fileManager": {
+    "foldersCannotBeAttached": "Les dossiers ne peuvent pas être attachés à l'invite.",
+    "warningDeleteFolder": "ATTENTION: Cela supprimera tout le contenu à l'intérieur",
+    "pullingDefaultBranch": "Récupération de la branche par défaut (authentification non encore implémentée)...",
+    "pushingDefaultBranch": "Envoi de la branche par défaut (authentification non encore implémentée)...",
+    "repositoryUrlEmpty": "L'URL du dépôt ne peut pas être vide.",
+    "deleteConfirmation": "Supprimer {{type}} \"{{name}}\"?",
+    "commitMessageEmpty": "Le message de commit ne peut pas être vide.",
+    "initializingFilesystem": "Initialisation du système de fichiers : {{key}}",
+    "loadingFilesystem": "Chargement du système de fichiers...",
+    "errorLoadingFilesystem": "Erreur lors du chargement du système de fichiers : {{error}}",
+    "errorPrefix": "Erreur : ",
+    "retry": "Réessayer",
+    "toolbar": {
+      "goToRootDir": "Aller au répertoire racine",
+      "goUpOneLevel": "Monter d'un niveau",
+      "refreshCurrentDir": "Actualiser le répertoire actuel",
+      "createNewFolder": "Créer un nouveau dossier",
+      "folder": "Dossier",
+      "uploadFiles": "Importer des fichiers",
+      "files": "Fichiers",
+      "uploadFolder": "Importer un dossier",
+      "uploadAndExtractZip": "Importer et extraire le ZIP",
+      "zip": "ZIP",
+      "cloneRepository": "Cloner le dépôt",
+      "gitOperations": "Opérations Git",
+      "downloadAll": "Tout télécharger"
+    },
+    "table": {
+      "loading": "Chargement...",
+      "name": "Nom",
+      "size": "Taille",
+      "modified": "Modifié",
+      "actions": "Actions",
+      "folderIsEmpty": "Le dossier est vide"
+    },
+    "fileList": {
+      "selectFile": "Sélectionner {{name}}",
+      "gitRepository": "Dépôt Git",
+      "folder": "Dossier",
+      "saveName": "Enregistrer le nom",
+      "cancelEdit": "Annuler la modification",
+      "moreActions": "Plus d'actions",
+      "download": "Télécharger",
+      "rename": "Renommer",
+      "delete": "Supprimer",
+      "initializeGitRepo": "Initialiser le dépôt Git",
+      "pull": "Pull",
+      "commit": "Commit",
+      "push": "Push",
+      "status": "Statut",
+      "filePreview": "Aperçu du fichier"
+    }
+  }
+}

@@ -1,1 +1,40 @@
-{}
+{
+  "settings": {
+    "tabs": {
+      "assistant": "Assistant",
+      "general": "General",
+      "theme": "Theme",
+      "providers": "Providers & Models"
+    }
+  },
+  "rulesModule": {
+    "alreadyRegistered": "Already registered. Skipping.",
+    "initializationError": "Error initializing module {{id}}:",
+    "initializationErrorMessage": "Module Init Error ({{id}}): {{message}}",
+    "registrationError": "Error registering module {{id}}:",
+    "registrationErrorMessage": "Module Registration Error ({{id}}): {{message}}",
+    "settingsTabTitle": "Rules & Tags",
+    "destroyed": "Destroyed.",
+    "controlRulesOnly": "Only module-defined control rules can be managed this way.",
+    "cannotDeleteControlRule": "Control rules cannot be deleted.",
+    "failedToAddRule": "Failed to add rule.",
+    "ruleAddedSuccessfully": "Rule added successfully.",
+    "failedToUpdateRule": "Failed to update rule.",
+    "ruleUpdatedSuccessfully": "Rule updated successfully.",
+    "failedToDeleteRule": "Failed to delete rule.",
+    "ruleDeletedSuccessfully": "Rule deleted successfully.",
+    "failedToAddTag": "Failed to add tag.",
+    "tagAddedSuccessfully": "Tag added successfully.",
+    "failedToUpdateTag": "Failed to update tag.",
+    "tagUpdatedSuccessfully": "Tag updated successfully.",
+    "failedToDeleteTag": "Failed to delete tag.",
+    "tagDeletedSuccessfully": "Tag deleted successfully.",
+    "failedToLinkTagToRule": "Failed to link tag to rule.",
+    "tagLinkedSuccessfully": "Tag linked successfully.",
+    "failedToUnlinkTagFromRule": "Failed to unlink tag from rule.",
+    "tagUnlinkedSuccessfully": "Tag unlinked successfully.",
+    "failedToAutoSelectRules": "Failed to auto-select rules.",
+    "rulesAutoSelectedSuccessfully": "Rules auto-selected successfully.",
+    "noRulesOrTagsConfigured": "No rules or tags configured."
+  }
+}

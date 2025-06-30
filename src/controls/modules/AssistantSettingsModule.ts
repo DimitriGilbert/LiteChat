@@ -3,6 +3,8 @@
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsAssistant } from "@/controls/components/assistant-settings/SettingsAssistant";
+import i18next from 'i18next';
+import type { ControlModuleConstructor } from '@/types/litechat/control';
 
 export class AssistantSettingsModule implements ControlModule {
   readonly id = "core-settings-assistant";
@@ -19,7 +21,7 @@ export class AssistantSettingsModule implements ControlModule {
     }
     this.unregisterCallback = modApi.registerSettingsTab({
       id: "assistant",
-      title: "Assistant",
+      title: i18next.t("controls:settings.tabs.assistant"),
       component: SettingsAssistant,
       order: 40,
     });
@@ -34,3 +36,16 @@ export class AssistantSettingsModule implements ControlModule {
     console.log(`[${this.id}] Destroyed.`);
   }
 }
+
+(AssistantSettingsModule as ControlModuleConstructor).translations = {
+  en: {
+    controls: {
+      "settings.tabs.assistant": "Assistant"
+    }
+  },
+  fr: {
+    controls: {
+      "settings.tabs.assistant": "Assistant"
+    }
+  }
+};

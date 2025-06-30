@@ -108,8 +108,17 @@ export interface ControlModule {
   destroy(modApi: LiteChatModApi): void;
 }
 
-export type ControlModuleConstructor = new () => ControlModule;
-
 export type { CorePromptControlFromTypes as PromptControl };
 export type { CoreChatControlFromTypes as ChatControl };
 export type { CoreCanvasControlFromTypes as CanvasControl }; // Added
+
+export interface ControlTranslations {
+  [lang: string]: {
+    [namespace: string]: Record<string, string>;
+  };
+}
+
+export interface ControlModuleConstructor {
+  new (modApi: LiteChatModApi): ControlModule;
+  translations?: ControlTranslations;
+}
