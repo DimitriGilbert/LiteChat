@@ -48,7 +48,10 @@
     "title": "Menu LiteChat",
     "close": "Fermer le menu",
     "open": "Ouvrir le menu",
-    "loading": "Chargement du menu..."
+    "loading": "Chargement du menu...",
+    "deleteConfirmation": "Êtes-vous sûr de vouloir supprimer cette conversation ?",
+    "deleteProjectConfirmation": "Êtes-vous sûr de vouloir supprimer ce projet et toutes les conversations qu'il contient ?",
+    "searchPlaceholder": "Rechercher des conversations..."
   },
   "autoTitle": {
     "disableForChat": "Désactiver le titre automatique pour ce chat",
@@ -87,5 +90,81 @@
     "max": "Max",
     "perMillion": "($/1M)",
     "apply": "Appliquer"
+  },
+  "conversationList": {
+    "title": "LiteChat",
+    "newChat": "Nouveau Chat",
+    "newProject": "Nouveau Projet",
+    "filterPlaceholder": "Filtrer...",
+    "workspaceEmpty": "L'espace de travail est vide.",
+    "initializing": "Initialisation de la liste...",
+    "newChatError": "Échec de la création du nouveau chat.",
+    "newProjectError": "Échec de la création du nouveau projet.",
+    "deleteConversationError": "Échec de la suppression de la conversation.",
+    "deleteProjectError": "Échec de la suppression du projet.",
+    "confirmDeleteConversation": "Supprimer cette conversation ? Cette action est irréversible.",
+    "githubRepo": "Dépôt GitHub",
+    "downloadLiteChat": "Télécharger LiteChat",
+    "loading": "Chargement...",
+    "noItemsMatchFilter": "Aucun élément ne correspond à votre filtre.",
+    "noItemsYet": "Aucune conversation ou projet pour le moment.",
+    "getStarted": "Créez un nouveau chat ou projet pour commencer.",
+    "openOnGitHub": "Ouvrir sur GitHub",
+    "synced": "Synchronisé",
+    "syncing": "Synchronisation...",
+    "syncError": "Erreur de synchro",
+    "notSynced": "Non synchronisé",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirmDeletionTitle": "Confirmer la suppression",
+    "confirmDeletionMessage": "Êtes-vous sûr de vouloir supprimer '{{name}}' ?",
+    "confirmDeletionWarning": "Cela supprimera l'élément et tout son contenu. Cette action est irréversible.",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "export": "Exporter",
+    "deleteProject": "Supprimer le Projet",
+    "deleteConversation": "Supprimer le Chat",
+    "untitled": "Sans titre"
+  },
+  "modelSelector": {
+    "selectModel": "Sélectionner un modèle...",
+    "searchPlaceholder": "Rechercher un modèle...",
+    "sortTitle": "Trier les modèles",
+    "sortAriaLabel": "Trier les modèles",
+    "sortOptions": {
+      "nameAsc": "Nom (A-Z)",
+      "nameDesc": "Nom (Z-A)",
+      "inputPriceAsc": "Prix d'entrée (Bas-Haut)",
+      "inputPriceDesc": "Prix d'entrée (Haut-Bas)",
+      "outputPriceAsc": "Prix de sortie (Bas-Haut)",
+      "outputPriceDesc": "Prix de sortie (Haut-Bas)",
+      "contextLengthDesc": "Taille du contexte (Haut-Bas)",
+      "contextLengthAsc": "Taille du contexte (Bas-Haut)",
+      "releaseDateDesc": "Date de sortie (Plus récent)",
+      "releaseDateAsc": "Date de sortie (Plus ancien)"
+    },
+    "filterTitles": {
+      "reasoning": "Filtre : Raisonnement",
+      "webSearch": "Filtre : Recherche Web",
+      "tools": "Filtre : Outils",
+      "multimodal": "Filtre : Multimodal",
+      "imageGeneration": "Filtre : Génération d'images"
+    },
+    "filterAriaLabels": {
+      "reasoning": "Filtrer par capacité de raisonnement",
+      "webSearch": "Filtrer par capacité de recherche web",
+      "tools": "Filtrer par capacité d'utilisation d'outils",
+      "multimodal": "Filtrer par capacité multimodale",
+      "imageGeneration": "Filtrer par capacité de génération d'images"
+    },
+    "emptyState": {
+      "noMatch": "Aucun modèle ne correspond à tous les filtres actifs.",
+      "noModels": "Aucun modèle disponible.",
+      "notFound": "Aucun modèle trouvé."
+    }
+  },
+  "sidebarToggle": {
+    "expand": "Développer la barre latérale",
+    "collapse": "Réduire la barre latérale"
   }
 }

@@ -20,6 +20,7 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
 import { useSettingsStore } from "@/store/settings.store";
+import { useTranslation } from "react-i18next";
 
 interface RulesControlTriggerProps {
   module: RulesControlModule;
@@ -28,6 +29,7 @@ interface RulesControlTriggerProps {
 export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
   module,
 }) => {
+  const { t } = useTranslation('prompt');
   const [, forceUpdate] = useState({});
   const autoRuleSelectionEnabled = useSettingsStore((s) => s.autoRuleSelectionEnabled);
   
@@ -125,7 +127,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
                   size="icon"
                   className="h-8 w-8"
                   disabled={isDisabled}
-                  aria-label="Configure Rules & Tags for Next Turn"
+                  aria-label={t('rulesControl.trigger.configureAria')}
                   onClick={handleTriggerClick}
                 >
                   <ShieldAlertIcon className="h-4 w-4" />
@@ -137,7 +139,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
                 size="icon"
                 className="h-8 w-8"
                 disabled={isDisabled}
-                aria-label="Add Rules & Tags (Opens Settings)"
+                aria-label={t('rulesControl.trigger.addAria')}
                 onClick={handleTriggerClick}
               >
                 <ShieldAlertIcon className="h-4 w-4" />
@@ -147,9 +149,9 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
           <TooltipContent side="top">
             {hasRulesOrTags
               ? hasActiveSettings
-                ? `Rules/Tags Active (${activeTagIds.size} tags, ${activeRuleIds.size} rules)`
-                : "Activate Rules/Tags (Next Turn)"
-              : "Add Rules/Tags (Opens Settings)"}
+                ? t('rulesControl.trigger.tooltipActive', { tagsCount: activeTagIds.size, rulesCount: activeRuleIds.size })
+                : t('rulesControl.trigger.tooltipInactive')
+              : t('rulesControl.trigger.tooltipAdd')}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

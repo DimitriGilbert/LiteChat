@@ -25,6 +25,7 @@ import {
 import { getSyncIndicator } from "@/controls/components/conversation-list/SyncIndicator";
 import type { SyncStatus } from "@/types/litechat/sync";
 import type { GitSyncControlModule } from "@/controls/modules/GitSyncControlModule";
+import { useTranslation } from "react-i18next";
 
 interface GitSyncControlTriggerProps {
   module: GitSyncControlModule;
@@ -33,6 +34,7 @@ interface GitSyncControlTriggerProps {
 export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
   module,
 }) => {
+  const { t } = useTranslation('git');
   const [, forceUpdate] = useState({});
   useEffect(() => {
     module.setNotifyCallback(() => forceUpdate({}));
@@ -112,7 +114,7 @@ export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
                 size="icon"
                 className="h-8 w-8"
                 disabled={isStreaming || isLinking || isSyncing}
-                aria-label="Configure Git Sync"
+                aria-label={t('syncTrigger.ariaLabel')}
               >
                 {currentStatus === "syncing" || isSyncing || isLinking ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -124,14 +126,14 @@ export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
           </TooltipTrigger>
           <TooltipContent side="top">
             {currentRepoId
-              ? `Sync Status: ${currentStatus}`
-              : "Link to Sync Repo"}
+              ? t('syncTrigger.tooltipStatus', { status: currentStatus })
+              : t('syncTrigger.tooltipLink')}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <PopoverContent className="w-64 p-4 space-y-3" align="start">
         <Label htmlFor="sync-repo-select" className="text-sm font-medium">
-          Link to Repository
+          {t('syncTrigger.popoverLabel')}
         </Label>
         <Select
           value={currentRepoId ?? "none"}
@@ -139,11 +141,11 @@ export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
           disabled={isLinking || isSyncing || isStreaming}
         >
           <SelectTrigger id="sync-repo-select" className="w-full h-9">
-            <SelectValue placeholder="Select repository..." />
+            <SelectValue placeholder={t('syncTrigger.selectPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">
-              <span className="text-muted-foreground">None</span>
+              <span className="text-muted-foreground">{t('syncTrigger.selectNone')}</span>
             </SelectItem>
             {syncRepos.map((repo) => (
               <SelectItem key={repo.id} value={repo.id}>
@@ -154,7 +156,7 @@ export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
         </Select>
         <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            Status: {syncIndicator || "Not Linked"}
+            {t('syncTrigger.statusLabelPart')} {syncIndicator || t('syncTrigger.statusNotLinked')}
           </div>
           <Button
             size="sm"
@@ -168,7 +170,7 @@ export const GitSyncControlTrigger: React.FC<GitSyncControlTriggerProps> = ({
             ) : (
               <GitPullRequestIcon className="h-4 w-4 mr-1" />
             )}
-            Sync Now
+            {t('syncTrigger.syncNowButton')}
           </Button>
         </div>
       </PopoverContent>

@@ -26,6 +26,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import type { ModelListItem } from "@/types/litechat/provider";
+import { useTranslation } from "react-i18next";
 
 interface ModelSelectorProps {
   models: ModelListItem[];
@@ -59,6 +60,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   disabled,
   isLoading,
 }) => {
+  const { t } = useTranslation('controls');
   const [open, setOpen] = useState(false);
   const [filterText, setFilterText] = useState("");
   const [sortActive, setSortActive] = useState(false);
@@ -224,7 +226,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           <span className="truncate max-w-[200px] sm:max-w-[300px]">
             {selectedModelDetails
               ? `${selectedModelDetails.name} (${selectedModelDetails.providerName})`
-              : "Select Model..."}
+              : t('modelSelector.selectModel')}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           {totalActiveFilters > 0 && (
@@ -252,7 +254,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           <div className="flex items-center border-b px-3 gap-2">
             <SearchIconLucide className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <CommandInput
-              placeholder="Search model..."
+              placeholder={t('modelSelector.searchPlaceholder')}
               value={filterText}
               onValueChange={setFilterText}
               className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -262,8 +264,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 variant={sortActive ? "secondary" : "ghost"}
                 size="sm"
                 className="h-7 w-7 p-0"
-                title="Sort models"
-                aria-label="Sort models"
+                title={t('modelSelector.sortTitle')}
+                aria-label={t('modelSelector.sortAriaLabel')}
                 onClick={() => setSortActive((v) => !v)}
               >
                 <ArrowUpDown className="h-4 w-4" />
@@ -281,30 +283,30 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                     setSortDirection(direction as SortDirection);
                   }}
                   style={{ minWidth: 120 }}
-                  aria-label="Sort models"
+                  aria-label={t('modelSelector.sortAriaLabel')}
                 >
-                  <option value="name:asc">Name (A-Z)</option>
-                  <option value="name:desc">Name (Z-A)</option>
+                  <option value="name:asc">{t('modelSelector.sortOptions.nameAsc')}</option>
+                  <option value="name:desc">{t('modelSelector.sortOptions.nameDesc')}</option>
                   <option value="price_input:asc">
-                    Input Price (Low-High)
+                    {t('modelSelector.sortOptions.inputPriceAsc')}
                   </option>
                   <option value="price_input:desc">
-                    Input Price (High-Low)
+                    {t('modelSelector.sortOptions.inputPriceDesc')}
                   </option>
                   <option value="price_output:asc">
-                    Output Price (Low-High)
+                    {t('modelSelector.sortOptions.outputPriceAsc')}
                   </option>
                   <option value="price_output:desc">
-                    Output Price (High-Low)
+                    {t('modelSelector.sortOptions.outputPriceDesc')}
                   </option>
                   <option value="context_length:desc">
-                    Context Length (High-Low)
+                    {t('modelSelector.sortOptions.contextLengthDesc')}
                   </option>
                   <option value="context_length:asc">
-                    Context Length (Low-High)
+                    {t('modelSelector.sortOptions.contextLengthAsc')}
                   </option>
-                  <option value="created:desc">Release Date (Newest)</option>
-                  <option value="created:asc">Release Date (Oldest)</option>
+                  <option value="created:desc">{t('modelSelector.sortOptions.releaseDateDesc')}</option>
+                  <option value="created:asc">{t('modelSelector.sortOptions.releaseDateAsc')}</option>
                 </select>
               )}
               <Button
@@ -315,8 +317,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                   capabilityFilters.reasoning && "text-primary"
                 )}
                 onClick={() => toggleCapabilityFilter("reasoning")}
-                title="Filter: Reasoning"
-                aria-label="Filter by reasoning capability"
+                title={t('modelSelector.filterTitles.reasoning')}
+                aria-label={t('modelSelector.filterAriaLabels.reasoning')}
               >
                 <Brain className="h-4 w-4" />
               </Button>
@@ -328,8 +330,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                   capabilityFilters.webSearch && "text-primary"
                 )}
                 onClick={() => toggleCapabilityFilter("webSearch")}
-                title="Filter: Web Search"
-                aria-label="Filter by web search capability"
+                title={t('modelSelector.filterTitles.webSearch')}
+                aria-label={t('modelSelector.filterAriaLabels.webSearch')}
               >
                 <Globe className="h-4 w-4" />
               </Button>
@@ -341,8 +343,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                   capabilityFilters.tools && "text-primary"
                 )}
                 onClick={() => toggleCapabilityFilter("tools")}
-                title="Filter: Tools"
-                aria-label="Filter by tool usage capability"
+                title={t('modelSelector.filterTitles.tools')}
+                aria-label={t('modelSelector.filterAriaLabels.tools')}
               >
                 <Wrench className="h-4 w-4" />
               </Button>
@@ -354,8 +356,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                   capabilityFilters.multimodal && "text-primary"
                 )}
                 onClick={() => toggleCapabilityFilter("multimodal")}
-                title="Filter: Multimodal"
-                aria-label="Filter by multimodal capability"
+                title={t('modelSelector.filterTitles.multimodal')}
+                aria-label={t('modelSelector.filterAriaLabels.multimodal')}
               >
                 <ImageIcon className="h-4 w-4" />
               </Button>
@@ -369,8 +371,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                   capabilityFilters.imageGeneration && "text-primary"
                 )}
                 onClick={() => toggleCapabilityFilter("imageGeneration")}
-                title="Filter: Image Generation"
-                aria-label="Filter by image generation capability"
+                title={t('modelSelector.filterTitles.imageGeneration')}
+                aria-label={t('modelSelector.filterAriaLabels.imageGeneration')}
               >
                 <Palette className="h-4 w-4" />
               </Button>
@@ -379,10 +381,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           <CommandList className="max-h-[calc(min(40vh,400px)-70px)] overflow-y-auto">
             <CommandEmpty>
               {totalActiveFilters > 0
-                ? "No models match all active filters."
+                ? t('modelSelector.emptyState.noMatch')
                 : modelsFromSource.length === 0
-                ? "No models available."
-                : "No model found."}
+                ? t('modelSelector.emptyState.noModels')
+                : t('modelSelector.emptyState.notFound')}
             </CommandEmpty>
             <CommandGroup>
               {filteredModels.map((model: ModelListItem) => (

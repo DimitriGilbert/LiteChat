@@ -18,8 +18,10 @@ import { SettingsAssistantPrompts } from "./SettingsAssistantPrompts";
 import { SettingsAssistantAgent } from "./SettingsAssistantAgent";
 import { SettingsAssistantMcp } from "./SettingsAssistantMcp";
 import { SettingsAssistantForkCompact } from "./SettingsAssistantForkCompact";
+import { useTranslation } from "react-i18next";
 
 const SettingsAssistantComponent: React.FC = () => {
+  const { t } = useTranslation('settings');
 
   const { enableAdvancedSettings } = useSettingsStore(
     useShallow((state) => ({
@@ -31,27 +33,27 @@ const SettingsAssistantComponent: React.FC = () => {
     const allTabs: TabDefinition[] = [
       {
         value: "prompt",
-        label: "System Prompt",
+        label: t('assistantTabs.systemPrompt'),
         content: <SettingsAssistantPrompt />,
       },
       {
         value: "library",
-        label: "Library",
+        label: t('assistantTabs.library'),
         content: <SettingsAssistantPrompts />,
       },
       {
         value: "agents",
-        label: "Agents",
+        label: t('assistantTabs.agents'),
         content: <SettingsAssistantAgent />,
       },
       {
         value: "titles",
-        label: "Auto-Titles",
+        label: t('assistantTabs.autoTitles'),
         content: <SettingsAssistantTitles />,
       },
       {
         value: "tools",
-        label: "Tools",
+        label: t('assistantTabs.tools'),
         content: <SettingsAssistantTools />,
       },
     ];
@@ -60,24 +62,24 @@ const SettingsAssistantComponent: React.FC = () => {
     if (enableAdvancedSettings) {
       allTabs.push({
           value: "mcp",
-          label: "MCP",
+          label: t('assistantTabs.mcp'),
           content: <SettingsAssistantMcp />,
         },
         {
           value: "parameters",
-          label: "Parameters",
+          label: t('assistantTabs.parameters'),
           content: <SettingsAssistantParameters />,
         },
         {
           value: "fork-compact",
-          label: "Fork Compact",
+          label: t('assistantTabs.forkCompact'),
           content: <SettingsAssistantForkCompact />,
         }
       );
     }
 
     return allTabs;
-  }, [enableAdvancedSettings]);
+  }, [enableAdvancedSettings, t]);
 
   return (
     <div className="space-y-4 p-1 h-full flex flex-col">

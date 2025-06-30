@@ -22,6 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useTranslation } from "react-i18next";
 
 interface BulkSyncControlProps {
   onSyncAll: () => Promise<void>;
@@ -44,6 +45,7 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
   totalConversations,
   pendingConversations,
 }) => {
+  const { t } = useTranslation('git');
   const [progress, setProgress] = useState<BulkSyncProgress | null>(null);
   const [isLocallyRunning, setIsLocallyRunning] = useState(false);
 
@@ -141,10 +143,10 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <GitBranchIcon className="h-5 w-5" />
-          Bulk Git Sync
+          {t('bulkSync.title')}
         </CardTitle>
         <CardDescription>
-          Manage synchronization across all repositories and conversations
+          {t('bulkSync.description')}
         </CardDescription>
       </CardHeader>
       
@@ -153,11 +155,11 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
         <div className="grid grid-cols-3 gap-4 text-sm">
           <div className="text-center">
             <div className="font-medium text-lg">{totalRepos}</div>
-            <div className="text-muted-foreground">Repositories</div>
+            <div className="text-muted-foreground">{t('bulkSync.repositories')}</div>
           </div>
           <div className="text-center">
             <div className="font-medium text-lg">{totalConversations}</div>
-            <div className="text-muted-foreground">Total Conversations</div>
+            <div className="text-muted-foreground">{t('bulkSync.totalConversations')}</div>
           </div>
           <div className="text-center">
             <div className={cn(
@@ -166,7 +168,7 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
             )}>
               {pendingConversations}
             </div>
-            <div className="text-muted-foreground">Pending Sync</div>
+            <div className="text-muted-foreground">{t('bulkSync.pendingSync')}</div>
           </div>
         </div>
 
@@ -176,9 +178,9 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
         {progress && (
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">Current Operation</span>
+              <span className="font-medium">{t('bulkSync.currentOperation')}</span>
               <Badge variant={progress.errors.length > 0 ? "destructive" : "default"}>
-                {progress.errors.length > 0 ? "Errors" : "Running"}
+                {progress.errors.length > 0 ? t('bulkSync.statusErrors') : t('bulkSync.statusRunning')}
               </Badge>
             </div>
             
@@ -189,7 +191,7 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
             {progress.totalRepos > 0 && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Repository Progress</span>
+                  <span>{t('bulkSync.repoProgress')}</span>
                   <span>{progress.completedRepos}/{progress.totalRepos}</span>
                 </div>
                 <Progress value={totalRepoProgress} className="h-2" />
@@ -199,7 +201,7 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
             {progress.totalConversations > 0 && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Conversation Progress</span>
+                  <span>{t('bulkSync.convProgress')}</span>
                   <span>{progress.completedConversations}/{progress.totalConversations}</span>
                 </div>
                 <Progress value={totalConvProgress} className="h-2" />
@@ -210,7 +212,7 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
               <div className="mt-2">
                 <div className="flex items-center gap-2 text-sm text-destructive mb-2">
                   <AlertCircleIcon className="h-4 w-4" />
-                  {progress.errors.length} Error{progress.errors.length !== 1 ? 's' : ''}
+                  {t('bulkSync.errorCount', { count: progress.errors.length })}
                 </div>
                 <div className="max-h-24 overflow-y-auto space-y-1">
                   {progress.errors.slice(0, 5).map((error, index) => (
@@ -220,7 +222,7 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
                   ))}
                   {progress.errors.length > 5 && (
                     <div className="text-xs text-muted-foreground">
-                      ...and {progress.errors.length - 5} more errors
+                      {t('bulkSync.andMoreErrors', { count: progress.errors.length - 5 })}
                     </div>
                   )}
                 </div>
@@ -244,11 +246,11 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
                   className="w-full"
                 >
                   <DownloadIcon className="h-4 w-4 mr-1" />
-                  Clone Repos
+                  {t('bulkSync.cloneButton')}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                Initialize/clone all configured repositories
+                {t('bulkSync.cloneTooltip')}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -264,11 +266,11 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
                   className="w-full"
                 >
                   <Upload className="h-4 w-4 mr-1" />
-                  Sync Pending
+                  {t('bulkSync.syncPendingButton')}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                Sync only conversations that need syncing
+                {t('bulkSync.syncPendingTooltip')}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -286,11 +288,11 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
                     "h-4 w-4 mr-1",
                     isSyncing && "animate-spin"
                   )} />
-                  Sync All
+                  {t('bulkSync.syncAllButton')}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                Sync all repositories and conversations
+                {t('bulkSync.syncAllTooltip')}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -303,7 +305,7 @@ export const BulkSyncControl: React.FC<BulkSyncControlProps> = ({
             className="w-full"
           >
             <StopCircleIcon className="h-4 w-4 mr-1" />
-            Stop
+            {t('bulkSync.stopButton')}
           </Button>
         </div>
       </CardContent>

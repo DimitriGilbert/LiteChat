@@ -27,6 +27,7 @@ import { PersistenceService } from "@/services/persistence.service";
 import { nanoid } from "nanoid";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
+import i18next from "i18next";
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
@@ -424,7 +425,7 @@ export class RulesControlModule implements ControlModule {
     if (!this.unregisterSettingsTabCallback) {
       this.unregisterSettingsTabCallback = modApi.registerSettingsTab({
         id: "rules-tags",
-        title: "Rules & Tags",
+        title: i18next.t("tabs.rules", { ns: "settings" }),
         component: () =>
           React.createElement(SettingsRulesAndTags, { module: this }),
         order: 50,
@@ -458,28 +459,28 @@ export class RulesControlModule implements ControlModule {
   public autoSelectRules = async (promptOverride?: string) => {
     const settings = useSettingsStore.getState();
     if (!settings.autoRuleSelectionEnabled) {
-      toast.info("Auto-rule selection is disabled in settings.");
+      toast.info(i18next.t("rules.autoSelectDisabled", { ns: "prompt" }));
       return;
     }
     // Always get the current prompt value directly
     let userPrompt = promptOverride ?? this.modApiRef?.getContextSnapshot().promptInputValue ?? "";
     if (typeof userPrompt !== "string") userPrompt = String(userPrompt ?? "");
     if (!userPrompt) {
-      toast.error("No user prompt found to base selection on.");
+      toast.error(i18next.t("rules.noPromptForSelect", { ns: "prompt" }));
       return;
     }
     const rules = this.getAllRules();
     if (!rules.length) {
-      toast.error("No rules available for selection.");
+      toast.error(i18next.t("rules.noRulesForSelect", { ns: "prompt" }));
       return;
     }
     const modelId = settings.autoRuleSelectionModelId;
     if (!modelId) {
-      toast.error("No model selected for auto-rule selection in settings.");
+      toast.error(i18next.t("rules.noModelForSelect", { ns: "prompt" }));
       return;
     }
 
-    toast.loading("AI is selecting relevant rules...");
+    const toastId = toast.loading(i18next.t("rules.selectingRules", { ns: "prompt" }));
 
     const conversationId =
       useInteractionStore.getState().currentConversationId || "unassigned";
@@ -620,14 +621,24 @@ export class RulesControlModule implements ControlModule {
       await PersistenceService.saveInteraction(finalInteraction);
 
       this.setActiveRuleIds(() => new Set(ruleIds));
-      toast.dismiss();
-      toast.success(`AI selected ${ruleIds.length} rules.`);
+      toast.dismiss(toastId);
+      toast.success(
+        i18next.t("rules.selectionSuccess", {
+          ns: "prompt",
+          count: ruleIds.length,
+        })
+      );
       
     } catch (error) {
-      toast.dismiss();
+      toast.dismiss(toastId);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      toast.error(`Failed to auto-select rules: ${errorMessage}`);
+      toast.error(
+        i18next.t("rules.selectionFailed", {
+          ns: "prompt",
+          error: errorMessage,
+        })
+      );
       console.error("Auto-select rules error:", error);
 
       if (interaction) {

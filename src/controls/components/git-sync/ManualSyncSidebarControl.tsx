@@ -17,12 +17,14 @@ import { useConversationStore } from "@/store/conversation.store";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { ManualSyncSidebarControlModule } from "@/controls/modules/ManualSyncSidebarControlModule";
+import { useTranslation } from "react-i18next";
 
 interface ManualSyncSidebarControlProps {
   module: ManualSyncSidebarControlModule;
 }
 
 export const ManualSyncSidebarControl: React.FC<ManualSyncSidebarControlProps> = ({ module }) => {
+  const { t } = useTranslation('git');
   const [, forceUpdate] = useState({});
   
   useEffect(() => {
@@ -60,7 +62,7 @@ export const ManualSyncSidebarControl: React.FC<ManualSyncSidebarControlProps> =
                 size="icon"
                 className="h-8 w-8"
                 disabled={!hasSyncRepos}
-                aria-label="Manual Git Sync"
+                aria-label={t('manualSync.ariaLabel')}
               >
                 {(isSyncing || anyRepoSyncing) ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -71,14 +73,14 @@ export const ManualSyncSidebarControl: React.FC<ManualSyncSidebarControlProps> =
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent side="top">
-            {!hasSyncRepos ? "No sync repositories configured" : "Manual Git Sync"}
+            {!hasSyncRepos ? t('manualSync.tooltipNoRepos') : t('manualSync.tooltip')}
           </TooltipContent>
         </Tooltip>
         
         <PopoverContent className="w-80 p-4" align="start">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-sm">Git Sync Repositories</h4>
+              <h4 className="font-semibold text-sm">{t('manualSync.popoverTitle')}</h4>
               <Button
                 variant="outline"
                 size="sm"
@@ -91,13 +93,13 @@ export const ManualSyncSidebarControl: React.FC<ManualSyncSidebarControlProps> =
                 ) : (
                   <RefreshCwIcon className="h-3 w-3 mr-1" />
                 )}
-                Sync All
+                {t('manualSync.syncAllButton')}
               </Button>
             </div>
             
             {!hasSyncRepos ? (
               <p className="text-sm text-muted-foreground text-center py-4">
-                No sync repositories configured. Go to Settings → Git → Sync Repositories to add one.
+                {t('manualSync.noReposMessage')}
               </p>
             ) : (
               <div className="space-y-2">
@@ -127,10 +129,10 @@ export const ManualSyncSidebarControl: React.FC<ManualSyncSidebarControlProps> =
                             }
                             className="text-xs"
                           >
-                            {status === "idle" ? "Ready" :
-                             status === "syncing" ? "Syncing" :
-                             status === "error" ? "Error" :
-                             "Unknown"}
+                            {status === "idle" ? t('manualSync.statusReady') :
+                             status === "syncing" ? t('manualSync.statusSyncing') :
+                             status === "error" ? t('manualSync.statusError') :
+                             t('manualSync.statusUnknown')}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">

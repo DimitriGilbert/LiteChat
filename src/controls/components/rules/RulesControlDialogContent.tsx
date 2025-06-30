@@ -14,6 +14,7 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import type { DbRule, DbTag } from "@/types/litechat/rules"; // Import types
 import { useSettingsStore } from "@/store/settings.store";
+import { useTranslation } from "react-i18next";
 
 interface RulesControlDialogContentProps {
   activeTagIds: Set<string>;
@@ -38,6 +39,7 @@ export const RulesControlDialogContent: React.FC<
   getRulesForTag, // Destructure
   onAutoSelectRules, // Destructure
 }) => {
+  const { t } = useTranslation('prompt');
   const [tagFilter, setTagFilter] = useState("");
   const [ruleFilter, setRuleFilter] = useState("");
   const autoRuleSelectionEnabled = useSettingsStore((s) => s.autoRuleSelectionEnabled);
@@ -91,7 +93,7 @@ export const RulesControlDialogContent: React.FC<
           <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Filter tags..."
+            placeholder={t('rulesControl.dialog.filterTagsPlaceholder')}
             value={tagFilter}
             onChange={(e) => setTagFilter(e.target.value)}
             className="pl-8 h-9"
@@ -102,18 +104,18 @@ export const RulesControlDialogContent: React.FC<
           size="sm"
           onClick={handleOpenRulesSettings}
           className="h-9 px-3"
-          title="Open Rules Settings"
+          title={t('rulesControl.dialog.openSettingsTooltip')}
         >
           <Settings className="h-4 w-4 mr-1" />
-          Manage
+          {t('rulesControl.dialog.manageButton')}
         </Button>
       </div>
       <div className="border rounded-md p-2 bg-background/50">
         {filteredTags.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             {allTags.length === 0
-              ? "No tags defined."
-              : "No tags match filter."}
+              ? t('rulesControl.dialog.noTagsDefined')
+              : t('rulesControl.dialog.noTagsMatchFilter')}
           </p>
         ) : (
           <div className="space-y-1">
@@ -145,7 +147,7 @@ export const RulesControlDialogContent: React.FC<
                       )}
                       {rulesInTag.length > 0 && (
                         <span className="block text-xs text-blue-500 dark:text-blue-400">
-                          Includes: {rulesInTag.map((r) => r.name).join(", ")}
+                          {t('rulesControl.dialog.includes', { ruleNames: rulesInTag.map((r) => r.name).join(", ") })}
                         </span>
                       )}
                     </Label>
@@ -166,7 +168,7 @@ export const RulesControlDialogContent: React.FC<
           <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Filter rules..."
+            placeholder={t('rulesControl.dialog.filterRulesPlaceholder')}
             value={ruleFilter}
             onChange={(e) => setRuleFilter(e.target.value)}
             className="pl-8 h-9"
@@ -178,9 +180,9 @@ export const RulesControlDialogContent: React.FC<
             size="sm"
             onClick={onAutoSelectRules}
             className="h-9 px-3"
-            title="Auto-select rules based on prompt context"
+            title={t('rulesControl.dialog.autoSelectTooltip')}
           >
-            Auto-Select
+            {t('rulesControl.dialog.autoSelectButton')}
           </Button>
         )}
         <Button
@@ -188,18 +190,18 @@ export const RulesControlDialogContent: React.FC<
           size="sm"
           onClick={handleOpenRulesSettings}
           className="h-9 px-3"
-          title="Open Rules Settings"
+          title={t('rulesControl.dialog.openSettingsTooltip')}
         >
           <Settings className="h-4 w-4 mr-1" />
-          Manage
+          {t('rulesControl.dialog.manageButton')}
         </Button>
       </div>
       <div className="border rounded-md p-2 bg-background/50">
         {filteredRules.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             {allRules.length === 0
-              ? "No rules defined."
-              : "No rules match filter."}
+              ? t('rulesControl.dialog.noRulesDefined')
+              : t('rulesControl.dialog.noRulesMatchFilter')}
           </p>
         ) : (
           <div className="space-y-1">
@@ -223,10 +225,10 @@ export const RulesControlDialogContent: React.FC<
                   >
                     <span className="block font-medium">{rule.name}</span>
                     <span className="block text-xs text-muted-foreground">
-                      Type: {rule.type}
+                      {t('rulesControl.dialog.ruleType', { type: rule.type })}
                     </span>
                     <span className="block text-xs text-muted-foreground truncate max-w-xs">
-                      Content: {rule.content}
+                      {t('rulesControl.dialog.ruleContent', { content: rule.content })}
                     </span>
                   </Label>
                 </div>
@@ -239,8 +241,8 @@ export const RulesControlDialogContent: React.FC<
   );
 
   const tabs: TabDefinition[] = [
-    { value: "rules", label: "Activate Rules", content: renderRuleList() },
-    { value: "tags", label: "Activate Tags", content: renderTagList() },
+    { value: "rules", label: t('rulesControl.dialog.tabs.activateRules'), content: renderRuleList() },
+    { value: "tags", label: t('rulesControl.dialog.tabs.activateTags'), content: renderTagList() },
   ];
 
   return (

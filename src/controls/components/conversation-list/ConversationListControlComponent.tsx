@@ -33,6 +33,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Lnk } from "@/components/ui/lnk";
 import { GithubIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface VirtualListItem {
   id: string; // Unique ID for the virtual list item (e.g., `project-${projectId}` or `conversation-${conversationId}`)
@@ -114,6 +115,7 @@ interface ConversationListControlComponentProps {
 export const ConversationListControlComponent: React.FC<
   ConversationListControlComponentProps
 > = ({ module }) => {
+  const { t } = useTranslation('controls');
   const listRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [viewportReady, setViewportReady] = useState(false);
@@ -254,22 +256,22 @@ export const ConversationListControlComponent: React.FC<
     try {
       const parentProjectId = getParentProjectId();
       const newId = await addConversation({
-        title: "New Chat",
+        title: t('conversationList.newChat'),
         projectId: parentProjectId,
       });
       selectItem(newId, "conversation");
     } catch (error) {
       console.error("Failed to create new chat:", error);
-      toast.error("Failed to create new chat.");
+      toast.error(t('conversationList.newChatError'));
     }
-  }, [editingItemId, getParentProjectId, addConversation, selectItem]);
+  }, [editingItemId, getParentProjectId, addConversation, selectItem, t]);
 
   const handleNewProject = useCallback(async () => {
     if (editingItemId) return;
     try {
       const parentProjectId = getParentProjectId();
       const newId = await addProject({
-        name: "New Project",
+        name: t('conversationList.newProject'),
         parentId: parentProjectId,
       });
       selectItem(newId, "project");
@@ -284,6 +286,7 @@ export const ConversationListControlComponent: React.FC<
       }, 50);
     } catch (error) {
       console.error("Failed to create new project:", error);
+      toast.error(t('conversationList.newProjectError'));
     }
   }, [
     editingItemId,
@@ -292,6 +295,7 @@ export const ConversationListControlComponent: React.FC<
     selectItem,
     getProjectById,
     handleStartEditing,
+    t,
   ]);
 
   const handleSelectItem = useCallback(
@@ -317,14 +321,14 @@ export const ConversationListControlComponent: React.FC<
   const handleDeleteConversation = useCallback(
     (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      if (window.confirm("Delete this conversation? This cannot be undone.")) {
+      if (window.confirm(t('conversationList.confirmDeleteConversation'))) {
         deleteConversation(id).catch((error) => {
           console.error("Failed to delete conversation:", error);
-          toast.error("Failed to delete conversation.");
+          toast.error(t('conversationList.deleteConversationError'));
         });
       }
     },
-    [deleteConversation]
+    [deleteConversation, t]
   );
 
   const handleDeleteProject = useCallback(
@@ -332,10 +336,10 @@ export const ConversationListControlComponent: React.FC<
       e.stopPropagation();
       deleteProject(id).catch((error) => {
         console.error("Failed to delete project:", error);
-        toast.error("Failed to delete project.");
+        toast.error(t('conversationList.deleteProjectError'));
       });
     },
-    [deleteProject]
+    [deleteProject, t]
   );
 
   const handleExportConversation = useCallback(
@@ -413,13 +417,11 @@ export const ConversationListControlComponent: React.FC<
         conversationsByProjectId.get(parentId) || []
       ).filter((c) => c.title.toLowerCase().includes(lowerCaseFilter));
 
-      // Combine projects and conversations at this level
       const combinedChildren: (Project | Conversation)[] = [
         ...childProjects,
         ...childConversations,
       ];
 
-      // Sort combined children by updatedAt descending
       combinedChildren.sort(
         (a, b) =>
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -427,7 +429,6 @@ export const ConversationListControlComponent: React.FC<
 
       combinedChildren.forEach((item) => {
         if ("path" in item) {
-          // It's a Project
           flatList.push({
             id: `project-${item.id}`,
             originalId: item.id,
@@ -440,7 +441,6 @@ export const ConversationListControlComponent: React.FC<
             addChildren(item.id, level + 1);
           }
         } else {
-          // It's a Conversation
           flatList.push({
             id: `conversation-${item.id}`,
             originalId: item.id,
@@ -476,12 +476,12 @@ export const ConversationListControlComponent: React.FC<
     <div className="p-2 border-r border-[--border] bg-card text-card-foreground h-full flex flex-col">
       <div className="flex justify-between items-center mb-2 flex-shrink-0 px-1">
         <div className="flex items-center space-x-2">
-          <h3 className="text-sm font-semibold">LiteChat</h3>
+          <h3 className="text-sm font-semibold">{t('conversationList.title', 'LiteChat')}</h3>
           <Lnk
             href="https://github.com/DimitriGilbert/LiteChat"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="GitHub Repository"
+            aria-label={t('conversationList.githubRepo')}
           >
             <Button size="sm" variant="ghost" className="h-4 w-4 p-0">
               <GithubIcon className="h-4 w-4" />
@@ -490,7 +490,7 @@ export const ConversationListControlComponent: React.FC<
           <Lnk
             href="release/latest.zip"
             download="LiteChat.zip"
-            aria-label="Download LiteChat"
+            aria-label={t('conversationList.downloadLiteChat')}
           >
             <Button size="sm" variant="ghost" className="h-4 w-4 p-0">
               <DownloadIcon className="h-4 w-4" />
@@ -505,14 +505,14 @@ export const ConversationListControlComponent: React.FC<
                   size="sm"
                   variant="ghost"
                   onClick={handleNewProject}
-                  aria-label="New Project"
+                  aria-label={t('conversationList.newProject')}
                   disabled={isLoading || !!editingItemId}
                   className="h-7 w-7 p-0"
                 >
                   <FolderPlusIcon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">New Project</TooltipContent>
+              <TooltipContent side="bottom"><p>{t('conversationList.newProject')}</p></TooltipContent>
             </Tooltip>
           </TooltipProvider>
           <TooltipProvider delayDuration={100}>
@@ -522,14 +522,14 @@ export const ConversationListControlComponent: React.FC<
                   size="sm"
                   variant="ghost"
                   onClick={handleNewChat}
-                  aria-label="New Chat"
+                  aria-label={t('conversationList.newChat')}
                   disabled={isLoading || !!editingItemId}
                   className="h-7 w-7 p-0"
                 >
                   <PlusIcon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">New Chat</TooltipContent>
+              <TooltipContent side="bottom"><p>{t('conversationList.newChat')}</p></TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
@@ -538,7 +538,7 @@ export const ConversationListControlComponent: React.FC<
         <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Filter..."
+          placeholder={t('conversationList.filterPlaceholder')}
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
           className="h-8 text-xs pl-8"
@@ -555,8 +555,8 @@ export const ConversationListControlComponent: React.FC<
         ) : !isLoading && flattenedVisibleItems.length === 0 ? (
           <p className="text-xs text-muted-foreground p-2 text-center">
             {filterText.trim() !== ""
-              ? "No items match your filter."
-              : "Workspace is empty."}
+              ? t('conversationList.noItemsMatchFilter')
+              : t('conversationList.workspaceEmpty')}
           </p>
         ) : (
           viewportReady && (
@@ -620,7 +620,7 @@ export const ConversationListControlComponent: React.FC<
         )}
         {!viewportReady && !isLoading && (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            Initializing list...
+            {t('conversationList.initializing')}
           </div>
         )}
       </ScrollArea>

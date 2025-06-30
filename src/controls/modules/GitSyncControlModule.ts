@@ -16,6 +16,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import type { SyncRepo, SyncStatus } from "@/types/litechat/sync";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { BulkSyncService } from "@/services/bulk-sync.service";
+import i18next from "i18next";
 
 export class GitSyncControlModule implements ControlModule {
   readonly id = "core-git-sync";
@@ -270,7 +271,7 @@ export class GitSyncControlModule implements ControlModule {
     if (!this.unregisterSettingsTabCallback) {
       this.unregisterSettingsTabCallback = modApi.registerSettingsTab({
         id: "git",
-        title: "Git",
+        title: i18next.t("tabs.git", { ns: "settings" }),
         component: SettingsGit,
         order: 60,
       });

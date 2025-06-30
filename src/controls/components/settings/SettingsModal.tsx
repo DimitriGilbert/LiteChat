@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { ModalProviderProps } from "@/types/litechat/modding";
+import { useTranslation } from "react-i18next";
 
 interface SettingsModalProps extends ModalProviderProps {
   // isOpen and onClose are already in ModalProviderProps
@@ -28,6 +29,7 @@ interface SettingsModalProps extends ModalProviderProps {
 
 const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
   ({ isOpen, onClose, initialTab: propsInitialTab }) => {
+    const { t } = useTranslation('settings');
     const { modSettingsTabs } = useModStore(
       useShallow((state) => ({
         modSettingsTabs: state.modSettingsTabs || [],
@@ -73,12 +75,12 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             `[SettingsModal] Initial tab "${propsInitialTab}" not found. Defaulting to "${targetTab}".`
           );
           toast.error(
-            `Settings tab "${propsInitialTab}" not found. Opening default tab.`
+            t('settingsModal.noTabs.toast', { tabName: propsInitialTab })
           );
         }
         setActiveTabValue(targetTab);
       }
-    }, [isOpen, propsInitialTab, allTabs, getDefaultTab]);
+    }, [isOpen, propsInitialTab, allTabs, getDefaultTab, t]);
 
     const handleOpenChange = (open: boolean) => {
       if (!open) {
@@ -105,10 +107,9 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
           onPointerDownOutside={(e) => e.preventDefault()}
         >
           <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
-            <DialogTitle className="p-2">Settings</DialogTitle>
+            <DialogTitle className="p-2">{t('settingsModal.title')}</DialogTitle>
             <DialogDescription>
-              Manage application settings, AI behavior, API keys, providers, and
-              data.
+              {t('settingsModal.description')}
             </DialogDescription>
           </DialogHeader>
 
@@ -125,14 +126,13 @@ const SettingsModalComponent: React.FC<SettingsModalProps> = memo(
             />
           ) : (
             <div className="flex-grow flex items-center justify-center text-muted-foreground p-4">
-              No settings tabs available or still loading. Check console for
-              module registration errors.
+              {t('settingsModal.noTabs.message')}
             </div>
           )}
 
           <DialogFooter className="flex-shrink-0 border-t p-2 md:p-3 pt-1 md:pt-2 mt-auto">
             <Button variant="outline" onClick={() => handleOpenChange(false)}>
-              Close
+              {t('settingsModal.closeButton')}
             </Button>
           </DialogFooter>
         </DialogContent>

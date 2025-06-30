@@ -8,6 +8,7 @@ import type { ParameterControlModule } from "@/controls/modules/ParameterControl
 
 import { NumberField } from "@/components/LiteChat/common/form-fields/NumberField";
 import { SliderField } from "@/components/LiteChat/common/form-fields/SliderField";
+import { useTranslation } from "react-i18next";
 
 interface ParameterControlComponentProps {
   module: ParameterControlModule;
@@ -26,6 +27,7 @@ const paramsSchema = z.object({
 type ParamsFormValues = z.infer<typeof paramsSchema>;
 
 export const ParameterControlComponent: React.FC<ParameterControlComponentProps> = ({ module, className }) => {
+  const { t } = useTranslation('prompt');
   const form = useForm({
     defaultValues: {
       temperature: module.temperature ?? module.defaultTemperature ?? 0.7,
@@ -122,9 +124,10 @@ export const ParameterControlComponent: React.FC<ParameterControlComponentProps>
     moduleValue: number | null | undefined, // current value in the module
     moduleSetter: (value: number | null) => void, 
     defaultValue: number | null | undefined,
-    defaultDisplayValue: string = "N/A"
+    defaultDisplayValue: string = t('parameterControl.none')
   ) => {
     if (!showUseDefault || defaultValue === undefined) return null;
+    const displayValue = defaultValue?.toFixed?.(2) ?? defaultDisplayValue;
     return (
       <Button
         variant="link"
@@ -133,7 +136,7 @@ export const ParameterControlComponent: React.FC<ParameterControlComponentProps>
         onClick={() => handleUseDefault(fieldName, moduleSetter, defaultValue ?? null)}
         disabled={moduleValue === null} // Disabled if module is already using its internal default
       >
-        Use Default ({defaultValue?.toFixed?.(2) ?? defaultDisplayValue})
+        {t('parameterControl.useDefault', { defaultValue: displayValue })}
       </Button>
     );
   };
@@ -145,7 +148,7 @@ export const ParameterControlComponent: React.FC<ParameterControlComponentProps>
           <SliderField
             form={form}
             name="temperature"
-            label="Temperature"
+            label={t('parameterControl.temperature')}
             min={0}
             max={1}
             step={0.01}
@@ -162,7 +165,7 @@ export const ParameterControlComponent: React.FC<ParameterControlComponentProps>
           <SliderField
             form={form}
             name="topP"
-            label="Top P"
+            label={t('parameterControl.topP')}
             min={0}
             max={1}
             step={0.01}
@@ -180,15 +183,15 @@ export const ParameterControlComponent: React.FC<ParameterControlComponentProps>
             <NumberField
               form={form}
               name="maxTokens"
-              label="Max Tokens"
-              placeholder={`Default: ${module.defaultMaxTokens ?? "None"}`}
+              label={t('parameterControl.maxTokens')}
+              placeholder={t('parameterControl.placeholder', { defaultValue: module.defaultMaxTokens ?? t('parameterControl.none') })}
               min={1}
               allowNull={true}
               onBlurInput={() => handleNumberInputBlur("maxTokens", module.setMaxTokens)}
               className="h-8 text-xs"
               wrapperClassName="text-xs"
             />
-            {renderUseDefaultButton("maxTokens", module.maxTokens, module.setMaxTokens, module.defaultMaxTokens, "None")}
+            {renderUseDefaultButton("maxTokens", module.maxTokens, module.setMaxTokens, module.defaultMaxTokens, t('parameterControl.none'))}
           </div>
         )}
         {supportedParams.has("top_k") && (
@@ -196,15 +199,15 @@ export const ParameterControlComponent: React.FC<ParameterControlComponentProps>
             <NumberField
               form={form}
               name="topK"
-              label="Top K"
-              placeholder={`Default: ${module.defaultTopK ?? "None"}`}
+              label={t('parameterControl.topK')}
+              placeholder={t('parameterControl.placeholder', { defaultValue: module.defaultTopK ?? t('parameterControl.none') })}
               min={1}
               allowNull={true}
               onBlurInput={() => handleNumberInputBlur("topK", module.setTopK)}
               className="h-8 text-xs"
               wrapperClassName="text-xs"
             />
-            {renderUseDefaultButton("topK", module.topK, module.setTopK, module.defaultTopK, "None")}
+            {renderUseDefaultButton("topK", module.topK, module.setTopK, module.defaultTopK, t('parameterControl.none'))}
           </div>
         )}
       </div>
@@ -214,7 +217,7 @@ export const ParameterControlComponent: React.FC<ParameterControlComponentProps>
           <SliderField
             form={form}
             name="presencePenalty"
-            label="Presence Penalty"
+            label={t('parameterControl.presencePenalty')}
             min={-2}
             max={2}
             step={0.01}
@@ -231,7 +234,7 @@ export const ParameterControlComponent: React.FC<ParameterControlComponentProps>
           <SliderField
             form={form}
             name="frequencyPenalty"
-            label="Frequency Penalty"
+            label={t('parameterControl.frequencyPenalty')}
             min={-2}
             max={2}
             step={0.01}

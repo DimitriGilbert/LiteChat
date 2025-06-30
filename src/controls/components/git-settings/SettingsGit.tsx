@@ -7,24 +7,26 @@ import {
   TabbedLayout,
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
+import { useTranslation } from "react-i18next";
 
 const SettingsGitComponent: React.FC = () => {
+  const { t } = useTranslation('git');
   // Define tabs for the layout
   const tabs: TabDefinition[] = useMemo(
     () => [
       {
         value: "config",
-        label: "User Config",
+        label: t('settings.userConfigTab', 'User Config'),
         content: <SettingsGitConfig />,
       },
       {
         value: "sync",
-        label: "Sync Repositories",
+        label: t('settings.syncReposTab', 'Sync Repositories'),
         content: <SettingsGitSyncRepos />,
       },
       // Add more Git-related tabs here later if needed
     ],
-    []
+    [t]
   );
 
   return (

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { ParameterControlModule } from "@/controls/modules/ParameterControlModule";
 import { ParameterControlComponent } from "./ParameterControlComponent";
+import { useTranslation } from "react-i18next";
 
 interface ParameterControlTriggerProps {
   module: ParameterControlModule;
@@ -24,6 +25,7 @@ interface ParameterControlTriggerProps {
 export const ParameterControlTrigger: React.FC<
   ParameterControlTriggerProps
 > = ({ module }) => {
+  const { t } = useTranslation('prompt');
   const [, forceUpdate] = useState({});
   useEffect(() => {
     module.setNotifyCallback(() => forceUpdate({}));
@@ -48,13 +50,13 @@ export const ParameterControlTrigger: React.FC<
                 size="icon"
                 className="h-8 w-8"
                 disabled={isStreaming}
-                aria-label="Adjust Advanced Parameters"
+                aria-label={t('parameterControl.ariaLabel')}
               >
                 <SlidersHorizontalIcon className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent side="top">Advanced Parameters</TooltipContent>
+          <TooltipContent side="top">{t('parameterControl.title')}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <PopoverContent className="w-auto p-0" align="start">

@@ -2,7 +2,8 @@
 // FULL FILE
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { SettingsDataManagement } from "@/controls/components/data-settings/SettingsDataManagement";
+import SettingsDataManagement from "@/controls/components/data-settings/SettingsDataManagement";
+import i18next from "i18next";
 
 export class DataSettingsModule implements ControlModule {
   readonly id = "core-settings-data";
@@ -19,7 +20,7 @@ export class DataSettingsModule implements ControlModule {
     }
     this.unregisterCallback = modApi.registerSettingsTab({
       id: "data",
-      title: "Data",
+      title: i18next.t('settings:tabs.data'),
       component: SettingsDataManagement,
       order: 70,
     });
