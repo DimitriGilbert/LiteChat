@@ -7,12 +7,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { AlertCircle, Play, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 interface WorkflowControlFooterProps {
     module: WorkflowDisplayModule;
 }
 
 export const WorkflowControlFooter: React.FC<WorkflowControlFooterProps> = ({ module }) => {
+    const { t } = useTranslation('controls');
     const { activeRun, pausePayload } = useWorkflowStore(
         useShallow(state => ({
             activeRun: state.activeRun,
@@ -35,7 +37,7 @@ export const WorkflowControlFooter: React.FC<WorkflowControlFooterProps> = ({ mo
             try {
                 finalResumeData = JSON.parse(resumeData);
             } catch (e) {
-                toast.error('Invalid JSON. Please correct the data before resuming.');
+                toast.error(t('workflowFooter.invalidJson'));
                 return;
             }
         }
@@ -61,38 +63,38 @@ export const WorkflowControlFooter: React.FC<WorkflowControlFooterProps> = ({ mo
             <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm">
                     <AlertCircle className="h-4 w-4 text-orange-500" />
-                    Workflow Paused
+                    {t('workflowFooter.workflowPaused')}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                    Step "{step?.name || 'Unknown'}" requires your input to continue.
+                    {t('workflowFooter.stepRequiresInput', { stepName: step?.name || t('workflowFooter.unknownStep') })}
                 </CardDescription>
             </CardHeader>
             <CardContent className="py-2">
                 {pauseReason === 'data-correction' && (
                     <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">
-                            Review and correct the data before continuing:
+                            {t('workflowFooter.dataCorrection.reviewInstruction')}
                         </p>
                         <Textarea
                             value={resumeData || defaultCorrectionData}
                             onChange={(e) => setResumeData(e.target.value)}
                             className="text-xs font-mono"
                             rows={6}
-                            placeholder="Enter corrected data..."
+                            placeholder={t('workflowFooter.dataCorrection.placeholder')}
                         />
                     </div>
                 )}
                 {pauseReason === 'human-in-the-loop' && (
                     <div className="space-y-2">
                         <p className="text-xs text-muted-foreground">
-                            Provide input to continue the workflow:
+                            {t('workflowFooter.humanInLoop.provideInput')}
                         </p>
                         <Textarea
                             value={resumeData}
                             onChange={(e) => setResumeData(e.target.value)}
                             className="text-xs"
                             rows={3}
-                            placeholder="Enter your input..."
+                            placeholder={t('workflowFooter.humanInLoop.placeholder')}
                         />
                     </div>
                 )}
@@ -105,7 +107,7 @@ export const WorkflowControlFooter: React.FC<WorkflowControlFooterProps> = ({ mo
                     disabled={pauseReason === 'human-in-the-loop' && !resumeData.trim()}
                 >
                     <Play className="h-3 w-3 mr-1" />
-                    Resume
+                    {t('workflowFooter.resume')}
                 </Button>
                 <Button
                     size="sm"
@@ -114,7 +116,7 @@ export const WorkflowControlFooter: React.FC<WorkflowControlFooterProps> = ({ mo
                     className="flex-1"
                 >
                     <X className="h-3 w-3 mr-1" />
-                    Cancel
+                    {t('workflowFooter.cancel')}
                 </Button>
             </CardFooter>
         </Card>

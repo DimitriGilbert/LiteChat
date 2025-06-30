@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent } from "@/types/litechat/events/ui.events";
+import { useTranslation } from "react-i18next";
+import { useMemo } from "react";
 
 // Interface for the action card props
 interface ActionCardProps {
@@ -43,6 +45,8 @@ const ActionCard: React.FC<ActionCardProps> = ({
 );
 
 export const ActionCards: React.FC = () => {
+  const { t } = useTranslation('welcome');
+
   const openSettings = (tab: string, subTab?: string) => {
     emitter.emit(uiEvent.openModalRequest, {
       modalId: "settingsModal",
@@ -57,44 +61,45 @@ export const ActionCards: React.FC = () => {
     });
   };
 
-  const actions = [
+  const actions = useMemo(() => [
     {
-      title: "Configure Theme",
-      description: "Customize colors, fonts, and code block appearance.",
+      title: t('configureTheme.title'),
+      description: t('configureTheme.description'),
       icon: <PaletteIcon className="h-4 w-4 text-purple-500" />,
       onClick: () => openSettings("theme"),
     },
     {
-      title: "Manage Rules & Tags",
-      description: "Define reusable prompt snippets and organize them.",
+      title: t('manageRules.title'),
+      description: t('manageRules.description'),
       icon: <TagsIcon className="h-4 w-4 text-blue-500" />,
       onClick: () => openSettings("rules-tags"),
     },
     {
-      title: "Add Files",
-      description: "Upload or manage files in the virtual filesystem.",
+      title: t('addFiles.title'),
+      description: t('addFiles.description'),
       icon: <HardDriveIcon className="h-4 w-4 text-cyan-500" />,
       onClick: openVfs,
     },
     {
-      title: "Add Provider",
-      description: "Connect to AI services like OpenAI, Ollama, etc.",
+      title: t('addProvider.title'),
+      description: t('addProvider.description'),
       icon: <ServerIcon className="h-4 w-4 text-green-500" />,
       onClick: () => openSettings("providers", "providers-config"),
     },
     {
-      title: "Add API Key",
-      description: "Store API keys securely in your browser.",
+      title: t('addApiKey.title'),
+      description: t('addApiKey.description'),
       icon: <KeyIcon className="h-4 w-4 text-amber-500" />,
       onClick: () => openSettings("providers", "api-keys"),
     },
     {
-      title: "Setup Git Sync",
-      description: "Configure repositories to sync conversations with Git.",
+      title: t('setupGitSync.title'),
+      description: t('setupGitSync.description'),
       icon: <GitBranchIcon className="h-4 w-4 text-orange-500" />,
       onClick: () => openSettings("git"),
     },
-  ];
+  ], [t]);
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl w-full pt-4">
       {actions.map((action) => (

@@ -23,6 +23,7 @@ import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import type { VfsEventPayloads } from "@/types/litechat/events/vfs.events";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { useVfsStore } from "@/store/vfs.store";
+import { useTranslation } from "react-i18next";
 
 interface VfsModalPanelProps extends ModalProviderProps {
   module: VfsControlModule;
@@ -33,6 +34,7 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { t } = useTranslation(['vfs', 'common']);
   // Track selected count locally
   const [selectedCount, setSelectedCount] = useState(
     module.getSelectedFileIdsCount()
@@ -75,7 +77,7 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
     const selectedIds = useVfsStore.getState().selectedFileIds;
     const nodes = module.getVfsNodes();
     if (selectedIds.size === 0) {
-      toast.info("No files selected in VFS to attach.");
+      toast.info(t('vfs:modal.noFilesSelected'));
       return;
     }
 
@@ -96,12 +98,12 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
 
     if (attachedCount > 0) {
       toast.success(
-        `Attached ${attachedCount} file(s) from VFS to the next prompt.`
+        t('vfs:modal.filesAttached', { count: attachedCount })
       );
       module.clearVfsSelection();
       onClose();
     } else {
-      toast.warning("No valid files were selected to attach.");
+      toast.warning(t('vfs:modal.noValidFilesSelected'));
     }
   };
 
@@ -114,10 +116,9 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleDialogClose()}>
       <DialogContent className="sm:max-w-[90vw] md:max-w-[80vw] lg:max-w-[70vw] w-[90vw] h-[80vh] min-h-[500px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 border-b flex-shrink-0">
-          <DialogTitle className="p-2">Virtual Filesystem</DialogTitle>
+          <DialogTitle className="p-2">{t('vfs:modal.title')}</DialogTitle>
           <DialogDescription>
-            Manage files associated with the current context. Select files to
-            attach them to your next prompt.
+            {t('vfs:modal.description')}
           </DialogDescription>
           <FileManagerBanner
             vfsKey={vfsKey}
@@ -129,11 +130,11 @@ export const VfsModalPanel: React.FC<VfsModalPanelProps> = ({
         </div>
         <DialogFooter className="p-2 md:p-3 pt-1 md:pt-2 border-t flex-shrink-0">
           <Button variant="outline" onClick={handleDialogClose}>
-            Close
+            {t('common:close')}
           </Button>
           <Button onClick={handleAttachAndClose} disabled={selectedCount === 0}>
             <PaperclipIcon className="h-4 w-4 mr-2" />
-            Attach Selected ({selectedCount})
+            {t('vfs:modal.attachSelected', { count: selectedCount })}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,14 @@
 {
+  "generatingResponse": "Génération de la réponse...",
+  "loadingModel": "Chargement du modèle...",
+  "assistantLoading": "Assistant (Chargement...)",
+  "streamingStatus": "Streaming...",
+  "reasoning": "Raisonnement",
+  "unfoldReasoning": "Déplier le raisonnement",
+  "foldReasoning": "Plier le raisonnement",
+  "unfoldResponse": "Déplier la réponse",
+  "foldResponse": "Plier la réponse",
+  "assistant": "Assistant",
   "streaming": {
     "completed": "Terminé",
     "thinking": "Réflexion...",
@@ -73,5 +83,27 @@
     "downloadZip": "Télécharger {{count}} fichiers de code en ZIP",
     "downloadZipAriaLabel": "Télécharger les blocs de code en tant que fichier ZIP",
     "zipDownloadFailed": "Échec de la création du fichier ZIP"
+  },
+  "emptyStateSetup": {
+    "welcomeTitle": "Bienvenue dans LiteChat",
+    "setupProgress": "Progression de la configuration : {{progress}}%",
+    "stepsCompleted": "Étapes complétées : {{completed}} sur {{total}}",
+    "configurationIssue": "Problème de configuration détecté. Veuillez vérifier les paramètres du fournisseur.",
+    "openProviderSettings": "Ouvrir les paramètres du fournisseur",
+    "addApiKey": "Ajouter une clé API",
+    "addApiKeyDescription": "Pour utiliser des fournisseurs comme OpenAI, Google, Anthropic (Claude), ou OpenRouter ou tout fournisseur compatible avec l'API OpenAI, ajoutez une clé API. Les clés sont stockées de manière sécurisée dans votre navigateur.",
+    "localAiDescription": "Si vous voulez une IA vraiment locale, \"aucun internet requis\", vous pouvez configurer Ollama ou LMStudio (ou toute autre solution LLM locale avec une API compatible OpenAI). Celles-ci ne nécessitent généralement pas de clés API, alors rendez-vous à l'étape 2.",
+    "addProvider": "Ajouter un fournisseur IA",
+    "addProviderDescription": "Connectez-vous à un fournisseur IA pour lequel vous avez configuré la clé...",
+    "providerRedundancyNote": "Cela peut sembler redondant, mais cela vous permet d'avoir plusieurs clés pour le même fournisseur (personnel, professionnel, etc.)",
+    "enableModels": "Activer les modèles",
+    "enableModelsDescription": "Activez les modèles pour le fournisseur que vous venez d'ajouter ({{providerName}}).",
+    "enableModelsNote": "L'activation de modèles spécifiques améliore l'interface utilisateur en réduisant l'encombrement et la paralysie du choix. Vous pouvez en activer plus tard dans les paramètres.",
+    "enableModelsNote2": "Et comme avant, vous pouvez choisir d'activer un modèle pour une certaine combinaison clé/fournisseur !",
+    "addProviderFirst": "Ajoutez d'abord un fournisseur à l'étape {{stepNumber}}.",
+    "startChatting": "Commencer à discuter",
+    "startChattingDescription": "Vous êtes prêt ! Cliquez ci-dessous pour commencer votre première conversation.",
+    "launching": "Lancement...",
+    "startFirstChat": "Commencer la première conversation"
   }
 }

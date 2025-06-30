@@ -10,7 +10,7 @@ i18next
     resources,
     lng: language,
     fallbackLng: 'en',
-    ns: ['common', 'controls', 'canvas', 'settings', 'prompt', 'vfs', 'git', 'ai'],
+    ns: ['common', 'controls', 'canvas', 'settings', 'prompt', 'vfs', 'git', 'ai', 'welcome'],
     defaultNS: 'common',
     interpolation: {
       escapeValue: false,

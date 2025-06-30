@@ -51,8 +51,7 @@
     "open": "Open menu",
     "loading": "Loading menu...",
     "deleteConfirmation": "Are you sure you want to delete this conversation?",
-    "deleteProjectConfirmation": "Are you sure you want to delete this project and all conversations within it?",
-    "searchPlaceholder": "Search conversations..."
+    "deleteProjectConfirmation": "Are you sure you want to delete this project and all conversations within it?"
   },
   "autoTitle": {
     "disableForChat": "Disable Auto-Title for this Chat",
@@ -96,7 +95,10 @@
     "title": "LiteChat",
     "newChat": "New Chat",
     "newProject": "New Project",
+    "newChatTooltip": "New Chat",
     "filterPlaceholder": "Filter...",
+    "searchPlaceholder": "Search conversations...",
+    "newProjectTooltip": "New Project",
     "workspaceEmpty": "Workspace is empty.",
     "initializing": "Initializing list...",
     "newChatError": "Failed to create new chat.",
@@ -126,6 +128,24 @@
     "deleteProject": "Delete Project",
     "deleteConversation": "Delete Conversation",
     "untitled": "Untitled"
+  },
+  "itemRenderer": {
+    "deleteProjectConfirm": "Delete project \"{{name}}\" and ALL its contents (sub-projects and conversations)? This cannot be undone.",
+    "nameCannotBeEmpty": "Name cannot be empty.",
+    "saveEnter": "Save (Enter)",
+    "cancelEsc": "Cancel (Esc)",
+    "saveChanges": "Save changes",
+    "cancelEdit": "Cancel edit",
+    "projectSettings": "Project Settings",
+    "settingsFor": "Settings for {{name}}",
+    "edit": "Edit",
+    "editItem": "Edit {{name}}",
+    "exportProjectJson": "Export Project (JSON)",
+    "exportProject": "Export project {{name}}",
+    "exportConversation": "Export Conversation",
+    "exportItem": "Export {{name}}",
+    "delete": "Delete",
+    "deleteItem": "Delete {{name}}"
   },
   "modelSelector": {
     "selectModel": "Select Model...",
@@ -173,5 +193,27 @@
     "manageDescription": "Create tags to group related rules. You can activate tags before sending a prompt to apply their associated rules.",
     "addNew": "Add New Tag",
     "existing": "Existing Tags"
+  },
+  "workflowFooter": {
+    "workflowPaused": "Workflow Paused",
+    "stepRequiresInput": "Step \"{{stepName}}\" requires your input to continue.",
+    "unknownStep": "Unknown",
+    "dataCorrection": {
+      "reviewInstruction": "Review and correct the data before continuing:",
+      "placeholder": "Enter corrected data..."
+    },
+    "humanInLoop": {
+      "provideInput": "Provide input to continue the workflow:",
+      "placeholder": "Enter your input..."
+    },
+    "resume": "Resume",
+    "cancel": "Cancel",
+    "invalidJson": "Invalid JSON. Please correct the data before resuming."
+  },
+  "reasoningControl": {
+    "disableAriaLabel": "Disable Reasoning for Next Turn",
+    "enableAriaLabel": "Enable Reasoning for Next Turn",
+    "enabledTooltip": "Reasoning Enabled (Click to Disable)",
+    "disabledTooltip": "Reasoning Disabled (Click to Enable)"
   }
 }

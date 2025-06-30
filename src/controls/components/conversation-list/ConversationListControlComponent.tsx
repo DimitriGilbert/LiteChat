@@ -498,131 +498,135 @@ export const ConversationListControlComponent: React.FC<
           </Lnk>
         </div>
         <div className="flex items-center">
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleNewProject}
-                  aria-label={t('conversationList.newProject')}
-                  disabled={isLoading || !!editingItemId}
-                  className="h-7 w-7 p-0"
-                >
-                  <FolderPlusIcon className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom"><p>{t('conversationList.newProject')}</p></TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider delayDuration={100}>
+          <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={handleNewChat}
+                  disabled={!!editingItemId}
+                  className="h-6 w-6 p-0"
                   aria-label={t('conversationList.newChat')}
-                  disabled={isLoading || !!editingItemId}
-                  className="h-7 w-7 p-0"
                 >
                   <PlusIcon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom"><p>{t('conversationList.newChat')}</p></TooltipContent>
+              <TooltipContent>
+                <p>{t('conversationList.newChatTooltip', 'New Chat')}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleNewProject}
+                  disabled={!!editingItemId}
+                  className="h-6 w-6 p-0"
+                  aria-label={t('conversationList.newProject')}
+                >
+                  <FolderPlusIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{t('conversationList.newProjectTooltip', 'New Project')}</p>
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
       </div>
-      <div className="relative mb-2 px-1 flex-shrink-0">
-        <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="relative mb-2 flex-shrink-0">
+        <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          type="search"
-          placeholder={t('conversationList.filterPlaceholder')}
+          placeholder={t('conversationList.searchPlaceholder', 'Search...')}
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
-          className="h-8 text-xs pl-8"
-          disabled={isLoading}
+          className="pl-8 h-8"
         />
       </div>
-      <ScrollArea className="flex-grow" ref={listRef}>
-        {isLoading && flattenedVisibleItems.length === 0 ? (
-          <div className="space-y-1 p-1">
-            <div className="h-8 w-full bg-muted rounded animate-pulse" />
-            <div className="h-8 w-full bg-muted rounded animate-pulse" />
-            <div className="h-8 w-full bg-muted rounded animate-pulse" />
-          </div>
-        ) : !isLoading && flattenedVisibleItems.length === 0 ? (
-          <p className="text-xs text-muted-foreground p-2 text-center">
-            {filterText.trim() !== ""
-              ? t('conversationList.noItemsMatchFilter')
-              : t('conversationList.workspaceEmpty')}
-          </p>
-        ) : (
-          viewportReady && (
-            <div
-              style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                width: "100%",
-                position: "relative",
-              }}
-            >
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const itemData = flattenedVisibleItems[virtualRow.index];
-                if (!itemData) return null;
 
-                const itemForRenderer: SidebarItem = {
-                  ...(itemData.data as any),
-                  itemType: itemData.type,
-                };
-
-                return (
-                  <div
-                    key={itemData.id}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                    className="px-1"
-                  >
-                    <ConversationItemRenderer
-                      item={itemForRenderer}
-                      level={itemData.level}
-                      selectedItemId={selectedItemId}
-                      conversationSyncStatus={conversationSyncStatus}
-                      repoNameMap={repoNameMap}
-                      onSelectItem={() =>
-                        handleSelectItem(itemData.originalId, itemData.type)
-                      }
-                      onDeleteConversation={handleDeleteConversation}
-                      onDeleteProject={handleDeleteProject}
-                      onExportConversation={handleExportConversation}
-                      onExportProject={handleExportProject}
-                      expandedProjects={expandedProjects}
-                      toggleProjectExpansion={toggleProjectExpansion}
-                      editingItemId={editingItemId}
-                      editingItemType={editingItemType}
-                      handleStartEditing={handleStartEditing}
-                      handleSaveEdit={handleSaveEdit}
-                      handleCancelEdit={handleCancelEdit}
-                      isSavingEdit={isSavingEdit}
-                      originalNameToCompare={originalNameToCompare}
-                    />
-                  </div>
-                );
-              })}
+      <ScrollArea
+        className="flex-grow -mx-2"
+        ref={listRef}
+        data-testid="conversation-list-scroll-area"
+      >
+        <div
+          className="relative"
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            width: "100%",
+          }}
+        >
+          {isLoading && (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              {t('conversationList.loading', 'Loading...')}
             </div>
-          )
-        )}
-        {!viewportReady && !isLoading && (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            {t('conversationList.initializing')}
-          </div>
-        )}
+          )}
+          {!isLoading && flattenedVisibleItems.length === 0 && (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              {filterText ? (
+                <p>{t('conversationList.noItemsMatchFilter', 'No items match your filter.')}</p>
+              ) : (
+                <>
+                  <p>{t('conversationList.noItemsYet', 'No conversations or projects yet.')}</p>
+                  <p className="text-xs mt-1">
+                    {t('conversationList.getStarted', 'Create a new chat or project to get started.')}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+          {!isLoading &&
+            rowVirtualizer.getVirtualItems().map((virtualItem) => {
+              const itemData = flattenedVisibleItems[virtualItem.index];
+              if (!itemData) return null;
+
+              const itemForRenderer: SidebarItem = {
+                ...(itemData.data as any),
+                itemType: itemData.type,
+              };
+
+              return (
+                <div
+                  key={itemData.id}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: `${virtualItem.size}px`,
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                  className="px-1"
+                >
+                  <ConversationItemRenderer
+                    item={itemForRenderer}
+                    level={itemData.level}
+                    selectedItemId={selectedItemId}
+                    conversationSyncStatus={conversationSyncStatus}
+                    repoNameMap={repoNameMap}
+                    onSelectItem={() =>
+                      handleSelectItem(itemData.originalId, itemData.type)
+                    }
+                    onDeleteConversation={handleDeleteConversation}
+                    onDeleteProject={handleDeleteProject}
+                    onExportConversation={handleExportConversation}
+                    onExportProject={handleExportProject}
+                    expandedProjects={expandedProjects}
+                    toggleProjectExpansion={toggleProjectExpansion}
+                    editingItemId={editingItemId}
+                    editingItemType={editingItemType}
+                    handleStartEditing={handleStartEditing}
+                    handleSaveEdit={handleSaveEdit}
+                    handleCancelEdit={handleCancelEdit}
+                    isSavingEdit={isSavingEdit}
+                    originalNameToCompare={originalNameToCompare}
+                  />
+                </div>
+              );
+            })}
+        </div>
       </ScrollArea>
     </div>
   );

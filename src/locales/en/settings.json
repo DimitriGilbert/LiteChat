@@ -126,6 +126,12 @@
     "parameters": "Parameters",
     "forkCompact": "Fork Compact"
   },
+  "assistantPrompts": {
+    "templates": "Templates",
+    "newTemplate": "New Template",
+    "editTemplate": "Edit: {{name}}",
+    "deleteConfirmation": "Are you sure you want to delete this template?"
+  },
   "dataManagement": {
     "title": "Data Management",
     "description": "Import, export, or clear your application data. Use full import/export for backups or migrations.",

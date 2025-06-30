@@ -8,6 +8,7 @@ import git_en from '../locales/en/git.json';
 import ai_en from '../locales/en/ai.json';
 import tools_en from '../locales/en/tools.json';
 import renderers_en from '../locales/en/renderers.json';
+import welcome_en from '../locales/en/welcome.json';
 
 // Add other languages as needed
 import common_fr from '../locales/fr/common.json';
@@ -20,6 +21,7 @@ import git_fr from '../locales/fr/git.json';
 import ai_fr from '../locales/fr/ai.json';
 import tools_fr from '../locales/fr/tools.json';
 import renderers_fr from '../locales/fr/renderers.json';
+import welcome_fr from '../locales/fr/welcome.json';
 
 export const resources = {
   en: {
@@ -33,6 +35,7 @@ export const resources = {
     ai: ai_en,
     tools: tools_en,
     renderers: renderers_en,
+    welcome: welcome_en,
   },
   fr: {
     common: common_fr,
@@ -45,5 +48,6 @@ export const resources = {
     ai: ai_fr,
     tools: tools_fr,
     renderers: renderers_fr,
+    welcome: welcome_fr,
   },
 } as const;

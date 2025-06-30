@@ -11,6 +11,7 @@ import {
   BrainCircuitIcon,
   RocketIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { useProviderStore } from "@/store/provider.store";
@@ -161,6 +162,8 @@ const SetupStep: React.FC<{
 };
 
 export const EmptyStateSetup: React.FC = () => {
+  const { t } = useTranslation('canvas');
+  
   const {
     apiKeys,
     addApiKey,
@@ -270,7 +273,7 @@ export const EmptyStateSetup: React.FC = () => {
       setIsSavingKey(true);
       try {
         await addApiKey(name, providerId, value);
-        toast.success("API key added successfully!");
+        toast.success(t('common:apiKeyAddedSuccess'));
       } finally {
         setIsSavingKey(false);
       }
@@ -293,7 +296,7 @@ export const EmptyStateSetup: React.FC = () => {
               : null),
         };
         const newId = await addProviderConfig(configWithKey);
-        toast.success("Provider added successfully!");
+        toast.success(t('common:providerAddedSuccess'));
         return newId;
       } finally {
         setIsSavingProvider(false);
@@ -322,11 +325,11 @@ export const EmptyStateSetup: React.FC = () => {
         });
         toast.success(
           checked
-            ? "Model enabled successfully!"
-            : "Model disabled successfully!"
+            ? t('common:modelEnabledSuccess')
+            : t('common:modelDisabledSuccess')
         );
       } catch (error) {
-        toast.error("Failed to update model status.");
+        toast.error(t('common:failedToUpdateModel'));
         console.error("Failed to save model toggle:", error);
       } finally {
         setIsUpdatingModels(false);
@@ -340,12 +343,12 @@ export const EmptyStateSetup: React.FC = () => {
     setShowProgress(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 800));
-      const newId = await addConversation({ title: "New Chat" });
+      const newId = await addConversation({ title: t('common:newChat') });
       await selectItem(newId, "conversation");
-      toast.success("Welcome to your first chat!");
-    } catch (error) {
-      toast.error("Failed to start your first chat.");
-      console.error("Failed to start first chat:", error);
+      toast.success(t('common:welcomeFirstChat'));
+          } catch (error) {
+        toast.error(t('common:failedToStartChat'));
+        console.error("Failed to start first chat:", error);
       setIsStartingChat(false);
       setShowProgress(false);
     }
@@ -368,67 +371,61 @@ export const EmptyStateSetup: React.FC = () => {
   const progressPercentage = (completedSteps / totalSteps) * 100;
 
   const steps = [
-    ...(enableApiKeyManagement
-      ? [
-          {
-            id: "api-key",
-            title: "Add API Key",
-            description: (
-              <div className="space-y-2">
-                <p>
-                  To use providers like{" "}
-                  <Lnk
-                    href="https://platform.openai.com/api-keys"
-                    className="text-blue-500 hover:text-blue-700 transition-colors"
-                  >
-                    OpenAI
-                  </Lnk>
-                  ,{" "}
-                  <Lnk
-                    href="https://aistudio.google.com/app/apikey"
-                    className="text-green-600 hover:text-green-700 transition-colors"
-                  >
-                    Google
-                  </Lnk>
-                  ,{" "}
-                  <Lnk
-                    href="https://console.anthropic.com/settings/keys"
-                    className="text-purple-500 hover:text-purple-700 transition-colors"
-                  >
-                    Anthropic (Claude)
-                  </Lnk>
-                  , or{" "}
-                  <Lnk
-                    href="https://openrouter.ai/keys"
-                    className="text-orange-500 hover:text-orange-700 transition-colors"
-                  >
-                    OpenRouter
-                  </Lnk>{" "}
-                  or any OpenAI API compatible provider, add an API key. Keys
-                  are stored securely in your browser.
-                </p>
-                <p>
-                  If you want truly local AI, "no internet required", you can
-                  setup{" "}
-                  <Lnk
-                    href="https://www.ollama.com/"
-                    className="text-teal-500 hover:text-teal-700 transition-colors"
-                  >
-                    Ollama
-                  </Lnk>{" "}
-                  or,{" "}
-                  <Lnk
-                    href="https://lmstudio.ai/"
-                    className="text-indigo-500 hover:text-indigo-700 transition-colors"
-                  >
-                    LMStudio
-                  </Lnk>{" "}
-                  (or any other local LLM solution with an OpenAI compatible
-                  API). These typically don't require API keys so see you in
-                  step 2.
-                </p>
-              </div>
-            ),
+            ...(enableApiKeyManagement
+          ? [
+              {
+                id: "api-key",
+                title: t('emptyStateSetup.addApiKey'),
+                            description: (
+                  <div className="space-y-2">
+                    <p>
+                      {t('emptyStateSetup.addApiKeyDescription')}{" "}
+                      <Lnk
+                        href="https://platform.openai.com/api-keys"
+                        className="text-blue-500 hover:text-blue-700 transition-colors"
+                      >
+                        OpenAI
+                      </Lnk>
+                      ,{" "}
+                      <Lnk
+                        href="https://aistudio.google.com/app/apikey"
+                        className="text-green-600 hover:text-green-700 transition-colors"
+                      >
+                        Google
+                      </Lnk>
+                      ,{" "}
+                      <Lnk
+                        href="https://console.anthropic.com/settings/keys"
+                        className="text-purple-500 hover:text-purple-700 transition-colors"
+                      >
+                        Anthropic (Claude)
+                      </Lnk>
+                      , or{" "}
+                      <Lnk
+                        href="https://openrouter.ai/keys"
+                        className="text-orange-500 hover:text-orange-700 transition-colors"
+                      >
+                        OpenRouter
+                      </Lnk>.
+                    </p>
+                    <p>
+                      {t('emptyStateSetup.localAiDescription')}:{" "}
+                      <Lnk
+                        href="https://www.ollama.com/"
+                        className="text-teal-500 hover:text-teal-700 transition-colors"
+                      >
+                        Ollama
+                      </Lnk>{" "}
+                      or{" "}
+                      <Lnk
+                        href="https://lmstudio.ai/"
+                        className="text-indigo-500 hover:text-indigo-700 transition-colors"
+                      >
+                        LMStudio
+                      </Lnk>.
+                    </p>
+                  </div>
+                ),
             isComplete: isApiKeyStepComplete,
             content: (
               <ApiKeyForm
@@ -445,13 +442,12 @@ export const EmptyStateSetup: React.FC = () => {
       : []),
     {
       id: "add-provider",
-      title: "Add AI Provider",
+      title: t('emptyStateSetup.addProvider'),
       description: (
         <div className="space-y-2">
-          <p>Connect to an AI provider you configured the key for...</p>
+          <p>{t('emptyStateSetup.addProviderDescription')}</p>
           <p>
-            This might look redundant, but it allows you to have multiple keys
-            for the same provider (personal, professional, etc.)
+            {t('emptyStateSetup.providerRedundancyNote')}
           </p>
         </div>
       ),
@@ -474,23 +470,19 @@ export const EmptyStateSetup: React.FC = () => {
     },
     {
       id: "enable-models",
-      title: "Enable Models",
+      title: t('emptyStateSetup.enableModels'),
       description: (
         <div className="space-y-2">
           <p>
-            Enable models for the provider you just added (
-            <span className="font-medium text-primary">
-              {firstProvider?.name || "..."}
-            </span>
-            ).
+            {t('emptyStateSetup.enableModelsDescription', { 
+              providerName: firstProvider?.name || "..." 
+            })}
           </p>
           <p>
-            Enabling specific models improves the UI by reducing clutter and
-            choice paralysis. You can enable more later in Settings.
+            {t('emptyStateSetup.enableModelsNote')}
           </p>
           <p>
-            And just like before, you can choose to activate a model for a
-            certain combination of key/provider!
+            {t('emptyStateSetup.enableModelsNote2')}
           </p>
         </div>
       ),
@@ -509,15 +501,17 @@ export const EmptyStateSetup: React.FC = () => {
       ) : (
         <p className="text-sm text-muted-foreground italic flex items-center">
           <AlertCircleIcon className="h-4 w-4 mr-2 text-amber-500" />
-          Add a provider in Step {enableApiKeyManagement ? "2" : "1"} first.
+          {t('emptyStateSetup.addProviderFirst', { 
+            stepNumber: enableApiKeyManagement ? "2" : "1" 
+          })}
         </p>
       ),
       icon: <BrainCircuitIcon className="h-4 w-4" />,
     },
     {
       id: "start-chat",
-      title: "Start Chatting",
-      description: "You're all set! Click below to start your first chat.",
+      title: t('emptyStateSetup.startChatting'),
+      description: t('emptyStateSetup.startChattingDescription'),
       isComplete: false,
       content: (
         <div>
@@ -540,7 +534,7 @@ export const EmptyStateSetup: React.FC = () => {
             className="w-full bg-gradient-to-r from-indigo-500 to-primary hover:opacity-90 transition-all"
           >
             <MessageSquarePlusIcon className="mr-2 h-4 w-4" />
-            {isStartingChat ? "Launching..." : "Start First Chat"}
+            {isStartingChat ? t('emptyStateSetup.launching') : t('emptyStateSetup.startFirstChat')}
           </Button>
           <ActionCards />
         </div>
@@ -591,7 +585,7 @@ export const EmptyStateSetup: React.FC = () => {
             </div>
           </motion.div>
           <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-primary to-indigo-500 bg-clip-text text-transparent">
-            Welcome to LiteChat
+            {t('emptyStateSetup.welcomeTitle')}
           </h2>
 
           <OnBoardingRant />
@@ -611,13 +605,13 @@ export const EmptyStateSetup: React.FC = () => {
               <div className="mt-6 bg-card/40 backdrop-blur-sm border border-border/30 rounded-xl p-3 w-3/4 mx-auto">
                 <Progress value={progressPercentage} className="h-1.5" />
                 <p className="text-xs text-muted-foreground mt-2">
-                  Setup Progress: {Math.round(progressPercentage)}%
+                  {t('emptyStateSetup.setupProgress', { progress: Math.round(progressPercentage) })}
                 </p>
               </div>
             </TooltipTrigger>
             <TooltipContent>
               <p>
-                Steps completed: {completedSteps} of {totalSteps}
+                {t('emptyStateSetup.stepsCompleted', { completed: completedSteps, total: totalSteps })}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -664,7 +658,7 @@ export const EmptyStateSetup: React.FC = () => {
             >
               <AlertCircleIcon className="h-8 w-8 text-red-500 mx-auto mb-2" />
               <p className="text-sm mb-3">
-                Configuration issue detected. Please review provider settings.
+                {t('emptyStateSetup.configurationIssue')}
               </p>
               <Button
                 variant="outline"
@@ -672,7 +666,7 @@ export const EmptyStateSetup: React.FC = () => {
                 onClick={openSettings}
                 className="border-red-500/50 hover:bg-red-500/20 transition-colors"
               >
-                Open Provider Settings
+                {t('emptyStateSetup.openProviderSettings')}
               </Button>
             </motion.div>
           )}

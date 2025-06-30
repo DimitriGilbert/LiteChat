@@ -1,6 +1,7 @@
 // src/components/LiteChat/canvas/StreamingContentView.tsx
 // FULL FILE
 import React, {useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   useMarkdownParser,
   UniversalBlockData,
@@ -61,6 +62,7 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
   isStreaming = false,
   className,
 }) => {
+  const { t } = useTranslation('canvas');
   const { enableStreamingMarkdown } =
     useSettingsStore(
       useShallow((state) => ({
@@ -139,7 +141,7 @@ export const StreamingContentView: React.FC<StreamingContentViewProps> = ({
   }, [enableStreamingMarkdown, parsedContent, isStreaming, interactionId]);
 
   if (!enableStreamingMarkdown && !markdownContent && parsedToolSteps.length === 0) {
-      return isStreaming ? <div className={cn("text-muted-foreground italic", className)}>Generating response...</div> : null;
+      return isStreaming ? <div className={cn("text-muted-foreground italic", className)}>{t('generatingResponse')}</div> : null;
   }
 
   return (

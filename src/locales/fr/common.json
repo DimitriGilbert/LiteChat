@@ -45,5 +45,14 @@
     "noInteractions": "Aucune interaction pour le moment",
     "startTyping": "Commencez à taper pour démarrer la conversation.",
     "genericError": "Une erreur inattendue est survenue. Veuillez réessayer."
-  }
+  },
+  "close": "Fermer",
+  "apiKeyAddedSuccess": "Clé API ajoutée avec succès !",
+  "providerAddedSuccess": "Fournisseur ajouté avec succès !",
+  "modelEnabledSuccess": "Modèle activé avec succès !",
+  "modelDisabledSuccess": "Modèle désactivé avec succès !",
+  "failedToUpdateModel": "Échec de la mise à jour du statut du modèle.",
+  "newChat": "Nouvelle conversation",
+  "welcomeFirstChat": "Bienvenue dans votre première conversation !",
+  "failedToStartChat": "Échec du démarrage de votre première conversation."
 }

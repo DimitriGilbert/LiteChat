@@ -50,8 +50,7 @@
     "open": "Ouvrir le menu",
     "loading": "Chargement du menu...",
     "deleteConfirmation": "Êtes-vous sûr de vouloir supprimer cette conversation ?",
-    "deleteProjectConfirmation": "Êtes-vous sûr de vouloir supprimer ce projet et toutes les conversations qu'il contient ?",
-    "searchPlaceholder": "Rechercher des conversations..."
+    "deleteProjectConfirmation": "Êtes-vous sûr de vouloir supprimer ce projet et toutes les conversations qu'il contient ?"
   },
   "autoTitle": {
     "disableForChat": "Désactiver le titre automatique pour ce chat",
@@ -96,6 +95,9 @@
     "newChat": "Nouveau Chat",
     "newProject": "Nouveau Projet",
     "filterPlaceholder": "Filtrer...",
+    "searchPlaceholder": "Rechercher des conversations...",
+    "newChatTooltip": "Nouveau Chat",
+    "newProjectTooltip": "Nouveau Projet",
     "workspaceEmpty": "L'espace de travail est vide.",
     "initializing": "Initialisation de la liste...",
     "newChatError": "Échec de la création du nouveau chat.",
@@ -125,6 +127,24 @@
     "deleteProject": "Supprimer le Projet",
     "deleteConversation": "Supprimer le Chat",
     "untitled": "Sans titre"
+  },
+  "itemRenderer": {
+    "deleteProjectConfirm": "Supprimer le projet \"{{name}}\" et TOUT son contenu (sous-projets et conversations) ? Cette action est irréversible.",
+    "nameCannotBeEmpty": "Le nom ne peut pas être vide.",
+    "saveEnter": "Enregistrer (Entrée)",
+    "cancelEsc": "Annuler (Échap)",
+    "saveChanges": "Enregistrer les modifications",
+    "cancelEdit": "Annuler la modification",
+    "projectSettings": "Paramètres du projet",
+    "settingsFor": "Paramètres pour {{name}}",
+    "edit": "Modifier",
+    "editItem": "Modifier {{name}}",
+    "exportProjectJson": "Exporter le projet (JSON)",
+    "exportProject": "Exporter le projet {{name}}",
+    "exportConversation": "Exporter la conversation",
+    "exportItem": "Exporter {{name}}",
+    "delete": "Supprimer",
+    "deleteItem": "Supprimer {{name}}"
   },
   "modelSelector": {
     "selectModel": "Sélectionner un modèle...",
@@ -172,5 +192,27 @@
     "manageDescription": "Créez des tags pour regrouper les règles associées. Vous pouvez activer les tags avant d'envoyer un prompt pour appliquer leurs règles associées.",
     "addNew": "Ajouter un nouveau Tag",
     "existing": "Tags Existants"
+  },
+  "workflowFooter": {
+    "workflowPaused": "Workflow en Pause",
+    "stepRequiresInput": "L'étape \"{{stepName}}\" nécessite votre saisie pour continuer.",
+    "unknownStep": "Inconnu",
+    "dataCorrection": {
+      "reviewInstruction": "Vérifiez et corrigez les données avant de continuer :",
+      "placeholder": "Entrez les données corrigées..."
+    },
+    "humanInLoop": {
+      "provideInput": "Fournissez une saisie pour continuer le workflow :",
+      "placeholder": "Entrez votre saisie..."
+    },
+    "resume": "Reprendre",
+    "cancel": "Annuler",
+    "invalidJson": "JSON invalide. Veuillez corriger les données avant de reprendre."
+  },
+  "reasoningControl": {
+    "disableAriaLabel": "Désactiver le raisonnement pour le prochain tour",
+    "enableAriaLabel": "Activer le raisonnement pour le prochain tour",
+    "enabledTooltip": "Raisonnement activé (Cliquer pour désactiver)",
+    "disabledTooltip": "Raisonnement désactivé (Cliquer pour activer)"
   }
 }

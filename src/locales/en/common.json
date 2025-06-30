@@ -45,5 +45,14 @@
     "noInteractions": "No interactions yet",
     "startTyping": "Start typing to begin the conversation.",
     "genericError": "An unexpected error occurred. Please try again."
-  }
+  },
+  "close": "Close",
+  "apiKeyAddedSuccess": "API key added successfully!",
+  "providerAddedSuccess": "Provider added successfully!",
+  "modelEnabledSuccess": "Model enabled successfully!",
+  "modelDisabledSuccess": "Model disabled successfully!",
+  "failedToUpdateModel": "Failed to update model status.",
+  "newChat": "New Chat",
+  "welcomeFirstChat": "Welcome to your first chat!",
+  "failedToStartChat": "Failed to start your first chat."
 }

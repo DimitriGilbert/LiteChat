@@ -52,5 +52,20 @@
       "status": "Status",
       "filePreview": "File Preview"
     }
+  },
+  "modal": {
+    "title": "Virtual Filesystem",
+    "description": "Manage files associated with the current context. Select files to attach them to your next prompt.",
+    "noFilesSelected": "No files selected in VFS to attach.",
+    "filesAttached": "Attached {{count}} file(s) from VFS to the next prompt.",
+    "noValidFilesSelected": "No valid files were selected to attach.",
+    "attachSelected": "Attach Selected ({{count}})"
+  },
+  "triggerButton": {
+    "toggleVfs": "Toggle Virtual File System",
+    "virtualFilesystem": "Virtual Filesystem",
+    "attachVfsFiles": "Attach {{count}} selected VFS file(s)",
+    "attachButtonText": "Attach ({{count}})",
+    "attachSelectedTooltip": "Attach selected VFS files to prompt"
   }
 }
