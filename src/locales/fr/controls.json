@@ -166,5 +166,11 @@
   "sidebarToggle": {
     "expand": "Développer la barre latérale",
     "collapse": "Réduire la barre latérale"
+  },
+  "tagsSettings": {
+    "manageTitle": "Gérer les Tags",
+    "manageDescription": "Créez des tags pour regrouper les règles associées. Vous pouvez activer les tags avant d'envoyer un prompt pour appliquer leurs règles associées.",
+    "addNew": "Ajouter un nouveau Tag",
+    "existing": "Tags Existants"
   }
 }

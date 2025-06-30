@@ -167,5 +167,11 @@
   "sidebarToggle": {
     "expand": "Expand Sidebar",
     "collapse": "Collapse Sidebar"
+  },
+  "tagsSettings": {
+    "manageTitle": "Manage Tags",
+    "manageDescription": "Create tags to group related rules. You can activate tags before sending a prompt to apply their associated rules.",
+    "addNew": "Add New Tag",
+    "existing": "Existing Tags"
   }
 }
