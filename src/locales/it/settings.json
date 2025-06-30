@@ -1,0 +1,174 @@
+{
+  "tabs": {
+    "general": "Generale",
+    "assistant": "Assistente",
+    "providers": "Provider",
+    "rules": "Regole & Tag",
+    "data": "Dati",
+    "git": "Git",
+    "mcp": "MCP"
+  },
+  "modelBrowser": {
+    "notApplicable": "N/A",
+    "perMillionTokens": "per 1M token",
+    "filterPlaceholder": "Filtra modelli per nome o provider...",
+    "noModelsMatchFilters": "Nessun modello corrisponde ai filtri attivi.",
+    "context": "Contesto",
+    "inputPrice": "Prezzo Input",
+    "outputPrice": "Prezzo Output",
+    "releaseDate": "Data di Rilascio",
+    "capabilities": "Funzionalità",
+    "modalities": "Modalità",
+    "input": "Input",
+    "output": "Output",
+    "selectModel": "Seleziona un modello dall'elenco per vedere i dettagli",
+    "noModelSelected": "Nessun modello selezionato"
+  },
+  "providerSettings": {
+    "title": "Configurazione Provider",
+    "description": "Aggiungi, rimuovi o configura connessioni a provider AI. Abilita i modelli all'interno della sezione di modifica di ciascun provider. Clicca su un nome di modello per visualizzarne i dettagli.",
+    "addProvider": "Aggiungi Configurazione Provider",
+    "noProviders": "Nessun provider configurato. Clicca su \"Aggiungi Configurazione Provider\" sopra.",
+    "tabs": {
+      "config": "Configurazione",
+      "order": "Ordine Modelli",
+      "apiKeys": "Chiavi API",
+      "selectedModel": "Modello Selezionato",
+      "browse": "Sfoglia Modelli"
+    }
+  },
+  "modelEnablement": {
+    "searchPlaceholder": "Filtra modelli per nome...",
+    "noModelsAvailable": "Nessun modello disponibile per questo provider. Prova a recuperare i modelli.",
+    "noModelsMatchFilters": "Nessun modello corrisponde ai filtri attivi.",
+    "initializingList": "Inizializzazione elenco...",
+    "filter": {
+      "all": "Tutti",
+      "enabled": "Abilitati",
+      "disabled": "Disabilitati"
+    },
+    "sort": {
+      "name": "Nome",
+      "inputPrice": "Prezzo Input",
+      "outputPrice": "Prezzo Output",
+      "contextLength": "Lunghezza Contesto",
+      "created": "Creato"
+    },
+    "capabilities": {
+      "reasoning": "Ragionamento",
+      "webSearch": "Ricerca Web",
+      "tools": "Strumenti",
+      "multimodal": "Multimodale"
+    },
+    "yes": "Sì",
+    "no": "No"
+  },
+  "generalSettings": {
+    "title": "Impostazioni Generali",
+    "advancedSettings": "Impostazioni Avanzate",
+    "advancedVisible": "Le opzioni di configurazione avanzate sono visibili. Disattiva per nascondere le impostazioni complesse.",
+    "advancedHidden": "Modalità base - le opzioni di configurazione avanzate sono nascoste. Attiva per mostrare tutte le impostazioni.",
+    "streamingDisplayTitle": "Streaming & Visualizzazione",
+    "enableStreamingMarkdownLabel": "Analizza Markdown Durante lo Streaming",
+    "enableStreamingMarkdownDescription": "Renderizza la formattazione Markdown man mano che la risposta arriva (potrebbe influire leggermente sulle prestazioni).",
+    "enableStreamingCodeBlockParsingLabel": "Usa Blocchi di Codice Completi Durante lo Streaming",
+    "enableStreamingCodeBlockParsingDescription": "Usa il componente di evidenziazione della sintassi per i blocchi di codice durante lo streaming.",
+    "foldStreamingCodeBlocksLabel": "Comprimi Blocchi di Codice per Impostazione Predefinita Durante lo Streaming",
+    "foldStreamingCodeBlocksDescription": "Comprimi automaticamente i blocchi di codice man mano che vengono trasmessi in streaming. Utile per output di codice lunghi.",
+    "foldUserMessagesOnCompletionLabel": "Comprimi Messaggi Utente Dopo la Risposta",
+    "foldUserMessagesOnCompletionDescription": "Comprimi automaticamente il messaggio di richiesta dell'utente una volta che l'assistente ha finito di rispondere.",
+    "enableAutoScrollOnStreamLabel": "Scorrimento Automatico Durante lo Streaming",
+    "enableAutoScrollOnStreamDescription": "Scorri automaticamente verso il basso man mano che arrivano nuovi contenuti.",
+    "streamingUpdateRateLabel": "Frequenza di Aggiornamento Streaming",
+    "streamingUpdateRateDescription": "Controlla la frequenza con cui l'interfaccia utente si aggiorna durante lo streaming (3-60 FPS).",
+    "fpsInputLabel": "Input FPS",
+    "autoScrollIntervalLabel": "Intervallo di Scorrimento Automatico",
+    "autoScrollIntervalDescription": "Il ritardo tra i controlli di scorrimento automatico durante lo streaming (50-5000 ms).",
+    "msInputLabel": "Input ms",
+    "resetButton": "Ripristina Impostazioni Streaming & Visualizzazione",
+    "resetConfirmation": "Sei sicuro di voler ripristinare le impostazioni di Streaming & Visualizzazione ai valori predefiniti?",
+    "validation": {
+      "minFps": "Min 3 FPS",
+      "maxFps": "Max 60 FPS",
+      "minMs": "Min 50ms",
+      "maxMs": "Max 5000ms"
+    },
+    "fpsSuffix": " FPS",
+    "msSuffix": " ms",
+    "streamingUpdateRateAriaLabel": "Valore FPS di Rendering Streaming",
+    "autoScrollIntervalAriaLabel": "Valore Intervallo Scorrimento Automatico",
+    "saving": "Salvataggio...",
+    "validating": "Validazione...",
+    "saveChanges": "Salva Modifiche"
+  },
+  "modelSelector": {
+    "title": "Selezione Modello",
+    "globalModel": "Modello Globale",
+    "noModelSelected": "Nessun modello selezionato",
+    "selectModel": "Seleziona un modello"
+  },
+  "settingsModal": {
+    "title": "Impostazioni",
+    "description": "Gestisci impostazioni applicazione, comportamento AI, chiavi API, provider e dati.",
+    "noTabs": {
+      "message": "Nessuna scheda impostazioni disponibile o ancora in caricamento. Controlla la console per errori di registrazione moduli.",
+      "toast": "Scheda impostazioni \"{{tabName}}\" non trovata. Apertura scheda predefinita."
+    },
+    "closeButton": "Chiudi"
+  },
+  "assistantTabs": {
+    "systemPrompt": "Prompt di Sistema",
+    "library": "Libreria",
+    "agents": "Agenti",
+    "autoTitles": "Titoli Automatici",
+    "tools": "Strumenti",
+    "mcp": "MCP",
+    "parameters": "Parametri",
+    "forkCompact": "Fork Compact"
+  },
+  "assistantPrompts": {
+    "templates": "Modelli",
+    "newTemplate": "Nuovo Modello",
+    "editTemplate": "Modifica: {{name}}",
+    "deleteConfirmation": "Sei sicuro di voler eliminare questo modello?"
+  },
+  "dataManagement": {
+    "title": "Gestione Dati",
+    "description": "Importa, esporta o cancella i dati dell'applicazione. Usa l'importazione/esportazione completa per backup o migrazioni.",
+    "importConversationsTitle": "Importa Conversazioni (Legacy)",
+    "importConversationsDescription": "Importa conversazioni da un file JSON precedentemente esportato. Questo importa solo la cronologia chat.",
+    "importConversationsButton": "Importa da File",
+    "exportConversationsTitle": "Esporta Tutte le Conversazioni (Legacy)",
+    "exportConversationsDescription": "Esporta tutte le tue conversazioni in un singolo file JSON. Questo include solo la cronologia chat.",
+    "exportConversationsButton": "Esporta Tutto in JSON",
+    "fullExportTitle": "Esportazione Completa",
+    "fullExportDescription": "Seleziona i dati da includere nel tuo file di backup completo.",
+    "exportButton": "Esporta Backup Completo",
+    "fullImportTitle": "Importazione Completa",
+    "fullImportDescription": "Importa un file di backup completo. Questo sovrascriverà i dati esistenti per le categorie selezionate.",
+    "importButton": "Importa da Backup",
+    "dangerZoneTitle": "Zona Pericolo",
+    "dangerZoneDescription": "Queste azioni sono distruttive e non possono essere annullate. Procedi con cautela.",
+    "clearAllDataButton": "Cancella Tutti i Dati Locali",
+    "importConfirmation": "L'importazione di questo file SOVRASCRIVERÀ i dati esistenti per le categorie selezionate. Sei sicuro di voler procedere?",
+    "clearDataConfirmationTitle": "🚨 SEI ASSOLUTAMENTE SICURO? 🚨",
+    "clearDataConfirmationMessage": "Questo eliminerà permanentemente TUTTE le conversazioni, i messaggi, i mod, le impostazioni, i provider e le chiavi API memorizzate dal tuo browser. Questa azione non può essere annullata.",
+    "clearDataSecondConfirmation": "SECONDA CONFERMA:\n\nVuoi davvero eliminare tutto? Considera di esportare prima.",
+    "dataClearedSuccess": "Tutti i dati locali cancellati. Ricaricamento dell'applicazione...",
+    "dataClearedError": "Impossibile cancellare tutti i dati",
+    "options": {
+      "settings": "Impostazioni",
+      "apiKeys": "Chiavi API",
+      "providerConfigs": "Configurazioni Provider",
+      "projects": "Progetti",
+      "conversations": "Conversazioni",
+      "rulesAndTags": "Regole & Tag",
+      "mods": "Mod",
+      "syncRepos": "Repo Sincronizzazione Git",
+      "mcpServers": "Server MCP",
+      "promptTemplates": "Modelli di Prompt",
+      "agents": "Agenti",
+      "workflows": "Workflow"
+    }
+  }
+}

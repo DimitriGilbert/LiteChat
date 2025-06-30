@@ -1,0 +1,174 @@
+{
+  "tabs": {
+    "general": "General",
+    "assistant": "Asistente",
+    "providers": "Proveedores",
+    "rules": "Reglas y Etiquetas",
+    "data": "Datos",
+    "git": "Git",
+    "mcp": "MCP"
+  },
+  "modelBrowser": {
+    "notApplicable": "N/A",
+    "perMillionTokens": "por 1M de tokens",
+    "filterPlaceholder": "Filtrar modelos por nombre o proveedor...",
+    "noModelsMatchFilters": "Ningún modelo coincide con los filtros actuales.",
+    "context": "Contexto",
+    "inputPrice": "Precio de Entrada",
+    "outputPrice": "Precio de Salida",
+    "releaseDate": "Fecha de Lanzamiento",
+    "capabilities": "Capacidades",
+    "modalities": "Modalidades",
+    "input": "Entrada",
+    "output": "Salida",
+    "selectModel": "Seleccione un modelo de la lista para ver los detalles",
+    "noModelSelected": "Ningún modelo seleccionado"
+  },
+  "providerSettings": {
+    "title": "Configuración del Proveedor",
+    "description": "Añada, elimine o configure conexiones a proveedores de IA. Habilite modelos dentro de la sección de edición de cada proveedor. Haga clic en un nombre de modelo para ver sus detalles.",
+    "addProvider": "Añadir Configuración de Proveedor",
+    "noProviders": "Aún no hay proveedores configurados. Haga clic en \"Añadir Configuración de Proveedor\" arriba.",
+    "tabs": {
+      "config": "Configuración",
+      "order": "Orden de Modelos",
+      "apiKeys": "Claves API",
+      "selectedModel": "Modelo Seleccionado",
+      "browse": "Explorar Modelos"
+    }
+  },
+  "modelEnablement": {
+    "searchPlaceholder": "Filtrar modelos por nombre...",
+    "noModelsAvailable": "No hay modelos disponibles para este proveedor. Intente buscar modelos.",
+    "noModelsMatchFilters": "Ningún modelo coincide con los filtros actuales.",
+    "initializingList": "Inicializando lista...",
+    "filter": {
+      "all": "Todos",
+      "enabled": "Habilitados",
+      "disabled": "Deshabilitados"
+    },
+    "sort": {
+      "name": "Nombre",
+      "inputPrice": "Precio de Entrada",
+      "outputPrice": "Precio de Salida",
+      "contextLength": "Longitud de Contexto",
+      "created": "Creado"
+    },
+    "capabilities": {
+      "reasoning": "Razonamiento",
+      "webSearch": "Búsqueda Web",
+      "tools": "Herramientas",
+      "multimodal": "Multimodal"
+    },
+    "yes": "Sí",
+    "no": "No"
+  },
+  "generalSettings": {
+    "title": "Configuración General",
+    "advancedSettings": "Configuración Avanzada",
+    "advancedVisible": "Las opciones de configuración avanzadas están visibles. Desactive para ocultar la configuración compleja.",
+    "advancedHidden": "Modo básico - las opciones de configuración avanzadas están ocultas. Active para mostrar todas las configuraciones.",
+    "streamingDisplayTitle": "Transmisión y Visualización",
+    "enableStreamingMarkdownLabel": "Analizar Markdown Durante la Transmisión",
+    "enableStreamingMarkdownDescription": "Renderizar el formato Markdown a medida que llega la respuesta (puede afectar ligeramente el rendimiento).",
+    "enableStreamingCodeBlockParsingLabel": "Usar Bloques de Código Completos Durante la Transmisión",
+    "enableStreamingCodeBlockParsingDescription": "Usar el componente de resaltado de sintaxis para bloques de código durante la transmisión.",
+    "foldStreamingCodeBlocksLabel": "Plegar Bloques de Código por Defecto Durante la Transmisión",
+    "foldStreamingCodeBlocksDescription": "Colapsar automáticamente los bloques de código a medida que se transmiten. Útil para salidas de código largas.",
+    "foldUserMessagesOnCompletionLabel": "Plegar Mensajes del Usuario Después de la Respuesta",
+    "foldUserMessagesOnCompletionDescription": "Colapsar automáticamente el mensaje del prompt del usuario una vez que el asistente termine de responder.",
+    "enableAutoScrollOnStreamLabel": "Desplazamiento Automático Durante la Transmisión",
+    "enableAutoScrollOnStreamDescription": "Desplazarse automáticamente hacia abajo a medida que llega nuevo contenido.",
+    "streamingUpdateRateLabel": "Tasa de Actualización de Transmisión",
+    "streamingUpdateRateDescription": "Controla la frecuencia con la que la UI se actualiza durante la transmisión (3-60 FPS).",
+    "fpsInputLabel": "Entrada de FPS",
+    "autoScrollIntervalLabel": "Intervalo de Desplazamiento Automático",
+    "autoScrollIntervalDescription": "El retraso entre las comprobaciones de desplazamiento automático durante la transmisión (50-5000 ms).",
+    "msInputLabel": "Entrada de ms",
+    "resetButton": "Restablecer Configuración de Transmisión y Visualización",
+    "resetConfirmation": "¿Está seguro de que desea restablecer la configuración de Transmisión y Visualización a sus valores predeterminados?",
+    "validation": {
+      "minFps": "Mín. 3 FPS",
+      "maxFps": "Máx. 60 FPS",
+      "minMs": "Mín. 50ms",
+      "maxMs": "Máx. 5000ms"
+    },
+    "fpsSuffix": " FPS",
+    "msSuffix": " ms",
+    "streamingUpdateRateAriaLabel": "Valor FPS de Renderizado de Transmisión",
+    "autoScrollIntervalAriaLabel": "Valor del Intervalo de Desplazamiento Automático",
+    "saving": "Guardando...",
+    "validating": "Validando...",
+    "saveChanges": "Guardar Cambios"
+  },
+  "modelSelector": {
+    "title": "Selección de Modelo",
+    "globalModel": "Modelo Global",
+    "noModelSelected": "Ningún modelo seleccionado",
+    "selectModel": "Seleccionar un modelo"
+  },
+  "settingsModal": {
+    "title": "Configuración",
+    "description": "Administre la configuración de la aplicación, el comportamiento de la IA, las claves API, los proveedores y los datos.",
+    "noTabs": {
+      "message": "No hay pestañas de configuración disponibles o aún se están cargando. Verifique la consola en busca de errores de registro de módulos.",
+      "toast": "Pestaña de configuración '\"{{tabName}}\"' no encontrada. Abriendo pestaña predeterminada."
+    },
+    "closeButton": "Cerrar"
+  },
+  "assistantTabs": {
+    "systemPrompt": "Prompt del Sistema",
+    "library": "Biblioteca",
+    "agents": "Agentes",
+    "autoTitles": "Títulos Automáticos",
+    "tools": "Herramientas",
+    "mcp": "MCP",
+    "parameters": "Parámetros",
+    "forkCompact": "Fork Compact"
+  },
+  "assistantPrompts": {
+    "templates": "Plantillas",
+    "newTemplate": "Nueva Plantilla",
+    "editTemplate": "Editar: {{name}}",
+    "deleteConfirmation": "¿Está seguro de que desea eliminar esta plantilla?"
+  },
+  "dataManagement": {
+    "title": "Gestión de Datos",
+    "description": "Importe, exporte o borre los datos de su aplicación. Utilice la importación/exportación completa para copias de seguridad o migraciones.",
+    "importConversationsTitle": "Importar Conversaciones (Legado)",
+    "importConversationsDescription": "Importar conversaciones desde un archivo JSON exportado previamente. Esto solo importa el historial de chat.",
+    "importConversationsButton": "Importar desde Archivo",
+    "exportConversationsTitle": "Exportar Todas las Conversaciones (Legado)",
+    "exportConversationsDescription": "Exportar todas sus conversaciones a un único archivo JSON. Esto solo incluye el historial de chat.",
+    "exportConversationsButton": "Exportar Todo a JSON",
+    "fullExportTitle": "Exportación Completa",
+    "fullExportDescription": "Seleccione los datos a incluir en su archivo de copia de seguridad completa.",
+    "exportButton": "Exportar Copia de Seguridad Completa",
+    "fullImportTitle": "Importación Completa",
+    "fullImportDescription": "Importar un archivo de copia de seguridad completa. Esto sobrescribirá los datos existentes para las categorías seleccionadas.",
+    "importButton": "Importar desde Copia de Seguridad",
+    "dangerZoneTitle": "Zona de Peligro",
+    "dangerZoneDescription": "Estas acciones son destructivas y no se pueden deshacer. Proceda con precaución.",
+    "clearAllDataButton": "Borrar Todos los Datos Locales",
+    "importConfirmation": "La importación de este archivo SOBREESCRIBIRÁ los datos existentes para las categorías seleccionadas. ¿Está seguro de que desea continuar?",
+    "clearDataConfirmationTitle": "🚨 ¿ESTÁ ABSOLUTAMENTE SEGURO? 🚨",
+    "clearDataConfirmationMessage": "Esto eliminará permanentemente TODAS las conversaciones, mensajes, mods, configuraciones, proveedores y claves API almacenadas de su navegador. Esta acción no se puede deshacer.",
+    "clearDataSecondConfirmation": "SEGUNDA CONFIRMACIÓN:\n\n¿Realmente desea eliminar todo? Considere exportar primero.",
+    "dataClearedSuccess": "Todos los datos locales borrados. Recargando la aplicación...",
+    "dataClearedError": "Error al borrar todos los datos",
+    "options": {
+      "settings": "Configuración",
+      "apiKeys": "Claves API",
+      "providerConfigs": "Configuraciones de Proveedor",
+      "projects": "Proyectos",
+      "conversations": "Conversaciones",
+      "rulesAndTags": "Reglas y Etiquetas",
+      "mods": "Mods",
+      "syncRepos": "Repositorios de Sincronización Git",
+      "mcpServers": "Servidores MCP",
+      "promptTemplates": "Plantillas de Prompt",
+      "agents": "Agentes",
+      "workflows": "Flujos de Trabajo"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "sendMessagePlaceholder": "Invia un messaggio...",
+  "promptSubmissionCancelled": "Invio del prompt annullato dal middleware.",
+  "failedToSendMessage": "Impossibile inviare il messaggio: {{errorMessage}}",
+  "sendMessage": "Invia messaggio",
+  "inputAreaPlaceholder": "Scrivi messaggio... (Shift+Invio per nuova riga)",
+  "chatInputAriaLabel": "Input chat",
+  "parameterControl": {
+    "title": "Parametri Avanzati",
+    "ariaLabel": "Regola Parametri Avanzati",
+    "temperature": "Temperatura",
+    "topP": "Top P",
+    "maxTokens": "Max Token",
+    "topK": "Top K",
+    "presencePenalty": "Penalità di Presenza",
+    "frequencyPenalty": "Penalità di Frequenza",
+    "placeholder": "Predefinito: {{defaultValue}}",
+    "none": "Nessuno",
+    "useDefault": "Usa Predefinito ({{defaultValue}})"
+  },
+  "rules": {
+    "autoSelectDisabled": "La selezione automatica delle regole è disabilitata nelle impostazioni.",
+    "noPromptForSelect": "Nessun prompt utente trovato su cui basare la selezione.",
+    "noRulesForSelect": "Nessuna regola disponibile per la selezione.",
+    "noModelForSelect": "Nessun modello selezionato per la selezione automatica delle regole nelle impostazioni.",
+    "selectingRules": "L'IA sta selezionando le regole pertinenti...",
+    "selectionFailed": "Selezione regole IA fallita: {{error}}",
+    "selectionSuccess": "L'IA ha selezionato {{count}} regole.",
+    "noRulesSelected": "L'IA non ha selezionato alcuna regola."
+  },
+  "rulesControl": {
+    "trigger": {
+      "configureAria": "Configura Regole & Tag per il Prossimo Turno",
+      "addAria": "Aggiungi Regole & Tag (Apre Impostazioni)",
+      "tooltipActive": "Regole/Tag Attivi ({{tagsCount}} tag, {{rulesCount}} regole)",
+      "tooltipInactive": "Attiva Regole/Tag (Prossimo Turno)",
+      "tooltipAdd": "Aggiungi Regole & Tag (Apre Impostazioni)"
+    },
+    "dialog": {
+      "filterTagsPlaceholder": "Filtra tag...",
+      "openSettingsTooltip": "Apri Impostazioni Regole",
+      "manageButton": "Gestisci",
+      "noTagsDefined": "Nessun tag definito.",
+      "noTagsMatchFilter": "Nessun tag corrisponde al filtro.",
+      "includes": "Include: {{ruleNames}}",
+      "filterRulesPlaceholder": "Filtra regole...",
+      "autoSelectTooltip": "Seleziona automaticamente le regole in base al contesto del prompt",
+      "autoSelectButton": "Selezione Automatica",
+      "noRulesDefined": "Nessuna regola definita.",
+      "noRulesMatchFilter": "Nessuna regola corrisponde al filtro.",
+      "ruleType": "Tipo: {{type}}",
+      "ruleContent": "Contenuto: {{content}}",
+      "tabs": {
+        "activateRules": "Attiva Regole",
+        "activateTags": "Attiva Tag"
+      }
+    }
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "initializingLiteChat": "Inicializando LiteChat...",
+  "liteChatMenu": "Menú LiteChat",
+  "closeMenu": "Cerrar menú",
+  "openMenu": "Abrir menú",
+  "loadingMenu": "Cargando menú...",
+  "pleaseWaitInitialization": "Por favor, espere mientras la aplicación se inicializa.",
+  "footerControlsLoading": "Cargando controles de pie de página...",
+  "applicationCoreNotReady": "Núcleo de la aplicación no listo. Por favor, inténtelo de nuevo.",
+  "failedToStartNewChat": "Error al iniciar nuevo chat.",
+  "failedToSendMessage": "Error al enviar mensaje.",
+  "modalManager": {
+    "noProvider": "No hay proveedor para modalId: {{id}}"
+  },
+  "universalBlockRenderer": {
+    "code": "CÓDIGO",
+    "renderError": "Error de Renderizado"
+  },
+  "codeEditor": {
+    "saveButtonText": "Guardar",
+    "saving": "Guardando...",
+    "syntaxHighlightingError": "Error de resaltado de sintaxis:"
+  },
+  "theme": {
+    "toggle": "Alternar tema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
+  },
+  "app": {
+    "initializationError": "La aplicación no pudo inicializarse. Por favor, actualice la página.",
+    "initializationErrorDetails": "Error de Inicialización",
+    "initializing": "Inicializando...",
+    "noConversationSelected": "Ninguna conversación seleccionada",
+    "startNewConversation": "Inicie una nueva conversación o seleccione una de la barra lateral.",
+    "newConversation": "Nueva Conversación",
+    "createConversationError": "Error al crear conversación",
+    "loadConversationError": "Error al cargar conversación",
+    "loadInteractionsError": "Error al cargar interacciones",
+    "runningWorkflow": "Ejecutando flujo de trabajo...",
+    "workflowAborted": "Flujo de trabajo abortado",
+    "workflowError": "Fallo en la ejecución del flujo de trabajo",
+    "workflowCompleted": "Flujo de trabajo completado",
+    "updateError": "Error de actualización",
+    "noInteractions": "Aún no hay interacciones",
+    "startTyping": "Empiece a escribir para iniciar la conversación.",
+    "genericError": "Ocurrió un error inesperado. Por favor, inténtelo de nuevo."
+  },
+  "close": "Cerrar",
+  "apiKeyAddedSuccess": "¡Clave API añadida exitosamente!",
+  "providerAddedSuccess": "¡Proveedor añadido exitosamente!",
+  "modelEnabledSuccess": "¡Modelo habilitado exitosamente!",
+  "modelDisabledSuccess": "¡Modelo deshabilitado exitosamente!",
+  "failedToUpdateModel": "Error al actualizar el estado del modelo.",
+  "newChat": "Nuevo Chat",
+  "welcomeFirstChat": "¡Bienvenido a su primer chat!",
+  "failedToStartChat": "Error al iniciar su primer chat.",
+  "submit": "Enviar",
+  "cancel": "Cancelar",
+  "submitting": "Enviando...",
+  "apiKeyForm": {
+    "keyNameRequired": "El nombre de la clave es obligatorio.",
+    "providerTypeRequired": "El tipo de proveedor es obligatorio.",
+    "apiKeyValueRequired": "El valor de la clave API es obligatorio.",
+    "providerTypeLabel": "Tipo de Proveedor",
+    "keyNameLabel": "Nombre de la Clave",
+    "apiKeyValueLabel": "Valor de la Clave API",
+    "selectProviderPlaceholder": "Seleccione Tipo de Proveedor",
+    "keyNamePlaceholder": "ej., Mi Clave OpenAI",
+    "keyValuePlaceholder": "Ingrese su clave API",
+    "saving": "Guardando...",
+    "updateApiKey": "Actualizar Clave API",
+    "saveApiKey": "Guardar Clave API"
+  },
+  "errorBoundary": {
+    "copySuccess": "¡{label} copiado al portapapeles!",
+    "copyFailed": "Error al copiar {label}.",
+    "copied": "¡Copiado!",
+    "copyLabel": "Copiar {label}",
+    "title": "¡Ups! Algo salió mal.",
+    "description": "LiteChat encontró un error inesperado. Por favor, intente actualizar la página. Si el problema persiste, considere reportarlo. Copie los detalles y péguelos en el problema de GitHub.",
+    "unknownError": "Error Desconocido",
+    "refreshButton": "Actualizar Página",
+    "detailsLabel": "Detalles",
+    "aiDebugPromptLabel": "Prompt de Depuración de IA",
+    "reportButton": "Reportar en GitHub",
+    "reportSuccess": "Informe de error copiado al portapapeles. Péguelo en el cuerpo del problema de GitHub.",
+    "reportFailed": "Error al copiar el informe de error. Por favor, copie manualmente."
+  },
+  "filePreview": {
+    "decodeError": "Error al decodificar el contenido del archivo para la vista previa.",
+    "tooLargeForPreview": "Archivo de texto demasiado grande para vista previa ({{size}} KB).",
+    "missingContent": "Contenido de texto faltante en los metadatos.",
+    "alreadyInVfs": "El archivo ya está en VFS.",
+    "reconstructError": "No se puede agregar a VFS: Error al reconstruir los datos del archivo.",
+    "addSuccess": "\"{{name}}\" añadido exitosamente a la raíz de VFS.",
+    "addFailed": "Error al añadir \"{{name}}\" a VFS.",
+    "reconstructDownloadError": "No se pudieron reconstruir los datos del archivo.",
+    "downloadFailed": "Error de descarga: {error}",
+    "vfsAttached": "Archivo VFS adjunto. El contenido se cargará al enviar.",
+    "addToVfsTooltip": "Añadir al Sistema de Archivos Virtual",
+    "downloadTooltip": "Descargar archivo"
+  },
+  "loadingStateWrapper": {
+    "loading": "Cargando...",
+    "error": "Error: {{error}}",
+    "noItems": "No se encontraron elementos."
+  },
+  "sortableModelItem": {
+    "dragToReorder": "Arrastre para reordenar el modelo {{name}}",
+    "modelInfo": "Información del modelo",
+    "moveToTop": "Mover al Principio",
+    "moveUp": "Mover Arriba",
+    "moveDown": "Mover Abajo"
+  },
+  "stopButton": {
+    "stop": "Detener",
+    "stopGeneration": "Detener Generación"
+  },
+  "cloneDialog": {
+    "title": "Clonar Repositorio Git",
+    "description": "Ingrese la URL del repositorio. Se clonará en una nueva carpeta con el nombre del repositorio dentro de {{path}}.",
+    "clone": "Clonar",
+    "url": "URL",
+    "branch": "Rama",
+    "urlPlaceholder": "https://github.com/user/repo.git",
+    "branchPlaceholder": "main (predeterminado)",
+    "httpsRecommendation": "Recomendación: Use URLs HTTPS para una mejor compatibilidad del navegador y autenticación (ej., https://github.com/user/repo.git)"
+  }
+}

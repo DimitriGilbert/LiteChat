@@ -1,0 +1,174 @@
+{
+  "tabs": {
+    "general": "Allgemein",
+    "assistant": "Assistent",
+    "providers": "Anbieter",
+    "rules": "Regeln & Tags",
+    "data": "Daten",
+    "git": "Git",
+    "mcp": "MCP"
+  },
+  "modelBrowser": {
+    "notApplicable": "N/Z",
+    "perMillionTokens": "pro 1M Token",
+    "filterPlaceholder": "Modelle nach Name oder Anbieter filtern...",
+    "noModelsMatchFilters": "Keine Modelle stimmen mit den aktuellen Filtern überein.",
+    "context": "Kontext",
+    "inputPrice": "Eingabepreis",
+    "outputPrice": "Ausgabepreis",
+    "releaseDate": "Veröffentlichungsdatum",
+    "capabilities": "Funktionen",
+    "modalities": "Modalitäten",
+    "input": "Eingabe",
+    "output": "Ausgabe",
+    "selectModel": "Wählen Sie ein Modell aus der Liste, um Details anzuzeigen",
+    "noModelSelected": "Kein Modell ausgewählt"
+  },
+  "providerSettings": {
+    "title": "Anbieterkonfiguration",
+    "description": "Fügen Sie AI-Anbieter hinzu, entfernen oder konfigurieren Sie Verbindungen. Aktivieren Sie Modelle innerhalb des Bearbeitungsbereichs jedes Anbieters. Klicken Sie auf einen Modellnamen, um dessen Details anzuzeigen.",
+    "addProvider": "Anbieterkonfiguration hinzufügen",
+    "noProviders": "Noch keine Anbieter konfiguriert. Klicken Sie oben auf \"Anbieterkonfiguration hinzufügen\".",
+    "tabs": {
+      "config": "Konfiguration",
+      "order": "Modellreihenfolge",
+      "apiKeys": "API-Schlüssel",
+      "selectedModel": "Ausgewähltes Modell",
+      "browse": "Modelle durchsuchen"
+    }
+  },
+  "modelEnablement": {
+    "searchPlaceholder": "Modelle nach Name filtern...",
+    "noModelsAvailable": "Keine Modelle für diesen Anbieter verfügbar. Versuchen Sie, Modelle abzurufen.",
+    "noModelsMatchFilters": "Keine Modelle stimmen mit den aktuellen Filtern überein.",
+    "initializingList": "Liste wird initialisiert...",
+    "filter": {
+      "all": "Alle",
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert"
+    },
+    "sort": {
+      "name": "Name",
+      "inputPrice": "Eingabepreis",
+      "outputPrice": "Ausgabepreis",
+      "contextLength": "Kontextlänge",
+      "created": "Erstellt"
+    },
+    "capabilities": {
+      "reasoning": "Argumentation",
+      "webSearch": "Websuche",
+      "tools": "Tools",
+      "multimodal": "Multimodal"
+    },
+    "yes": "Ja",
+    "no": "Nein"
+  },
+  "generalSettings": {
+    "title": "Allgemeine Einstellungen",
+    "advancedSettings": "Erweiterte Einstellungen",
+    "advancedVisible": "Erweiterte Konfigurationsoptionen sind sichtbar. Umschalten, um komplexe Einstellungen auszublenden.",
+    "advancedHidden": "Basismodus - erweiterte Konfigurationsoptionen sind ausgeblendet. Umschalten, um alle Einstellungen anzuzeigen.",
+    "streamingDisplayTitle": "Streaming & Anzeige",
+    "enableStreamingMarkdownLabel": "Markdown während des Streamings parsen",
+    "enableStreamingMarkdownDescription": "Markdown-Formatierung rendern, während die Antwort ankommt (kann die Leistung leicht beeinträchtigen).",
+    "enableStreamingCodeBlockParsingLabel": "Volle Codeblöcke während des Streamings verwenden",
+    "enableStreamingCodeBlockParsingDescription": "Verwenden Sie die Syntaxhervorhebungskomponente für Codeblöcke während des Streamings.",
+    "foldStreamingCodeBlocksLabel": "Codeblöcke standardmäßig während des Streamings einklappen",
+    "foldStreamingCodeBlocksDescription": "Codeblöcke beim Streaming automatisch einklappen. Nützlich für lange Codeausgaben.",
+    "foldUserMessagesOnCompletionLabel": "Benutzernachrichten nach Abschluss einklappen",
+    "foldUserMessagesOnCompletionDescription": "Die Prompt-Nachricht des Benutzers automatisch einklappen, sobald der Assistent geantwortet hat.",
+    "enableAutoScrollOnStreamLabel": "Automatisch scrollen während des Streamings",
+    "enableAutoScrollOnStreamDescription": "Automatisch nach unten scrollen, wenn neue Inhalte ankommen.",
+    "streamingUpdateRateLabel": "Streaming-Aktualisierungsrate",
+    "streamingUpdateRateDescription": "Steuert, wie häufig die UI während des Streamings aktualisiert wird (3-60 FPS).",
+    "fpsInputLabel": "FPS-Eingabe",
+    "autoScrollIntervalLabel": "Auto-Scroll-Intervall",
+    "autoScrollIntervalDescription": "Die Verzögerung zwischen den Auto-Scroll-Prüfungen während des Streamings (50-5000 ms).",
+    "msInputLabel": "ms-Eingabe",
+    "resetButton": "Streaming- & Anzeigeeinstellungen zurücksetzen",
+    "resetConfirmation": "Sind Sie sicher, dass Sie die Streaming- & Anzeigeeinstellungen auf ihre Standardwerte zurücksetzen möchten?",
+    "validation": {
+      "minFps": "Min. 3 FPS",
+      "maxFps": "Max. 60 FPS",
+      "minMs": "Min. 50ms",
+      "maxMs": "Max. 5000ms"
+    },
+    "fpsSuffix": " FPS",
+    "msSuffix": " ms",
+    "streamingUpdateRateAriaLabel": "Streaming Render FPS Wert",
+    "autoScrollIntervalAriaLabel": "Auto-Scroll Intervall Wert",
+    "saving": "Wird gespeichert...",
+    "validating": "Wird validiert...",
+    "saveChanges": "Änderungen speichern"
+  },
+  "modelSelector": {
+    "title": "Modellauswahl",
+    "globalModel": "Globales Modell",
+    "noModelSelected": "Kein Modell ausgewählt",
+    "selectModel": "Modell auswählen"
+  },
+  "settingsModal": {
+    "title": "Einstellungen",
+    "description": "Anwendungseinstellungen, AI-Verhalten, API-Schlüssel, Anbieter und Daten verwalten.",
+    "noTabs": {
+      "message": "Keine Einstellungs-Tabs verfügbar oder werden noch geladen. Überprüfen Sie die Konsole auf Modul-Registrierungsfehler.",
+      "toast": "Einstellungs-Tab \"{{tabName}}\" nicht gefunden. Öffne Standard-Tab."
+    },
+    "closeButton": "Schließen"
+  },
+  "assistantTabs": {
+    "systemPrompt": "System-Prompt",
+    "library": "Bibliothek",
+    "agents": "Agenten",
+    "autoTitles": "Auto-Titel",
+    "tools": "Tools",
+    "mcp": "MCP",
+    "parameters": "Parameter",
+    "forkCompact": "Fork Compact"
+  },
+  "assistantPrompts": {
+    "templates": "Vorlagen",
+    "newTemplate": "Neue Vorlage",
+    "editTemplate": "Bearbeiten: {{name}}",
+    "deleteConfirmation": "Sind Sie sicher, dass Sie diese Vorlage löschen möchten?"
+  },
+  "dataManagement": {
+    "title": "Datenverwaltung",
+    "description": "Importieren, exportieren oder löschen Sie Ihre Anwendungsdaten. Verwenden Sie den vollständigen Import/Export für Backups oder Migrationen.",
+    "importConversationsTitle": "Konversationen importieren (Legacy)",
+    "importConversationsDescription": "Konversationen aus einer zuvor exportierten JSON-Datei importieren. Dies importiert nur den Chatverlauf.",
+    "importConversationsButton": "Aus Datei importieren",
+    "exportConversationsTitle": "Alle Konversationen exportieren (Legacy)",
+    "exportConversationsDescription": "Alle Ihre Konversationen in eine einzige JSON-Datei exportieren. Dies beinhaltet nur den Chatverlauf.",
+    "exportConversationsButton": "Alle in JSON exportieren",
+    "fullExportTitle": "Vollständiger Export",
+    "fullExportDescription": "Wählen Sie die Daten aus, die in Ihre vollständige Sicherungsdatei aufgenommen werden sollen.",
+    "exportButton": "Vollständiges Backup exportieren",
+    "fullImportTitle": "Vollständiger Import",
+    "fullImportDescription": "Eine vollständige Sicherungsdatei importieren. Dadurch werden vorhandene Daten für ausgewählte Kategorien überschrieben.",
+    "importButton": "Aus Backup importieren",
+    "dangerZoneTitle": "Gefahrenzone",
+    "dangerZoneDescription": "Diese Aktionen sind destruktiv und können nicht rückgängig gemacht werden. Gehen Sie mit Vorsicht vor.",
+    "clearAllDataButton": "Alle lokalen Daten löschen",
+    "importConfirmation": "Durch das Importieren dieser Datei werden vorhandene Daten für die ausgewählten Kategorien ÜBERSCHRIEBEN. Möchten Sie wirklich fortfahren?",
+    "clearDataConfirmationTitle": "🚨 SIND SIE ABSOLUT SICHER? 🚨",
+    "clearDataConfirmationMessage": "Dadurch werden ALLE Konversationen, Nachrichten, Mods, Einstellungen, Anbieter und gespeicherte API-Schlüssel unwiderruflich aus Ihrem Browser gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "clearDataSecondConfirmation": "ZWEITE BESTÄTIGUNG:\n\nWirklich alles löschen? Ziehen Sie zuerst den Export in Betracht.",
+    "dataClearedSuccess": "Alle lokalen Daten gelöscht. Anwendung wird neu geladen...",
+    "dataClearedError": "Fehler beim Löschen aller Daten",
+    "options": {
+      "settings": "Einstellungen",
+      "apiKeys": "API-Schlüssel",
+      "providerConfigs": "Anbieterkonfigurationen",
+      "projects": "Projekte",
+      "conversations": "Konversationen",
+      "rulesAndTags": "Regeln & Tags",
+      "mods": "Mods",
+      "syncRepos": "Git-Sync-Repos",
+      "mcpServers": "MCP-Server",
+      "promptTemplates": "Prompt-Vorlagen",
+      "agents": "Agenten",
+      "workflows": "Workflows"
+    }
+  }
+}

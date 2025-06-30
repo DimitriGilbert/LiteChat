@@ -1,0 +1,71 @@
+{
+  "fileManager": {
+    "foldersCannotBeAttached": "Ordner können nicht an den Prompt angehängt werden.",
+    "warningDeleteFolder": "WARNUNG: Dies löscht alle Inhalte in",
+    "pullingDefaultBranch": "Standard-Branch wird abgerufen (Authentifizierung noch nicht implementiert)...",
+    "pushingDefaultBranch": "Standard-Branch wird gepusht (Authentifizierung noch nicht implementiert)...",
+    "repositoryUrlEmpty": "Repository-URL darf nicht leer sein.",
+    "deleteConfirmation": "{{type}} \"{{name}}\" löschen?",
+    "commitMessageEmpty": "Commit-Nachricht darf nicht leer sein.",
+    "initializingFilesystem": "Dateisystem wird initialisiert: {{key}}",
+    "loadingFilesystem": "Dateisystem wird geladen...",
+    "errorLoadingFilesystem": "Fehler beim Laden des Dateisystems: {{error}}",
+    "errorPrefix": "Fehler: ",
+    "retry": "Wiederholen",
+    "toolbar": {
+      "goToRootDir": "Zum Stammverzeichnis gehen",
+      "goUpOneLevel": "Eine Ebene höher gehen",
+      "refreshCurrentDir": "Aktuelles Verzeichnis aktualisieren",
+      "createNewFolder": "Neuen Ordner erstellen",
+      "folder": "Ordner",
+      "uploadFiles": "Dateien hochladen",
+      "files": "Dateien",
+      "uploadFolder": "Ordner hochladen",
+      "uploadAndExtractZip": "ZIP hochladen & entpacken",
+      "zip": "ZIP",
+      "cloneRepository": "Repository klonen",
+      "gitOperations": "Git-Operationen",
+      "downloadAll": "Alle herunterladen"
+    },
+    "table": {
+      "loading": "Wird geladen...",
+      "name": "Name",
+      "size": "Größe",
+      "modified": "Geändert",
+      "actions": "Aktionen",
+      "folderIsEmpty": "Ordner ist leer"
+    },
+    "fileList": {
+      "selectFile": "{{name}} auswählen",
+      "gitRepository": "Git-Repository",
+      "folder": "Ordner",
+      "saveName": "Namen speichern",
+      "cancelEdit": "Bearbeitung abbrechen",
+      "moreActions": "Weitere Aktionen",
+      "download": "Herunterladen",
+      "rename": "Umbenennen",
+      "delete": "Löschen",
+      "initializeGitRepo": "Git-Repo initialisieren",
+      "pull": "Pull",
+      "commit": "Commit",
+      "push": "Push",
+      "status": "Status",
+      "filePreview": "Dateivorschau"
+    }
+  },
+  "modal": {
+    "title": "Virtuelles Dateisystem",
+    "description": "Dateien verwalten, die mit dem aktuellen Kontext verknüpft sind. Wählen Sie Dateien aus, um sie an Ihren nächsten Prompt anzuhängen.",
+    "noFilesSelected": "Keine Dateien im VFS ausgewählt, die angehängt werden sollen.",
+    "filesAttached": "{{count}} Datei(en) aus VFS an den nächsten Prompt angehängt.",
+    "noValidFilesSelected": "Keine gültigen Dateien zum Anhängen ausgewählt.",
+    "attachSelected": "Ausgewählte anhängen ({{count}})"
+  },
+  "triggerButton": {
+    "toggleVfs": "Virtuelles Dateisystem umschalten",
+    "virtualFilesystem": "Virtuelles Dateisystem",
+    "attachVfsFiles": "{{count}} ausgewählte VFS-Datei(en) anhängen",
+    "attachButtonText": "Anhängen ({{count}})",
+    "attachSelectedTooltip": "Ausgewählte VFS-Dateien an Prompt anhängen"
+  }
+}

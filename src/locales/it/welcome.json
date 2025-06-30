@@ -1,0 +1,74 @@
+{
+  "configureTheme": {
+    "title": "Configura Tema",
+    "description": "Personalizza colori, font e aspetto dei blocchi di codice."
+  },
+  "manageRules": {
+    "title": "Gestisci Regole & Tag",
+    "description": "Definisci snippet di prompt riutilizzabili e organizzali."
+  },
+  "addFiles": {
+    "title": "Aggiungi File",
+    "description": "Carica o gestisci file nel filesystem virtuale."
+  },
+  "addProvider": {
+    "title": "Aggiungi Provider",
+    "description": "Connettiti a servizi AI come OpenAI, Ollama, ecc."
+  },
+  "addApiKey": {
+    "title": "Aggiungi Chiave API",
+    "description": "Memorizza le chiavi API in modo sicuro nel tuo browser."
+  },
+  "setupGitSync": {
+    "title": "Configura Sincronizzazione Git",
+    "description": "Configura i repository per sincronizzare le conversazioni con Git."
+  },
+  "startChatting": {
+    "title": "Inizia a Chiacchierare",
+    "description": "Seleziona una conversazione o un progetto esistente dalla barra laterale, oppure clicca sul pulsante '+' per iniziare una nuova chat. Puoi anche esplorare queste opzioni di configurazione:"
+  },
+  "clickToExpand": "Clicca per espandere",
+  "loadingTitle": "Caricamento della tua Configurazione...",
+  "loadingDescription": "Stiamo preparando tutto per te. Ci vorrà solo un momento.",
+  "progressTitle": "Progresso Configurazione",
+  "progressDescription": "Completa questi passi per sbloccare tutta la potenza di LiteChat.",
+  "stepsComplete": "passi completati",
+  "complete": "completo",
+  "orSkipSetup": "O salta la configurazione ed esplora",
+  "newConversationName": "Nuova Conversazione",
+  "toasts": {
+    "providerAddedSuccess": "Provider '{{name}}' aggiunto con successo!",
+    "providerAddedError": "Impossibile aggiungere provider.",
+    "modelsUpdatedSuccess": "Modelli per '{{name}}' aggiornati.",
+    "modelsUpdatedError": "Impossibile aggiornare i modelli.",
+    "startChatError": "Impossibile avviare nuova chat."
+  },
+  "steps": {
+    "apiKey": {
+      "title": "Aggiungi una Chiave API",
+      "description": "Per connettersi a servizi come OpenAI, è necessaria una chiave API. Le tue chiavi sono memorizzate in modo sicuro nella memoria locale del tuo browser e non lasciano mai la tua macchina.",
+      "submitButton": "Salva Chiave API"
+    },
+    "provider": {
+      "title": "Configura un Provider",
+      "description": {
+        "part1": "Un provider è un servizio AI (come OpenAI, Google, Ollama, ecc.). Puoi aggiungerne uno nuovo qui o gestire quelli esistenti in ",
+        "link": "Impostazioni.",
+        "part2": ""
+      },
+      "alreadyConfigured": "Hai già configurato un provider! Puoi aggiungerne altri o gestire quelli esistenti dalle impostazioni.",
+      "manageButton": "Gestisci Provider"
+    },
+    "enableModels": {
+      "title": "Abilita Modelli",
+      "description": "Scegli quali modelli vuoi utilizzare dal tuo provider configurato. Solo i modelli abilitati appariranno nel selettore del modello.",
+      "noProvider": "Per favore, aggiungi e configura prima un provider per vedere i modelli disponibili."
+    }
+  },
+  "allStepsComplete": {
+    "title": "Configurazione Completata!",
+    "description": "Sei pronto per partire. Inizia la tua prima conversazione ora.",
+    "startButton": "Inizia Prima Chat",
+    "startingButton": "Avvio..."
+  }
+} 

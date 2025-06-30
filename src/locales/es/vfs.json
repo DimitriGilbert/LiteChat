@@ -1,0 +1,71 @@
+{
+  "fileManager": {
+    "foldersCannotBeAttached": "Las carpetas no pueden adjuntarse al prompt.",
+    "warningDeleteFolder": "ADVERTENCIA: Esto eliminará todo el contenido dentro de",
+    "pullingDefaultBranch": "Extrayendo rama predeterminada (autenticación aún no implementada)...",
+    "pushingDefaultBranch": "Enviando rama predeterminada (autenticación aún no implementada)...",
+    "repositoryUrlEmpty": "La URL del repositorio no puede estar vacía.",
+    "deleteConfirmation": "¿Eliminar {{type}} \"{{name}}\"?",
+    "commitMessageEmpty": "El mensaje de commit no puede estar vacío.",
+    "initializingFilesystem": "Inicializando sistema de archivos: {{key}}",
+    "loadingFilesystem": "Cargando sistema de archivos...",
+    "errorLoadingFilesystem": "Error al cargar el sistema de archivos: {{error}}",
+    "errorPrefix": "Error: ",
+    "retry": "Reintentar",
+    "toolbar": {
+      "goToRootDir": "Ir al directorio raíz",
+      "goUpOneLevel": "Subir un nivel",
+      "refreshCurrentDir": "Actualizar directorio actual",
+      "createNewFolder": "Crear Nueva Carpeta",
+      "folder": "Carpeta",
+      "uploadFiles": "Subir Archivos",
+      "files": "Archivos",
+      "uploadFolder": "Subir Carpeta",
+      "uploadAndExtractZip": "Subir y Extraer ZIP",
+      "zip": "ZIP",
+      "cloneRepository": "Clonar Repositorio",
+      "gitOperations": "Operaciones Git",
+      "downloadAll": "Descargar Todo"
+    },
+    "table": {
+      "loading": "Cargando...",
+      "name": "Nombre",
+      "size": "Tamaño",
+      "modified": "Modificado",
+      "actions": "Acciones",
+      "folderIsEmpty": "La carpeta está vacía"
+    },
+    "fileList": {
+      "selectFile": "Seleccionar {{name}}",
+      "gitRepository": "Repositorio Git",
+      "folder": "Carpeta",
+      "saveName": "Guardar nombre",
+      "cancelEdit": "Cancelar edición",
+      "moreActions": "Más acciones",
+      "download": "Descargar",
+      "rename": "Renombrar",
+      "delete": "Eliminar",
+      "initializeGitRepo": "Inicializar Repositorio Git",
+      "pull": "Pull",
+      "commit": "Commit",
+      "push": "Push",
+      "status": "Estado",
+      "filePreview": "Vista Previa del Archivo"
+    }
+  },
+  "modal": {
+    "title": "Sistema de Archivos Virtual",
+    "description": "Administre los archivos asociados con el contexto actual. Seleccione archivos para adjuntarlos a su próximo prompt.",
+    "noFilesSelected": "No se seleccionaron archivos en VFS para adjuntar.",
+    "filesAttached": "Se adjuntaron {{count}} archivo(s) de VFS al próximo prompt.",
+    "noValidFilesSelected": "No se seleccionaron archivos válidos para adjuntar.",
+    "attachSelected": "Adjuntar Seleccionados ({{count}})"
+  },
+  "triggerButton": {
+    "toggleVfs": "Alternar Sistema de Archivos Virtual",
+    "virtualFilesystem": "Sistema de Archivos Virtual",
+    "attachVfsFiles": "Adjuntar {{count}} archivo(s) VFS seleccionados",
+    "attachButtonText": "Adjuntar ({{count}})",
+    "attachSelectedTooltip": "Adjuntar archivos VFS seleccionados al prompt"
+  }
+}
