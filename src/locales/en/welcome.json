@@ -1,0 +1,74 @@
+{
+  "configureTheme": {
+    "title": "Configure Theme",
+    "description": "Customize colors, fonts, and code block appearance."
+  },
+  "manageRules": {
+    "title": "Manage Rules & Tags",
+    "description": "Define reusable prompt snippets and organize them."
+  },
+  "addFiles": {
+    "title": "Add Files",
+    "description": "Upload or manage files in the virtual filesystem."
+  },
+  "addProvider": {
+    "title": "Add Provider",
+    "description": "Connect to AI services like OpenAI, Ollama, etc."
+  },
+  "addApiKey": {
+    "title": "Add API Key",
+    "description": "Store API keys securely in your browser."
+  },
+  "setupGitSync": {
+    "title": "Setup Git Sync",
+    "description": "Configure repositories to sync conversations with Git."
+  },
+  "startChatting": {
+    "title": "Start Chatting",
+    "description": "Select an existing conversation or project from the sidebar, or click the '+' button to start a new chat. You can also explore these setup options:"
+  },
+  "clickToExpand": "Click to expand",
+  "loadingTitle": "Loading Your Setup...",
+  "loadingDescription": "Getting everything ready for you. This should only take a moment.",
+  "progressTitle": "Configuration Progress",
+  "progressDescription": "Complete these steps to unlock the full power of LiteChat.",
+  "stepsComplete": "steps complete",
+  "complete": "complete",
+  "orSkipSetup": "Or skip setup and explore",
+  "newConversationName": "New Conversation",
+  "toasts": {
+    "providerAddedSuccess": "Provider '{{name}}' added successfully!",
+    "providerAddedError": "Failed to add provider.",
+    "modelsUpdatedSuccess": "Models for '{{name}}' updated.",
+    "modelsUpdatedError": "Failed to update models.",
+    "startChatError": "Failed to start new chat."
+  },
+  "steps": {
+    "apiKey": {
+      "title": "Add an API Key",
+      "description": "To connect to services like OpenAI, you need an API key. Your keys are stored securely in your browser's local storage and never leave your machine.",
+      "submitButton": "Save API Key"
+    },
+    "provider": {
+      "title": "Configure a Provider",
+      "description": {
+        "part1": "A provider is an AI service (like OpenAI, Google, Ollama, etc.). You can add a new one here or manage existing providers in ",
+        "link": "Settings.",
+        "part2": ""
+      },
+      "alreadyConfigured": "You've already configured a provider! You can add more or manage existing ones from the settings.",
+      "manageButton": "Manage Providers"
+    },
+    "enableModels": {
+      "title": "Enable Models",
+      "description": "Choose which models you want to use from your configured provider. Only enabled models will appear in the model selector.",
+      "noProvider": "Please add and configure a provider first to see available models."
+    }
+  },
+  "allStepsComplete": {
+    "title": "Setup Complete!",
+    "description": "You're all set up and ready to go. Start your first conversation now.",
+    "startButton": "Start First Chat",
+    "startingButton": "Starting..."
+  }
+} 
