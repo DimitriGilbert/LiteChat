@@ -10,6 +10,7 @@ import type { OpenRouterModel } from "@/types/litechat/provider";
 import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ModelFilterControls } from "@/controls/components/common/ModelFilterControls";
+import { useTranslation } from "react-i18next";
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 type EnabledFilterStatus = "all" | "enabled" | "disabled";
@@ -48,6 +49,8 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   listHeightClass = "h-[26rem]",
   onModelClick,
 }) => {
+  const { t } = useTranslation('settings');
+
   const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(
     null
   );
@@ -266,7 +269,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   if (allAvailableModels.length === 0) {
     return (
       <p className="text-sm text-muted-foreground italic pt-2">
-        No models available for this provider. Try fetching models.
+        {t('modelEnablement.noModelsAvailable', 'No models available for this provider. Try fetching models.')}
       </p>
     );
   }
@@ -279,7 +282,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter models by name..."
+            placeholder={t('modelEnablement.searchPlaceholder', 'Filter models by name...')}
             className="pl-8 h-9 w-full text-xs"
             type="text"
             disabled={disabled}
@@ -322,7 +325,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           >
             {filteredModels.length === 0 && !isLoading ? (
               <p className="text-sm text-muted-foreground text-center py-4 absolute inset-0 flex items-center justify-center">
-                No models match the current filters.
+                {t('modelEnablement.noModelsMatchFilters', 'No models match the current filters.')}
               </p>
             ) : (
               rowVirtualizer.getVirtualItems().map((virtualRow) => {
@@ -390,7 +393,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
         )}
         {!viewportElement && !isLoading && (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            Initializing list...
+            {t('modelEnablement.initializingList', 'Initializing list...')}
           </div>
         )}
       </ScrollArea>

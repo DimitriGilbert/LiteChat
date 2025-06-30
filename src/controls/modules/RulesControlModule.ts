@@ -1,7 +1,7 @@
 // src/controls/modules/RulesControlModule.ts
 // FULL FILE
 import React from "react";
-import { type ControlModule } from "@/types/litechat/control";
+import { type ControlModule,  type ControlModuleConstructor } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { rulesEvent } from "@/types/litechat/events/rules.events";
@@ -646,3 +646,22 @@ export class RulesControlModule implements ControlModule {
     }
   };
 }
+
+(RulesControlModule as ControlModuleConstructor).translations = {
+  en: {
+    controls: {
+      rulesAndTags: "Rules & Tags",
+      rules: "Rules",
+      tags: "Tags",
+      alwaysOn: "Always On",
+    },
+  },
+  fr: {
+    controls: {
+      rulesAndTags: "Règles et Tags",
+      rules: "Règles",
+      tags: "Tags",
+      alwaysOn: "Toujours Activé",
+    },
+  },
+};

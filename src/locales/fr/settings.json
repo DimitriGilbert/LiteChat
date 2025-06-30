@@ -1,1 +1,8 @@
-{}
+{
+  "modelBrowser": {
+    "notApplicable": "N/A",
+    "perMillionTokens": "/ 1M jetons",
+    "filterPlaceholder": "Filtrer les modèles par nom ou fournisseur...",
+    "noModelsMatchFilters": "Aucun modèle ne correspond à vos filtres."
+  }
+}

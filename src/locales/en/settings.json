@@ -1,1 +1,8 @@
-{}
+{
+  "modelBrowser": {
+    "notApplicable": "N/A",
+    "perMillionTokens": "/ 1M tokens",
+    "filterPlaceholder": "Filter models by name or provider...",
+    "noModelsMatchFilters": "No models match your filters."
+  }
+}

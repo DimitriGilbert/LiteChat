@@ -15,16 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ModelFilterControls } from "@/controls/components/common/ModelFilterControls";
-
-// Import the existing formatPrice utility
-const formatPrice = (priceStr: string | null | undefined): string => {
-  if (!priceStr) return "N/A";
-  const priceNum = parseFloat(priceStr);
-  if (isNaN(priceNum)) return "N/A";
-  // OpenRouter pricing is per token, so multiply by 1M to show price per 1M tokens
-  const pricePerMillion = priceNum * 1_000_000;
-  return `$${pricePerMillion.toFixed(2)} / 1M tokens`;
-};
+import { useTranslation } from "react-i18next";
 
 interface ModelBrowserListProps {
   onSelectModelForDetails: (combinedModelId: string | null) => void;
@@ -34,6 +25,18 @@ type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
   onSelectModelForDetails,
 }) => {
+  const { t } = useTranslation('settings');
+
+  // Define formatPrice inside the component to use the `t` function
+  const formatPrice = useCallback((priceStr: string | null | undefined): string => {
+    if (!priceStr) return t('modelBrowser.notApplicable');
+    const priceNum = parseFloat(priceStr);
+    if (isNaN(priceNum)) return t('modelBrowser.notApplicable');
+    // OpenRouter pricing is per token, so multiply by 1M to show price per 1M tokens
+    const pricePerMillion = priceNum * 1_000_000;
+    return `$${pricePerMillion.toFixed(2)} ${t('modelBrowser.perMillionTokens')}`;
+  }, [t]);
+
   // @ts-expect-error we do not use it but cant remove, thank you unamed array destruct ! @AI DONT TOUCH !!
   const [scrollAreaContainer, setScrollAreaContainer] =
     useState<HTMLDivElement | null>(null);
@@ -195,7 +198,7 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
           <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Filter models by name or provider..."
+            placeholder={t('modelBrowser.filterPlaceholder')}
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             className="pl-8 w-full h-9"
@@ -228,7 +231,7 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
           >
             {filteredModels.length === 0 && !isLoading ? (
               <p className="text-sm text-muted-foreground text-center py-4 absolute inset-0 flex items-center justify-center">
-                No models match your filters.
+                {t('modelBrowser.noModelsMatchFilters')}
               </p>
             ) : (
               rowVirtualizer.getVirtualItems().map((virtualRow) => {
