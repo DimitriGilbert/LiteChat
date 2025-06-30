@@ -1,0 +1,8 @@
+{
+  "sendMessagePlaceholder": "Send a message...",
+  "promptSubmissionCancelled": "Prompt submission cancelled by middleware.",
+  "failedToSendMessage": "Failed to send message: {{errorMessage}}",
+  "sendMessage": "Send message",
+  "inputAreaPlaceholder": "Type message... (Shift+Enter for new line)",
+  "chatInputAriaLabel": "Chat input"
+}

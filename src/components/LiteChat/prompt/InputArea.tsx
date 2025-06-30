@@ -15,6 +15,7 @@ import type { InputAreaRef } from "@/types/litechat/prompt";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
+import { useTranslation } from "react-i18next";
 
 interface InputAreaProps {
   initialValue?: string;
@@ -43,6 +44,7 @@ export const InputArea = memo(
       const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
       const [internalValue, setInternalValue] = useState(initialValue);
       const setPromptInputValue = usePromptInputValueStore((state) => state.setValue);
+      const { t } = useTranslation('prompt');
 
       useImperativeHandle(ref, () => ({
         getValue: () => internalValue,
@@ -163,14 +165,14 @@ export const InputArea = memo(
           onChange={handleTextareaChange}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          placeholder={placeholder}
+          placeholder={t('inputAreaPlaceholder')}
           rows={1}
           className={cn(
             "w-full p-3 border rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto",
             "min-h-[40px] max-h-[250px]",
             className
           )}
-          aria-label="Chat input"
+          aria-label={t('chatInputAriaLabel')}
           {...rest}
         />
       );

@@ -22,12 +22,12 @@ import { ModMiddlewareHook } from "@/types/litechat/modding";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { usePromptStateStore } from "@/store/prompt.store";
+import { useTranslation } from "react-i18next";
 
 interface PromptWrapperProps {
   InputAreaRenderer: InputAreaRenderer;
   onSubmit: (turnData: PromptTurnObject) => Promise<void>;
   className?: string;
-  placeholder?: string;
   inputAreaRef: React.RefObject<InputAreaRef | null>;
   selectedItemId: string | null;
   selectedItemType: SidebarItemType | null;
@@ -37,13 +37,13 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
   InputAreaRenderer,
   onSubmit,
   className,
-  placeholder = "Send a message...",
   inputAreaRef,
   selectedItemId,
   selectedItemType,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasInputValue, setHasInputValue] = useState(false);
+  const { t } = useTranslation('prompt');
 
   const registeredPromptControls = useControlRegistryStore(
     useShallow((state) => state.promptControls)
@@ -186,11 +186,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     };
 
     const handleSubmitRequest = async (payload: { turnData: PromptTurnObject }) => {
-      // Check current state instead of stale closure values
       const currentInteractionState = useInteractionStore.getState();
       if (currentInteractionState.status === "streaming" || isSubmitting) return;
 
-      // Use the existing handleSubmit with override content to ensure all middleware and lifecycle hooks are respected
       await handleSubmit(payload.turnData.content);
     };
 
@@ -203,11 +201,13 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
       emitter.off(promptEvent.setInputTextRequest, handleSetInputTextRequest);
       emitter.off(promptEvent.submitPromptRequest, handleSubmitRequest);
     };
-  }, [inputAreaRef, handleSubmit, isSubmitting]);
+  }, [handleSubmit, isSubmitting]);
 
   const handleInputValueChange = useCallback((value: string) => {
     setHasInputValue(value.trim().length > 0);
   }, []);
+
+  const translatedPlaceholder = t('sendMessagePlaceholder');
 
   return (
     <div className={cn("p-2 md:p-4 space-y-2 md:space-y-3", className)}>
@@ -222,9 +222,9 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
         <InputAreaRenderer
           ref={inputAreaRef}
           onSubmit={handleSubmit}
-          disabled={isStreaming || isSubmitting}
-          placeholder={placeholder}
+          placeholder={translatedPlaceholder}
           onValueChange={handleInputValueChange}
+          disabled={isStreaming || isSubmitting}
           className="flex-grow"
         />
         <Button
@@ -237,7 +237,7 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
             (!hasInputValue && attachedFilesMetadata.length === 0)
           }
           className="h-9 w-9 flex-shrink-0"
-          aria-label="Send message"
+          aria-label={t('sendMessage')}
         >
           {isSubmitting ? (
             <Loader2 className="h-4 w-4 animate-spin" />

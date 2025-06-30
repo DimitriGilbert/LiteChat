@@ -1,0 +1,12 @@
+{
+  "initializingLiteChat": "Initializing LiteChat...",
+  "liteChatMenu": "LiteChat Menu",
+  "closeMenu": "Close menu",
+  "openMenu": "Open menu",
+  "loadingMenu": "Loading menu...",
+  "pleaseWaitInitialization": "Please wait while the application initializes.",
+  "footerControlsLoading": "Footer controls loading...",
+  "applicationCoreNotReady": "Application core not ready. Please try again.",
+  "failedToStartNewChat": "Failed to start new chat.",
+  "failedToSendMessage": "Failed to send message."
+}

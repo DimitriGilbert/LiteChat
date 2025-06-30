@@ -36,6 +36,7 @@ import type {
   CanvasControlRenderContext,
 } from "@/types/litechat/canvas/control";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
+import { useTranslation } from "react-i18next";
 
 const ChatCanvasHiddenInteractions = ["conversation.title_generation", "conversation.compact"];
 
@@ -463,6 +464,8 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
 
   const maxWidthClass = chatMaxWidth || "max-w-7xl";
 
+  const { t } = useTranslation();
+
   return (
     <div className={cn("flex-grow relative", className)}>
       {showSetupState ? (
@@ -488,39 +491,58 @@ const ChatCanvasComponent: React.FC<ChatCanvasProps> = ({
                     size="icon"
                     className="absolute bottom-4 right-4 z-[var(--z-sticky)] h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
                     onClick={() => scrollToBottom()}
-                    aria-label="Scroll to bottom"
+                    aria-label={t('jumpToBottom')}
                   >
                     <ArrowDownIcon className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="left">Scroll to Bottom</TooltipContent>
+                <TooltipContent side="left">
+                  {t('jumpToBottom')}
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
           {/* Follow Stream Toggle Button - only show when streaming */}
           {status === "streaming" && (
-            <TooltipProvider delayDuration={100}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="absolute bottom-4 right-14 z-[var(--z-sticky)] h-8 w-8 rounded-full shadow-md bg-background/80 backdrop-blur-sm hover:bg-muted"
-                    onClick={() => setEnableAutoScrollOnStream(!enableAutoScrollOnStream)}
-                    aria-label={enableAutoScrollOnStream ? "Disable follow stream" : "Enable follow stream"}
-                  >
-                    {enableAutoScrollOnStream ? (
-                      <PauseIcon className="h-4 w-4" />
-                    ) : (
-                      <PlayIcon className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  {enableAutoScrollOnStream ? "Stop Following Stream" : "Follow Stream"}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <div className="absolute bottom-4 right-14 z-[var(--z-sticky)]">
+              {enableAutoScrollOnStream ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEnableAutoScrollOnStream(false)}
+                        aria-label={t('pauseAutoscroll')}
+                      >
+                        <PauseIcon className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t('pauseAutoscroll')}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEnableAutoScrollOnStream(true)}
+                        aria-label={t('resumeAutoscroll')}
+                      >
+                        <PlayIcon className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t('resumeAutoscroll')}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
           )}
         </>
       )}

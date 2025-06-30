@@ -5,6 +5,7 @@ import App from "./App.tsx";
 import "./index.css";
 import { enableMapSet } from "immer";
 import { PWAService } from "./services/pwa.service";
+import "./i18n/config"; // Initialize i18next
 
 enableMapSet();
 
