@@ -6,6 +6,7 @@ import React, {
   useCallback,
   memo,
 } from "react";
+import { useTranslation } from "react-i18next";
 import Prism from "prismjs";
 import "prismjs/components/prism-javascript";
 
@@ -108,6 +109,8 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   blockId, 
   module 
 }) => {
+  const { t } = useTranslation('renderers');
+  
   // Settings
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
@@ -343,7 +346,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       }
     } catch (error) {
       console.error("Security check failed:", error);
-      toast.error("Security check failed. Please try again.");
+      toast.error(t('jsRunnableBlock.securityCheckFailed'));
     } finally {
       setIsCheckingSecurity(false);
     }
@@ -649,9 +652,9 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 
       // Show result toast
       if (capturedLogs.some((log) => log.includes("Error:"))) {
-        toast.error("Code execution failed - check output for details");
+        toast.error(t('jsRunnableBlock.executionFailed'));
       } else {
-        toast.success(`Code executed successfully ${useSafeMode ? "(safe mode)" : "(unsafe mode)"}`);
+                  toast.success(t('jsRunnableBlock.executionSuccess', { mode: useSafeMode ? t('jsRunnableBlock.safeMode') : t('jsRunnableBlock.unsafeMode') }));
       }
     }
   }, [code, editedCode, isEditing, useSafeMode, executeSafeMode, executeUnsafeMode]);
@@ -740,13 +743,13 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   );
 
   const getRunButtonText = () => {
-    if (isRunning) return "Running...";
-    if (quickjsStatus === 'loading') return "Loading...";
-    if (useSafeMode && quickjsStatus !== 'ready') return "Run";
+    if (isRunning) return t('jsRunnableBlock.running');
+    if (quickjsStatus === 'loading') return t('jsRunnableBlock.loading');
+    if (useSafeMode && quickjsStatus !== 'ready') return t('jsRunnableBlock.run');
     if (securityResult && clickCount > 0 && clickCount < securityResult.clicksRequired) {
-      return `Click ${securityResult.clicksRequired - clickCount} more`;
+      return t('jsRunnableBlock.clickMore', { count: securityResult.clicksRequired - clickCount });
     }
-    return "Run";
+    return t('jsRunnableBlock.run');
   };
 
   // Stop/Clear function
@@ -784,7 +787,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       console.warn('Error during cleanup:', error);
     }
     
-    toast.success('Preview cleared and modules unloaded');
+    toast.success(t('jsRunnableBlock.previewCleared'));
   }, []);
 
   // Download executable function
@@ -792,7 +795,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     const codeToDownload = isEditing ? editedCode : code;
     
     if (!codeToDownload.trim()) {
-      toast.error('No code to download');
+      toast.error(t('jsRunnableBlock.noCodeToDownload'));
       return;
     }
 
@@ -1152,22 +1155,22 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       {/* Header */}
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
-          <div className="text-sm font-medium">RUN JS</div>
+          <div className="text-sm font-medium">{t('jsRunnableBlock.header')}</div>
           
           {/* QuickJS Status */}
           {quickjsStatus === 'ready' && (
             <div className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
-              QuickJS Ready
+              {t('jsRunnableBlock.quickjsReady')}
             </div>
           )}
           {quickjsStatus === 'loading' && (
             <div className="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
-              QuickJS Loading
+              {t('jsRunnableBlock.quickjsLoading')}
             </div>
           )}
           {quickjsStatus === 'error' && (
             <div className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded">
-              QuickJS Error
+              {t('jsRunnableBlock.quickjsError')}
             </div>
           )}
           
@@ -1175,7 +1178,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           <span className={`text-xs px-1.5 py-0.5 rounded ${
             useSafeMode ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
           }`}>
-            {useSafeMode ? "SAFE" : "UNSAFE"}
+            {useSafeMode ? t('jsRunnableBlock.safe') : t('jsRunnableBlock.unsafe')}
           </span>
           
           {/* Security result */}
@@ -1196,7 +1199,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           {/* Safe/Unsafe toggle */}
           <div className="flex items-center gap-2">
             <Label htmlFor={`safe-mode-toggle-${blockUniqueId}`} className="text-xs">
-              {useSafeMode ? "Safe" : "Unsafe"}
+              {useSafeMode ? t('jsRunnableBlock.safe') : t('jsRunnableBlock.unsafe')}
             </Label>
             <Switch
               id={`safe-mode-toggle-${blockUniqueId}`}
@@ -1208,7 +1211,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           
           {/* Security check button */}
           <ActionTooltipButton
-            tooltipText={securityResult ? "Recheck Security" : "Check Security"}
+            tooltipText={securityResult ? t('jsRunnableBlock.recheckSecurity') : t('jsRunnableBlock.checkSecurity')}
             onClick={checkSecurity}
             disabled={isCheckingSecurity}
             className="text-xs h-7"
@@ -1223,7 +1226,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           
           {/* Download executable button */}
           <ActionTooltipButton
-            tooltipText="Download executable"
+            tooltipText={t('jsRunnableBlock.downloadExecutable')}
             onClick={handleDownloadExecutable}
             className="text-xs h-7"
             icon={<RocketIcon className="h-3 w-3 mr-1" />}
@@ -1233,25 +1236,25 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           {hasRun && (
             <>
               <ActionTooltipButton
-                tooltipText="Show Code"
+                tooltipText={t('jsRunnableBlock.showCode')}
                 onClick={toggleCode}
                 className="text-xs h-7"
                 icon={<CodeIcon className="h-3 w-3 mr-1" />}
               />
               <ActionTooltipButton
-                tooltipText="Show Console"
+                tooltipText={t('jsRunnableBlock.showConsole')}
                 onClick={toggleConsole}
                 className="text-xs h-7"
                 icon={<MonitorSpeakerIcon className="h-3 w-3 mr-1" />}
               />
               <ActionTooltipButton
-                tooltipText="Show Preview"
+                tooltipText={t('jsRunnableBlock.showPreview')}
                 onClick={togglePreview}
                 className="text-xs h-7"
                 icon={<EyeIcon className="h-3 w-3 mr-1" />}
               />
               <ActionTooltipButton
-                tooltipText="Stop & Clear"
+                tooltipText={t('jsRunnableBlock.stopAndClear')}
                 onClick={handleStop}
                 className="text-xs h-7"
                 icon={<SquareIcon className="h-3 w-3 mr-1" />}
@@ -1316,7 +1319,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       {!isFolded && showOutput && (
         <div className="output-container border border-border rounded-b-lg bg-black/90 text-green-400 p-4 font-mono text-sm">
           <div className="output-header text-green-300 mb-2 text-xs font-semibold">
-            CONSOLE OUTPUT:
+            {t('jsRunnableBlock.consoleOutput')}
           </div>
           {output.length > 0 ? (
             output.map((line, i) => (
@@ -1334,7 +1337,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
               </div>
             ))
           ) : (
-            <div className="text-muted-foreground">No output</div>
+            <div className="text-muted-foreground">{t('jsRunnableBlock.noOutput')}</div>
           )}
         </div>
       )}
@@ -1356,7 +1359,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         {!isFolded && showPreview && (
           <>
             <div className="preview-header text-muted-foreground mb-2 text-xs font-semibold">
-              PREVIEW:
+              {t('jsRunnableBlock.preview')}
             </div>
             <div 
               ref={previewContentRef}
@@ -1365,7 +1368,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
             >
               {!hasPreviewContent && (
                 <div className="text-muted-foreground text-sm italic absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                  No preview content. Use DOM manipulation or <code>litechat.target</code> to add elements here.
+                  {t('jsRunnableBlock.noPreviewContent')}
                 </div>
               )}
             </div>

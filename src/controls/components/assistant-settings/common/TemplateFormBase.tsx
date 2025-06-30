@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,6 +87,7 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
   followUpOptions = [],
   additionalActions,
 }) => {
+  const { t } = useTranslation('assistantSettings');
   const [maxSteps, setMaxSteps] = useState<number | null>(null);
 
   // Get rules and tags data
@@ -138,17 +140,17 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
 
   const getTypeLabel = () => {
     switch (type) {
-      case "agent": return "Agent";
-      case "task": return "Task";
-      default: return "Template";
+      case "agent": return t('template.agent');
+      case "task": return t('template.task');
+      default: return t('template.template');
     }
   };
 
   const getPromptLabel = () => {
     switch (type) {
-      case "agent": return "Agent Prompt";
-      case "task": return "Task Prompt";
-      default: return "Prompt Template";
+      case "agent": return t('template.agentPrompt');
+      case "task": return t('template.taskPrompt');
+      default: return t('template.promptTemplate');
     }
   };
 
@@ -156,12 +158,12 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
     <div className="space-y-4">
       <div>
         <h3 className="font-medium">
-          {template ? `Edit ${getTypeLabel()}` : `New ${getTypeLabel()}`}
+          {template ? t('template.edit', { type: getTypeLabel() }) : t('template.new', { type: getTypeLabel() })}
         </h3>
         <p className="text-sm text-muted-foreground">
           {template
-            ? `Update your ${type}`
-            : `Create a new ${type}${type === "prompt" ? " template with variables" : ""}`}
+            ? t('template.updateDescription', { type })
+            : t('template.createDescription', { type, hasVariables: type === "prompt" })}
         </p>
       </div>
 
@@ -179,17 +181,17 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
             name="name"
             children={(field) => (
               <div>
-                <Label htmlFor={field.name}>{getTypeLabel()} Name</Label>
+                <Label htmlFor={field.name}>{t('template.nameLabel', { type: getTypeLabel() })}</Label>
                 <Input
                   id={field.name}
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  placeholder={`Enter ${type} name`}
+                  placeholder={t('template.namePlaceholder', { type })}
                 />
                 {field.state.meta.errors && field.state.meta.errors.length > 0 && (
                   <p className="text-xs text-destructive mt-1">
-                    {field.state.meta.errors[0] || "Invalid input"}
+                    {field.state.meta.errors[0] || t('common.invalidInput')}
                   </p>
                 )}
               </div>
@@ -200,13 +202,13 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
             name="description"
             children={(field) => (
               <div>
-                <Label htmlFor={field.name}>Description</Label>
+                <Label htmlFor={field.name}>{t('template.description')}</Label>
                 <Textarea
                   id={field.name}
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  placeholder={`Describe what this ${type} does`}
+                  placeholder={t('template.descriptionPlaceholder', { type })}
                   rows={3}
                 />
               </div>
@@ -223,10 +225,10 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
                   onCheckedChange={(checked) => field.handleChange(checked)}
                 />
                 <Label htmlFor={field.name} className="text-sm font-medium">
-                  Show as shortcut
+                  {t('template.showAsShortcut')}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  When enabled, this {type} will appear in the quick access hover menu
+                  {t('template.shortcutDescription', { type })}
                 </p>
               </div>
             )}
@@ -242,17 +244,16 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  placeholder={`Enter your ${type} prompt using {{ variable_name }} syntax`}
+                  placeholder={t('template.promptPlaceholder', { type })}
                   rows={6}
                   className="font-mono"
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  Use double curly braces to reference variables:{" "}
-                  {`{{ variable_name }}`}
+                  {t('template.variableHelp')}
                 </p>
                 {field.state.meta.errors && field.state.meta.errors.length > 0 && (
                   <p className="text-xs text-destructive mt-1">
-                    {field.state.meta.errors[0] || "Invalid input"}
+                    {field.state.meta.errors[0] || t('common.invalidInput')}
                   </p>
                 )}
               </div>
@@ -290,10 +291,9 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
         {/* Auto Tools */}
         <div className="space-y-4">
           <div>
-            <Label className="text-base font-medium">Auto-select Tools</Label>
+            <Label className="text-base font-medium">{t('template.autoTools')}</Label>
             <p className="text-sm text-muted-foreground mb-4">
-              Choose tools that will be automatically enabled when this {type}
-              is applied.
+              {t('template.autoToolsDescription', { type })}
             </p>
             <form.Field
               name="tools"
@@ -315,11 +315,10 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
         <div className="space-y-4">
           <div>
             <Label className="text-base font-medium">
-              Auto-select Rules & Tags
+              {t('template.autoRulesAndTags')}
             </Label>
             <p className="text-sm text-muted-foreground mb-4">
-              Choose rules and tags that will be automatically enabled when this
-              {type} is applied.
+              {t('template.autoRulesDescription', { type })}
             </p>
             <RulesControlDialogContent
               activeTagIds={new Set(form.getFieldValue("tags"))}
@@ -356,7 +355,7 @@ export const TemplateFormBase: React.FC<TemplateFormBaseProps> = ({
         <div className="flex gap-3 pt-4 border-t">
           <Button type="submit" className="flex-1">
             <Save className="h-4 w-4 mr-2" />
-            {template ? `Update ${getTypeLabel()}` : `Create ${getTypeLabel()}`}
+            {template ? t('template.updateButton', { type: getTypeLabel() }) : t('template.createButton', { type: getTypeLabel() })}
           </Button>
           {additionalActions}
         </div>

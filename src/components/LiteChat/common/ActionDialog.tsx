@@ -1,5 +1,6 @@
 // src/components/LiteChat/common/ActionDialog.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -33,13 +34,14 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
   title,
   description,
   children,
-  submitLabel = "Submit",
+  submitLabel,
   onSubmit,
   isSubmitting,
   submitDisabled = false,
   className,
   contentClassName,
 }) => {
+  const { t } = useTranslation('common');
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (isSubmitting || submitDisabled) return;
@@ -58,7 +60,7 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
           {/* Use DialogClose for the Cancel button */}
           <DialogClose asChild>
             <Button variant="outline" disabled={isSubmitting}>
-              Cancel
+              {t('cancel')}
             </Button>
           </DialogClose>
           <Button
@@ -68,7 +70,7 @@ export const ActionDialog: React.FC<ActionDialogProps> = ({
             {isSubmitting && (
               <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
             )}
-            {isSubmitting ? "Submitting..." : submitLabel}
+            {isSubmitting ? t('submitting') : (submitLabel ?? t('submit'))}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -5,6 +5,7 @@ import React, {
   useCallback,
   memo,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import type { CanvasControl } from "@/types/litechat/canvas/control";
@@ -400,6 +401,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
   code,
   isStreaming = false,
 }) => {
+  const { t } = useTranslation('renderers');
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
@@ -619,20 +621,24 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
             };
             
             emitter.emit(promptEvent.submitPromptRequest, { turnData });
-            toast.success("Form submitted and prompt sent!");
+            toast.success(t('formedibleBlock.submitSuccess'));
           } catch (error) {
             console.error("Failed to submit prompt:", error);
-            toast.error("Form data added to input, but failed to send prompt");
+            toast.error(t('formedibleBlock.submitError'), {
+              description: error instanceof Error ? error.message : String(error),
+            });
           }
         });
       } else {
-        toast.success("Form data added to prompt input");
+        toast.success(t('formedibleBlock.submitSuccess'));
       }
     } catch (error) {
       console.error("Form submission error:", error);
-      toast.error("Failed to process form submission");
+      toast.error(t('formedibleBlock.submitError'), {
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
-  }, []); // Removed sendOnSubmit from dependencies
+  }, [t]);
 
   // Prepare form configuration
   const formConfig = useMemo(() => {
@@ -699,7 +705,9 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
           onSubmitInvalid: ({ value, formApi }: { value: Record<string, any>; formApi: any }) => {
             console.error("Formedible onSubmitInvalid triggered. Values:", value);
             console.error("Formedible onSubmitInvalid triggered. Form API errors:", formApi.formState.errors);
-            toast.error("Form has validation errors. Please check your input.");
+            toast.error(t('formedibleBlock.validationError'), {
+              description: t('formedibleBlock.validationErrorDescription'),
+            });
           },
         },
         disabled: false, // Enable the form for actual use
@@ -708,7 +716,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
       console.error("Form configuration error:", err);
       return { error: err instanceof Error ? err.message : "Unknown error" };
     }
-  }, [formDefinition, createSchemaFromFields, createDefaultValues, handleFormSubmit, sendOnSubmitFieldName]);
+  }, [formDefinition, createSchemaFromFields, createDefaultValues, handleFormSubmit, sendOnSubmitFieldName, t]);
 
   // Use the hook at the top level, but conditionally
   const formedibleResult = useFormedible(formConfig && !('error' in formConfig) ? formConfig : {
@@ -750,7 +758,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
     <div className="code-block-container group/codeblock my-4 max-w-full">
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between">
         <div className="flex items-center gap-1">
-          <div className="text-sm font-medium">Formedible</div>
+          <div className="text-sm font-medium">{t('formedibleBlock.header')}</div>
           <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
             {codeBlockHeaderActions}
           </div>
@@ -760,7 +768,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
           <button
             onClick={toggleView}
             className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            title={showCode ? "Show form" : "Show code"}
+            title={showCode ? t('formedibleBlock.showFormTitle') : t('formedibleBlock.showCodeTitle')}
           >
             {showCode ? (
               <FormInputIcon className="h-4 w-4" />
@@ -787,16 +795,16 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
                 <div className="flex items-center justify-center p-8">
                   <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
                   <span className="ml-2 text-sm text-muted-foreground">
-                    Parsing form definition...
+                    {t('formedibleBlock.parsingForm')}
                   </span>
                 </div>
               )}
               
-              {error && (
+              {error && !isStreaming && (
                 <div className="flex items-center gap-2 p-4 border border-destructive/20 bg-destructive/10 rounded-md">
                   <AlertCircleIcon className="h-5 w-5 text-destructive flex-shrink-0" />
                   <div className="text-sm text-destructive">
-                    <div className="font-medium">Failed to parse Formedible definition</div>
+                    <div className="font-medium">{t('formedibleBlock.parseErrorTitle')}</div>
                     <div className="text-xs mt-1 opacity-80">{error}</div>
                   </div>
                 </div>
@@ -805,7 +813,7 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
               {renderedForm && !isLoading && !error && (
                 <div className="p-4 bg-background border rounded-md">
                   <div className="mb-4 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-                    📋 Interactive Form - Fill out and submit to add data to prompt input
+                    {t('formedibleBlock.description')}
                   </div>
                   {renderedForm}
                 </div>

@@ -1,6 +1,7 @@
 // src/components/LiteChat/common/SortableModelItem.tsx
 // FULL FILE
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -46,6 +47,8 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
   isFirst,
   isLast,
 }) => {
+  const { t } = useTranslation('common');
+
   const {
     attributes,
     listeners,
@@ -86,7 +89,7 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
         isDragging && "shadow-2xl border-primary bg-card opacity-75 transform scale-105",
         "cursor-grab active:cursor-grabbing"
       )}
-      aria-label={`Drag to reorder model ${modelDetails.name}`}
+      aria-label={t('sortableModelItem.dragToReorder', { name: modelDetails.name })}
       onMouseDown={(e) => {
         // Only prevent default if not clicking on buttons
         const target = e.target as HTMLElement;
@@ -135,7 +138,7 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
               <TooltipTrigger asChild>
                 <span
                   className="p-1 text-muted-foreground hover:text-foreground cursor-default"
-                  aria-label="Model information"
+                  aria-label={t('sortableModelItem.modelInfo')}
                 >
                   <InfoIcon className="h-4 w-4" />
                 </span>
@@ -151,21 +154,21 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
           </TooltipProvider>
         )}
         <ActionTooltipButton
-          tooltipText="Move to Top"
+          tooltipText={t('sortableModelItem.moveToTop')}
           onClick={() => onMoveToTop(id)}
           disabled={isFirst || buttonsDisabled}
           icon={<ChevronsUpIcon />}
           className="h-6 w-6"
         />
         <ActionTooltipButton
-          tooltipText="Move Up"
+          tooltipText={t('sortableModelItem.moveUp')}
           onClick={() => onMoveUp(id)}
           disabled={isFirst || buttonsDisabled}
           icon={<ArrowUpIcon />}
           className="h-6 w-6"
         />
         <ActionTooltipButton
-          tooltipText="Move Down"
+          tooltipText={t('sortableModelItem.moveDown')}
           onClick={() => onMoveDown(id)}
           disabled={isLast || buttonsDisabled}
           icon={<ArrowDownIcon />}

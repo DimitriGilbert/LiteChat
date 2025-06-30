@@ -6,6 +6,7 @@ import React, {
   useCallback,
   memo,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Bar, BarChart, Line, LineChart, Area, AreaChart, Pie, PieChart, Radar, RadarChart, Scatter, ScatterChart, Cell,
   CartesianGrid, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, PolarAngleAxis, PolarGrid
@@ -32,6 +33,7 @@ interface ChartBlockProps {
 }
 
 const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStreaming }) => {
+  const { t } = useTranslation('renderers');
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
@@ -82,19 +84,19 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
       } else {
         // Only show errors when not streaming, to avoid flicker.
         if (!isStreaming) {
-          setError(parseResult.error || "Failed to parse chart data");
+          setError(parseResult.error || t('chartBlock.parseError'));
         }
         setChartData(null);
       }
     } catch (e) {
       if (!isStreaming) {
-        setError(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
+        setError(e instanceof Error ? e.message : t('chartBlock.unknownParseError'));
       }
       setChartData(null);
     } finally {
       setIsLoading(false);
     }
-  }, [code, isStreaming, isFolded]);
+  }, [code, isStreaming, isFolded, t]);
 
   useEffect(() => {
     // Debounce parsing during streaming to avoid excessive re-renders.
@@ -118,7 +120,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
 
   const handleDownloadSvg = useCallback(async () => {
     if (!containerRef.current) {
-      toast.error("Chart container not found.");
+      toast.error(t('chartBlock.containerNotFound'));
       return;
     }
     try {
@@ -126,7 +128,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
       
       const rechartWrapper = containerRef.current.querySelector('.recharts-wrapper');
       if (!rechartWrapper) {
-        toast.error("Chart wrapper not found");
+        toast.error(t('chartBlock.wrapperNotFound'));
         return;
       }
 
@@ -156,12 +158,12 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
       link.href = dataUrl;
       link.click();
       
-      toast.success("Chart downloaded successfully!");
+      toast.success(t('chartBlock.downloadSuccess'));
     } catch (error) {
       console.error("Error downloading chart:", error);
-      toast.error("Failed to download chart");
+      toast.error(t('chartBlock.downloadFailed'));
     }
-  }, [chartData]);
+  }, [chartData, t]);
 
   const renderSlotForCodeBlock = useCallback(
     (
@@ -220,7 +222,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
     <div className="code-block-container group/codeblock my-4 max-w-full">
       <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
         <div className="flex items-center gap-1">
-          <div className="text-sm font-medium">CHART</div>
+          <div className="text-sm font-medium">{t('chartBlock.header')}</div>
           <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
             {codeBlockHeaderActions}
           </div>
@@ -229,7 +231,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
           <button
             onClick={toggleView}
             className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            title={showCode ? "Show Chart" : "Show Code"}
+            title={showCode ? t('chartBlock.showChartTitle') : t('chartBlock.showCodeTitle')}
           >
             {showCode ? <ImageIcon className="h-4 w-4" /> : <CodeIcon className="h-4 w-4" />}
           </button>
@@ -238,7 +240,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
             <button
               onClick={handleDownloadSvg}
               className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-              title="Download Chart"
+              title={t('chartBlock.downloadChartTitle')}
             >
               <DownloadIcon className="h-4 w-4" />
             </button>
@@ -262,7 +264,7 @@ const ChartBlockRendererComponent: React.FC<ChartBlockProps> = ({ code, isStream
                 <div className="p-4 border border-destructive/20 bg-destructive/10 rounded-md">
                   <div className="flex items-center gap-2 text-destructive">
                       <AlertCircleIcon className="h-5 w-5 flex-shrink-0" />
-                      <div className="font-medium">Chart Parse Error</div>
+                      <div className="font-medium">{t('chartBlock.dataErrorTitle')}</div>
                   </div>
                   <pre className="text-xs mt-2 p-2 bg-black/20 rounded font-mono whitespace-pre-wrap">{error}</pre>
                 </div>
@@ -307,6 +309,7 @@ const ChartContent = React.forwardRef<
   HTMLDivElement,
   { chartData: ChartData }
 >(({ chartData }, ref) => {
+  const { t } = useTranslation('renderers');
   const [currentChartType, setCurrentChartType] = useState<SupportedChartType>(() => {
     const initialType = chartData.chartType;
     if (initialType && supportedTypes.includes(initialType as any)) {
@@ -344,6 +347,14 @@ const ChartContent = React.forwardRef<
   }, [chartData.chartData]);
 
   const renderChart = () => {
+    if (!chartData) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          {t('chartBlock.noData')}
+        </div>
+      );
+    }
+
     // Check if this is pie-style data (each row represents a category)
     const isPieStyleData = chartData.chartData.length > 1 &&
       chartData.chartData.some(item => item.color) &&
@@ -503,7 +514,7 @@ const ChartContent = React.forwardRef<
           </ScatterChart>
         );
       default:
-        return <div className="text-center text-muted-foreground">Unsupported chart type: {currentChartType}</div>;
+        return <div className="text-center py-8 text-destructive">{t('chartBlock.unsupportedType', { type: chartData.chartType })}</div>;
     }
   };
 
@@ -511,12 +522,12 @@ const ChartContent = React.forwardRef<
     <Card ref={ref}>
       <CardHeader className="flex flex-row items-start justify-between">
           <div className="flex-1">
-              <CardTitle>{chartData.title || 'Chart'}</CardTitle>
+              <CardTitle>{chartData.title || t('chartBlock.header')}</CardTitle>
               {chartData.description && <CardDescription className="mt-1">{chartData.description}</CardDescription>}
           </div>
           <Select value={currentChartType} onValueChange={(type) => setCurrentChartType(type as SupportedChartType)}>
               <SelectTrigger className="w-[140px] flex-shrink-0">
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder={t('chartBlock.selectDataKeyPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                   <SelectItem value="bar">Bar</SelectItem>

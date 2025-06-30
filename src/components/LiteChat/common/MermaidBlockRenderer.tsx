@@ -6,6 +6,7 @@ import React, {
   useCallback,
   memo,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { createMermaidRenderer } from "mermaid-isomorphic";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
@@ -25,6 +26,8 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
   code,
   isStreaming = false,
 }) => {
+  const { t } = useTranslation('renderers');
+
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
@@ -100,13 +103,13 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
         setSvgContent(results[0].value.svg);
       } else if (results.length > 0 && results[0].status === "rejected") {
         const reason = results[0].reason;
-        setError(reason?.message || "Failed to render Mermaid diagram");
+        setError(reason?.message || t('mermaidBlock.renderError'));
       } else {
-        setError("No results returned from Mermaid renderer");
+        setError(t('mermaidBlock.noResults'));
       }
     } catch (err) {
       console.error("Mermaid rendering error:", err);
-      setError(err instanceof Error ? err.message : "Failed to render Mermaid diagram");
+      setError(err instanceof Error ? err.message : t('mermaidBlock.renderError'));
     } finally {
       setIsLoading(false);
     }
@@ -128,7 +131,7 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
 
   const handleDownloadSvg = useCallback(async () => {
     if (!svgContent) {
-      toast.error("No SVG content to download");
+      toast.error(t('mermaidBlock.noSvgContent'));
       return;
     }
 
@@ -142,10 +145,10 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success("SVG downloaded successfully!");
+      toast.success(t('mermaidBlock.downloadSuccess'));
     } catch (err) {
       console.error("Download error:", err);
-      toast.error("Failed to download SVG");
+      toast.error(t('mermaidBlock.downloadFailed'));
     }
   }, [svgContent]);
 
@@ -185,7 +188,7 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
     <div className="code-block-container group/codeblock my-4 max-w-full">
       <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
         <div className="flex items-center gap-1">
-          <div className="text-sm font-medium">MERMAID</div>
+          <div className="text-sm font-medium">{t('mermaidBlock.header')}</div>
           <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
             {codeBlockHeaderActions}
           </div>
@@ -195,7 +198,7 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
           <button
             onClick={toggleView}
             className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-            title={showCode ? "Show diagram" : "Show code"}
+            title={showCode ? t('mermaidBlock.showDiagram') : t('mermaidBlock.showCode')}
           >
             {showCode ? (
               <ImageIcon className="h-4 w-4" />
@@ -222,7 +225,7 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
             <button
               onClick={handleDownloadSvg}
               className="p-1.5 rounded-md hover:bg-muted/50 transition-colors"
-              title="Download SVG"
+              title={t('mermaidBlock.downloadSvg')}
             >
               <DownloadIcon className="h-4 w-4" />
             </button>
@@ -246,7 +249,7 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
                   <div className="flex items-center justify-center p-8">
                     <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
                     <span className="ml-2 text-sm text-muted-foreground">
-                      Rendering diagram...
+                      {t('mermaidBlock.renderingDiagram')}
                     </span>
                   </div>
                 )}
@@ -255,7 +258,7 @@ const MermaidBlockRendererComponent: React.FC<MermaidBlockRendererProps> = ({
                   <div className="flex items-center gap-2 p-4 border border-destructive/20 bg-destructive/10 rounded-md">
                     <AlertCircleIcon className="h-5 w-5 text-destructive flex-shrink-0" />
                     <div className="text-sm text-destructive">
-                      <div className="font-medium">Failed to render Mermaid diagram</div>
+                      <div className="font-medium">{t('mermaidBlock.renderErrorTitle')}</div>
                       <div className="text-xs mt-1 opacity-80">{error}</div>
                     </div>
                   </div>

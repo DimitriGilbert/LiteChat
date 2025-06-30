@@ -1,6 +1,7 @@
 // src/controls/components/assistant-settings/SettingsAssistantTitles.tsx
 // FULL FILE
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -35,6 +36,7 @@ function FieldMetaMessages({ field }: { field: AnyFieldApi }) {
 }
 
 export const SettingsAssistantTitles: React.FC = () => {
+  const { t } = useTranslation('assistantSettings');
   const storeAccess = useSettingsStore(
     useShallow((state) => ({
       autoTitleEnabled: state.autoTitleEnabled,
@@ -74,9 +76,9 @@ export const SettingsAssistantTitles: React.FC = () => {
         storeAccess.setAutoTitlePromptMaxLength(value.autoTitlePromptMaxLength);
         storeAccess.setAutoTitleIncludeFiles(value.autoTitleIncludeFiles);
         storeAccess.setAutoTitleIncludeRules(value.autoTitleIncludeRules);
-        toast.success("Auto-title settings updated!");
+        toast.success(t('titles.updateSuccess'));
       } catch (error) {
-        toast.error("Failed to update auto-title settings.");
+        toast.error(t('titles.updateError'));
         console.error("Error submitting auto-title settings form:", error);
       }
     },
@@ -122,7 +124,7 @@ export const SettingsAssistantTitles: React.FC = () => {
               aria-labelledby={`${field.name}-label`}
             />
             <Label id={`${field.name}-label`} htmlFor={field.name}>
-              Enable Auto-Title Generation
+              {t('titles.enableAutoTitle')}
             </Label>
             <FieldMetaMessages field={field} />
           </div>
@@ -142,7 +144,7 @@ export const SettingsAssistantTitles: React.FC = () => {
                   aria-labelledby={`${field.name}-label`}
                 />
                 <Label id={`${field.name}-label`} htmlFor={field.name}>
-                  Always On (disable per-turn control)
+                  {t('titles.alwaysOn')}
                 </Label>
                 <FieldMetaMessages field={field} />
               </div>
@@ -152,10 +154,9 @@ export const SettingsAssistantTitles: React.FC = () => {
             name="autoTitleModelId"
             children={(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor={field.name}>Model for Title Generation</Label>
+                <Label htmlFor={field.name}>{t('titles.modelForGeneration')}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Choose which model to use for generating conversation titles.
-                  Uses global default model if not specified.
+                  {t('titles.modelDescription')}
                 </p>
                 <GlobalModelSelector
                   value={field.state.value}
@@ -171,11 +172,10 @@ export const SettingsAssistantTitles: React.FC = () => {
             children={(field) => (
               <div className="space-y-1.5">
                 <Label htmlFor={field.name}>
-                  Conversation Content Length Limit
+                  {t('titles.contentLengthLimit')}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Maximum characters from conversation to include in title
-                  generation prompt (100-4000).
+                  {t('titles.contentLengthDescription')}
                 </p>
                 <Input
                   id={field.name}
@@ -209,7 +209,7 @@ export const SettingsAssistantTitles: React.FC = () => {
                   aria-labelledby={`${field.name}-label`}
                 />
                 <Label id={`${field.name}-label`} htmlFor={field.name}>
-                  Include file context in title prompt
+                  {t('titles.includeFiles')}
                 </Label>
                 <FieldMetaMessages field={field} />
               </div>
@@ -227,7 +227,7 @@ export const SettingsAssistantTitles: React.FC = () => {
                   aria-labelledby={`${field.name}-label`}
                 />
                 <Label id={`${field.name}-label`} htmlFor={field.name}>
-                  Include active rules in title prompt
+                  {t('titles.includeRules')}
                 </Label>
                 <FieldMetaMessages field={field} />
               </div>
@@ -244,7 +244,7 @@ export const SettingsAssistantTitles: React.FC = () => {
               size="sm"
               disabled={!canSubmit || isSubmitting || isValidating || !isValid}
             >
-              {isSubmitting ? "Saving..." : isValidating ? "Validating..." : "Save Title Settings"}
+              {isSubmitting ? t('common.saving') : isValidating ? t('common.validating') : t('titles.saveButton')}
             </Button>
           )}
         />

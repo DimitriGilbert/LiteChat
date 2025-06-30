@@ -6,6 +6,7 @@ import React, {
   useCallback,
   memo,
 } from "react";
+import { useTranslation } from "react-i18next";
 import Prism from "prismjs";
 import "prismjs/components/prism-python";
 
@@ -309,6 +310,8 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
   interactionId,
   blockId,
 }) => {
+  const { t } = useTranslation('renderers');
+  
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
@@ -391,7 +394,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
       }
     } catch (error) {
       console.error("Security check failed:", error);
-      toast.error("Security check failed. Please try again.");
+      toast.error(t('pythonRunnableBlock.securityCheckFailed'));
     } finally {
       setIsCheckingSecurity(false);
     }
@@ -399,7 +402,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
 
   const handleRunClick = useCallback(async () => {
     if (!runnableBlocksEnabled) {
-      toast.error("Runnable blocks are disabled in settings.");
+      toast.error(t('pythonRunnableBlock.blocksDisabled'));
       return;
     }
 
@@ -411,7 +414,7 @@ const PythonRunnableBlockRendererComponent: React.FC<PythonRunnableBlockRenderer
       await pythonManager.ensurePythonLoaded();
     } catch (error) {
       setIsRunning(false); // Reset running state on error
-      toast.error("Failed to load Python environment");
+      toast.error(t('pythonRunnableBlock.loadFailed'));
       return;
     }
 
@@ -715,13 +718,13 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
   );
 
   const getRunButtonText = () => {
-    if (isRunning) return "Running...";
-    if (window.liteChatPython?.isLoading) return "Loading Python...";
-    if (!window.liteChatPython?.isReady) return "Load Python";
+    if (isRunning) return t('pythonRunnableBlock.running');
+    if (window.liteChatPython?.isLoading) return t('pythonRunnableBlock.loadingPython');
+    if (!window.liteChatPython?.isReady) return t('pythonRunnableBlock.loadPython');
     if (securityResult && clickCount > 0 && clickCount < securityResult.clicksRequired) {
-      return `Click ${securityResult.clicksRequired - clickCount} more`;
+      return t('pythonRunnableBlock.clickMore', { count: securityResult.clicksRequired - clickCount });
     }
-    return "Run";
+    return t('pythonRunnableBlock.run');
   };
 
   const hasPreviewContent = useMemo(() => {
@@ -735,10 +738,10 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
     <div className="code-block-container group/codeblock my-4 max-w-full">
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
-          <div className="text-sm font-medium">RUNNABLE PYTHON</div>
+          <div className="text-sm font-medium">{t('pythonRunnableBlock.header')}</div>
           {window.liteChatPython?.isReady && (
             <div className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
-              Ready ({window.liteChatPython.loadedPackages.size} packages)
+{t('pythonRunnableBlock.ready', { count: window.liteChatPython.loadedPackages.size })}
             </div>
           )}
           {securityResult && (
@@ -753,7 +756,7 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
         </div>
         <div className="flex items-center gap-1">
           <ActionTooltipButton
-            tooltipText={securityResult ? 'Recheck Security' : 'Check Security'}
+            tooltipText={securityResult ? t('pythonRunnableBlock.recheckSecurity') : t('pythonRunnableBlock.checkSecurity')}
             size="sm"
             variant="outline"
             onClick={checkSecurity}
@@ -770,7 +773,7 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
           {hasRun && (
             <>
               <ActionTooltipButton
-                tooltipText="Show Code"
+                tooltipText={t('pythonRunnableBlock.showCode')}
                 size="sm"
                 variant={!showOutput && !showPreview ? "default" : "outline"}
                 onClick={toggleCode}
@@ -778,7 +781,7 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
                 icon={<CodeIcon className="h-3 w-3 mr-1" />}
               />
               <ActionTooltipButton
-                tooltipText="Show Console"
+                tooltipText={t('pythonRunnableBlock.showConsole')}
                 size="sm"
                 variant={showOutput ? "default" : "outline"}
                 onClick={toggleConsole}
@@ -786,7 +789,7 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
                 icon={<MonitorSpeakerIcon className="h-3 w-3 mr-1" />}
               />
               <ActionTooltipButton
-                tooltipText="Show Preview"
+                tooltipText={t('pythonRunnableBlock.showPreview')}
                 size="sm"
                 variant={showPreview ? "default" : "outline"}
                 onClick={togglePreview}
@@ -848,7 +851,7 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
       {!isFolded && showOutput && (
         <div className="output-container border border-border rounded-b-lg bg-black/90 text-green-400 p-4 font-mono text-sm">
           <div className="output-header text-green-300 mb-2 text-xs font-semibold">
-            PYTHON OUTPUT:
+{t('pythonRunnableBlock.output')}
           </div>
           {output.length > 0 ? (
             output.map((line, i) => {
@@ -892,7 +895,7 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
               );
             })
           ) : (
-            <div className="text-muted-foreground">No output</div>
+            <div className="text-muted-foreground">{t('pythonRunnableBlock.noOutput')}</div>
           )}
         </div>
       )}
@@ -902,14 +905,13 @@ print("✓ Matplotlib configured for Pyodide with always-present target element"
         {!isFolded && showPreview && (
           <>
             <div className="preview-header text-muted-foreground px-4 pt-4 pb-2 text-xs font-semibold">
-              PREVIEW:
+{t('pythonRunnableBlock.preview')}
             </div>
             <div className="preview-content px-4 pb-4">
               {!hasPreviewContent && (
                 <div className="min-h-[100px] border border-dashed border-muted-foreground/20 rounded p-4 flex items-center justify-center">
                   <div className="text-muted-foreground text-sm italic text-center">
-                    No preview content.<br/>
-                    Use <code className="bg-muted px-1 py-0.5 rounded text-xs">plt.show()</code> or <code className="bg-muted px-1 py-0.5 rounded text-xs">litechat.target.appendChild(element)</code> to add content here.
+                    {t('pythonRunnableBlock.noPreviewContent')}
                   </div>
                 </div>
               )}

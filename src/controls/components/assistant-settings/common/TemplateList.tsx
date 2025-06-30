@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,36 +32,38 @@ export const TemplateList: React.FC<TemplateListProps> = ({
   additionalActions,
   getTaskCount,
 }) => {
+  const { t } = useTranslation('assistantSettings');
+  
   const getTypeLabel = () => {
     switch (type) {
-      case "agent": return "Agents";
-      case "task": return "Tasks";
-      default: return "Templates";
+      case "agent": return t('templateList.agents');
+      case "task": return t('templateList.tasks');
+      default: return t('templateList.templates');
     }
   };
 
   const getTypeDescription = () => {
     switch (type) {
-      case "agent": return "Manage your AI agents and their associated tasks";
-      case "task": return "Manage tasks for this agent";
-      default: return "Manage your reusable prompt templates with dynamic variables";
+      case "agent": return t('templateList.agentsDescription');
+      case "task": return t('templateList.tasksDescription');
+      default: return t('templateList.templatesDescription');
     }
   };
 
   const getEmptyMessage = () => {
     if (emptyMessage) return emptyMessage;
     switch (type) {
-      case "agent": return "No Agents Yet";
-      case "task": return "No Tasks Yet";
-      default: return "No Templates Yet";
+      case "agent": return t('templateList.noAgents');
+      case "task": return t('templateList.noTasks');
+      default: return t('templateList.noTemplates');
     }
   };
 
   const getEmptyDescription = () => {
     switch (type) {
-      case "agent": return 'Use the "New Agent" tab to create your first agent';
-      case "task": return "Create tasks to define what this agent can do";
-      default: return 'Use the "New Template" tab to create your first template';
+      case "agent": return t('templateList.noAgentsDescription');
+      case "task": return t('templateList.noTasksDescription');
+      default: return t('templateList.noTemplatesDescription');
     }
   };
 
@@ -86,14 +89,14 @@ export const TemplateList: React.FC<TemplateListProps> = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Variables</TableHead>
-              {type === "agent" && <TableHead>Tasks</TableHead>}
-              {(type === "prompt" || type === "task") && <TableHead>Follow-ups</TableHead>}
-              <TableHead>Tools</TableHead>
-              <TableHead>Rules/Tags</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t('templateList.nameColumn')}</TableHead>
+              <TableHead>{t('templateList.descriptionColumn')}</TableHead>
+              <TableHead>{t('templateList.variablesColumn')}</TableHead>
+              {type === "agent" && <TableHead>{t('templateList.tasksColumn')}</TableHead>}
+              {(type === "prompt" || type === "task") && <TableHead>{t('templateList.followUpsColumn')}</TableHead>}
+              <TableHead>{t('templateList.toolsColumn')}</TableHead>
+              <TableHead>{t('templateList.rulesTagsColumn')}</TableHead>
+              <TableHead className="text-right">{t('templateList.actionsColumn')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -128,10 +131,10 @@ export const TemplateList: React.FC<TemplateListProps> = ({
                 <TableCell>
                   <div className="flex gap-1">
                     <Badge variant="secondary">
-                      {template.tags?.length || 0} tags
+                      {template.tags?.length || 0} {t('templateList.tags')}
                     </Badge>
                     <Badge variant="secondary">
-                      {template.rules?.length || 0} rules
+                      {template.rules?.length || 0} {t('templateList.rules')}
                     </Badge>
                   </div>
                 </TableCell>
@@ -142,7 +145,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => onEdit(template)}
-                      title={`Edit ${type}`}
+                      title={t('templateList.editTitle', { type })}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -150,7 +153,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => onDelete(template.id)}
-                      title={`Delete ${type}`}
+                      title={t('templateList.deleteTitle', { type })}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

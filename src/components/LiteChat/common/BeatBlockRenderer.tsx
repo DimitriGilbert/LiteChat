@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import Prism from "prismjs";
 import "prismjs/components/prism-javascript";
+import { useTranslation } from "react-i18next";
 
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
@@ -48,6 +49,7 @@ interface BeatBlockRendererProps {
 class GlobalStrudelManager {
   private static instance: GlobalStrudelManager;
   private loadPromise: Promise<void> | null = null;
+  public t: (key: string) => string = (key) => key; // Add 't' property with a default
 
   static getInstance(): GlobalStrudelManager {
     if (!GlobalStrudelManager.instance) {
@@ -96,12 +98,12 @@ class GlobalStrudelManager {
       window.strudelLoaded = true;
       window.strudelLoading = false;
       
-      toast.success("Strudel environment ready!");
+      toast.success(this.t('renderers:beatBlock.strudelReady'));
 
     } catch (error) {
       window.strudelLoading = false;
       console.error("Failed to load Strudel:", error);
-      toast.error("Failed to load Strudel environment");
+      toast.error(this.t('renderers:beatBlock.strudelLoadFailed'));
       throw error;
     }
   }
@@ -125,6 +127,7 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
   interactionId,
   blockId,
 }) => {
+  const { t } = useTranslation(['renderers']);
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
@@ -143,7 +146,12 @@ const BeatBlockRendererComponent: React.FC<BeatBlockRendererProps> = ({
   const [strudelLoaded, setStrudelLoaded] = useState(false);
 
   // Get global Strudel manager
-  const strudelManager = useMemo(() => GlobalStrudelManager.getInstance(), []);
+  const strudelManager = useMemo(() => {
+    const manager = GlobalStrudelManager.getInstance();
+    // Inject t function
+    manager.t = t;
+    return manager;
+  }, [t]);
 
   // Update edited code when original code changes
   useEffect(() => {

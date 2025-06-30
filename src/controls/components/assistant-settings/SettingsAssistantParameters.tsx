@@ -1,6 +1,7 @@
 // src/controls/components/assitant/SettingsAssistantParameters.tsx
 // FULL FILE
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 // import { Label } from "@/components/ui/label"; // No longer directly used
@@ -27,6 +28,7 @@ const assistantParamsSchema = z.object({
 // Local FieldMetaMessages removed as it's part of primitives
 
 export const SettingsAssistantParameters: React.FC = () => {
+  const { t } = useTranslation('assistantSettings');
   const store = useSettingsStore(
     useShallow((state) => ({
       temperature: state.temperature,
@@ -65,9 +67,9 @@ export const SettingsAssistantParameters: React.FC = () => {
         store.setTopK(value.topK ?? null);
         store.setPresencePenalty(value.presencePenalty);
         store.setFrequencyPenalty(value.frequencyPenalty);
-        toast.success("Assistant parameters updated!");
+        toast.success(t('parameters.updateSuccess'));
       } catch (error) {
-        toast.error("Failed to update parameters.");
+        toast.error(t('parameters.updateError'));
         console.error("Error submitting parameters form:", error);
       }
     },
@@ -102,14 +104,13 @@ export const SettingsAssistantParameters: React.FC = () => {
       className="space-y-4"
     >
       <p className="text-xs text-muted-foreground mb-3">
-        Set the default global values for AI parameters. These can be overridden
-        per-project or per-prompt turn.
+        {t('parameters.description')}
       </p>
       
       <SliderField
         form={form}
         name="temperature"
-        label="Temperature"
+        label={t('parameters.temperature')}
         min={0}
         max={1}
         step={0.01}
@@ -120,7 +121,7 @@ export const SettingsAssistantParameters: React.FC = () => {
       <SliderField
         form={form}
         name="topP"
-        label="Top P"
+        label={t('parameters.topP')}
         min={0}
         max={1}
         step={0.01}
@@ -132,8 +133,8 @@ export const SettingsAssistantParameters: React.FC = () => {
         <NumberField
           form={form}
           name="maxTokens"
-          label="Max Tokens"
-          placeholder="Default (None)"
+          label={t('parameters.maxTokens')}
+          placeholder={t('parameters.defaultNone')}
           min={1}
           className="h-9 text-sm"
           allowNull={true}
@@ -142,8 +143,8 @@ export const SettingsAssistantParameters: React.FC = () => {
         <NumberField
           form={form}
           name="topK"
-          label="Top K"
-          placeholder="Default (None)"
+          label={t('parameters.topK')}
+          placeholder={t('parameters.defaultNone')}
           min={1}
           className="h-9 text-sm"
           allowNull={true}
@@ -154,7 +155,7 @@ export const SettingsAssistantParameters: React.FC = () => {
       <SliderField
         form={form}
         name="presencePenalty"
-        label="Presence Penalty"
+        label={t('parameters.presencePenalty')}
         min={-2}
         max={2}
         step={0.01}
@@ -165,7 +166,7 @@ export const SettingsAssistantParameters: React.FC = () => {
       <SliderField
         form={form}
         name="frequencyPenalty"
-        label="Frequency Penalty"
+        label={t('parameters.frequencyPenalty')}
         min={-2}
         max={2}
         step={0.01}
@@ -180,13 +181,13 @@ export const SettingsAssistantParameters: React.FC = () => {
           onClick={() => form.reset()}
           disabled={!form.state.isDirty}
         >
-          Reset
+          {t('common.reset')}
         </Button>
         <form.Subscribe
           selector={(state) => [state.canSubmit, state.isSubmitting]}
           children={([canSubmit, isSubmitting]) => (
             <Button type="submit" disabled={!canSubmit || isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save Changes"}
+              {isSubmitting ? t('common.saving') : t('common.saveChanges')}
             </Button>
           )}
         />

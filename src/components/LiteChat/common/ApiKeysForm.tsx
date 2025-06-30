@@ -2,6 +2,7 @@
 // FULL FILE
 import React, { useEffect, useRef } from "react";
 import { useForm, type AnyFieldApi } from "@tanstack/react-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,15 +46,6 @@ const providerTypeValues = PROVIDER_TYPES.map((pt) => pt.value) as [
   ...DbProviderType[]
 ];
 
-const apiKeyFormSchema = z.object({
-  keyName: z.string().min(1, "Key Name is required."),
-  // Provider type must be selected for saving
-  providerType: z.enum(providerTypeValues, {
-    errorMap: () => ({ message: "Provider Type is required." }),
-  }),
-  keyValue: z.string().min(1, "API Key Value is required."),
-});
-
 export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
   initialProviderType = null,
   initialName = "",
@@ -66,7 +58,16 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
   isEditMode = false,
   editId,
 }) => {
+  const { t } = useTranslation('common');
   const keyInputRef = useRef<HTMLInputElement>(null);
+
+  const apiKeyFormSchema = z.object({
+    keyName: z.string().min(1, t('apiKeyForm.keyNameRequired')),
+    providerType: z.enum(providerTypeValues, {
+      errorMap: () => ({ message: t('apiKeyForm.providerTypeRequired') }),
+    }),
+    keyValue: z.string().min(1, t('apiKeyForm.apiKeyValueRequired')),
+  });
 
   const form = useForm({
     defaultValues: {
@@ -131,7 +132,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
           validators={{ onChange: apiKeyFormSchema.shape.providerType }}
           children={(field: AnyFieldApi) => (
             <div className="space-y-1.5">
-              <Label htmlFor={field.name}>Provider Type</Label>
+              <Label htmlFor={field.name}>{t('apiKeyForm.providerTypeLabel')}</Label>
               <Select
                 value={field.state.value ?? ""} // Select expects string value, or handle null in options
                 onValueChange={(value: string) => {
@@ -143,7 +144,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
                 disabled={disabled || form.state.isSubmitting}
               >
                 <SelectTrigger id={field.name}>
-                  <SelectValue placeholder="Select Provider Type" />
+                  <SelectValue placeholder={t('apiKeyForm.selectProviderPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {PROVIDER_TYPES.map((pt) => (
@@ -162,13 +163,13 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
           validators={{ onChange: apiKeyFormSchema.shape.keyName }}
           children={(field: AnyFieldApi) => (
             <div className="space-y-1.5">
-              <Label htmlFor={field.name}>Key Name</Label>
+              <Label htmlFor={field.name}>{t('apiKeyForm.keyNameLabel')}</Label>
               <Input
                 id={field.name}
                 value={field.state.value ?? ""}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
-                placeholder="e.g., My OpenAI Key"
+                placeholder={t('apiKeyForm.keyNamePlaceholder')}
                 disabled={disabled || form.state.isSubmitting}
               />
               <FieldMetaMessages field={field} />
@@ -180,7 +181,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
           validators={{ onChange: apiKeyFormSchema.shape.keyValue }}
           children={(field: AnyFieldApi) => (
             <div className="space-y-1.5">
-              <Label htmlFor={field.name}>API Key Value</Label>
+              <Label htmlFor={field.name}>{t('apiKeyForm.apiKeyValueLabel')}</Label>
               <Input
                 ref={keyInputRef} // Keep ref here
                 id={field.name}
@@ -188,7 +189,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
                 value={field.state.value ?? ""}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
-                placeholder="Enter your API key"
+                placeholder={t('apiKeyForm.keyValuePlaceholder')}
                 disabled={disabled || form.state.isSubmitting}
                 autoComplete="new-password"
               />
@@ -205,7 +206,7 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
           disabled={disabled || form.state.isSubmitting}
           type="button"
         >
-          <XIcon className="h-4 w-4 mr-1" /> Cancel
+          <XIcon className="h-4 w-4 mr-1" /> {t('cancel')}
         </Button>
         <form.Subscribe
           selector={(state) =>
@@ -233,8 +234,8 @@ export const ApiKeyForm: React.FC<ApiKeyFormProps> = ({
               )}
               <SaveIcon className="h-4 w-4 mr-1" />
               {isSubmitting || isValidating
-                ? "Saving..."
-                : isEditMode ? "Update API Key" : "Save API Key"}
+                ? t('apiKeyForm.saving')
+                : isEditMode ? t('apiKeyForm.updateApiKey') : t('apiKeyForm.saveApiKey')}
             </Button>
           )}
         />

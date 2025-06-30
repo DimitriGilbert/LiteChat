@@ -2,6 +2,7 @@
 
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import React, { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FileTextIcon,
   ImageIcon,
@@ -92,6 +93,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   isReadOnly = false,
   compact = false,
 }) => {
+  const { t } = useTranslation('common');
   const [previewContentUrl, setPreviewContentUrl] = useState<string | null>(
     null,
   );
@@ -117,7 +119,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     if (fileMeta.source === "direct" && !isText && fileMeta.contentBase64) {
       objectUrl = base64ToBlobUrl(fileMeta.contentBase64, mimeType);
       if (!objectUrl) {
-        setError("Failed to decode file content for preview.");
+        setError(t('filePreview.decodeError'));
       }
       setPreviewContentUrl(objectUrl);
     } else {
@@ -132,7 +134,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       fileMeta.contentText.length > MAX_TEXT_PREVIEW_SIZE
     ) {
       setError(
-        `Text file too large for preview (${(fileMeta.size / 1024).toFixed(1)} KB).`,
+        t('filePreview.tooLargeForPreview', { size: (fileMeta.size / 1024).toFixed(1) })
       );
     } else if (
       fileMeta.source === "direct" &&
@@ -140,7 +142,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       fileMeta.contentText === undefined
     ) {
       // This should ideally not happen if registerFileControl is correct
-      setError("Text content missing from metadata.");
+      setError(t('filePreview.missingContent'));
     }
 
     // Cleanup function for blob URLs
@@ -159,17 +161,18 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     fileMeta.contentText,
     mimeType,
     isText,
+    t
   ]);
 
   const handleAddToVfs = async () => {
     if (fileMeta.source === "vfs") {
-      toast.info("File is already in VFS.");
+      toast.info(t('filePreview.alreadyInVfs'));
       return;
     }
     const fileToAdd = metadataToFile(fileMeta);
 
     if (!fileToAdd) {
-      toast.error("Cannot add to VFS: Failed to reconstruct file data.");
+      toast.error(t('filePreview.reconstructError'));
       return;
     }
 
@@ -177,10 +180,10 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     try {
       const targetPath = "/";
       await VfsOps.uploadFilesOp([fileToAdd], targetPath);
-      toast.success(`"${fileMeta.name}" added to VFS root.`);
+      toast.success(t('filePreview.addSuccess', { name: fileMeta.name }));
     } catch (err) {
       console.error("Failed to add file to VFS:", err);
-      toast.error(`Failed to add "${fileMeta.name}" to VFS.`);
+      toast.error(t('filePreview.addFailed', { name: fileMeta.name }));
     } finally {
       setIsAddingToVfs(false);
     }
@@ -195,7 +198,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
         blob = new Blob([content], { type: mimeType });
       } else {
         const file = metadataToFile(fileMeta);
-        if (!file) throw new Error("Could not reconstruct file data.");
+        if (!file) throw new Error(t('filePreview.reconstructDownloadError'));
         blob = file;
       }
 
@@ -210,7 +213,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     } catch (err) {
       console.error("Failed to download file:", err);
       toast.error(
-        `Download failed: ${err instanceof Error ? err.message : String(err)}`,
+        t('filePreview.downloadFailed', { error: err instanceof Error ? err.message : String(err) })
       );
     } finally {
       setIsDownloading(false);
@@ -233,7 +236,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     if (isVfsSource) {
       return (
         <p className="p-2 text-xs text-muted-foreground italic">
-          VFS file attached. Content will be loaded when sent.
+          {t('filePreview.vfsAttached')}
         </p>
       );
     }
