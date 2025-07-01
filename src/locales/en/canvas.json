@@ -67,6 +67,13 @@
     "forkCompactAriaLabel": "Fork Conversation with Compact Summary",
     "forkWith": "Fork with",
     "forkWithModelAriaLabel": "Fork Conversation with Model Selection",
+    "aiActions": "AI Actions",
+    "repairCode": "Repair Code",
+    "enhanceCode": "Enhance Code",
+    "enhanceWithContext": "Enhance with Context",
+    "thisMessageBlocks": "This Message's Blocks",
+    "thisConversationBlocks": "This Conversation's Blocks",
+    "completeFromContext": "Complete from Context",
     "ratings": {
       "terrible": "Terrible",
       "veryBad": "Very Bad",

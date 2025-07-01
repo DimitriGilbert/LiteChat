@@ -159,5 +159,23 @@
     "needsSync": "Needs sync with {{repoName}}",
     "synced": "Synced with {{repoName}}",
     "unknownStatus": "Linked to {{repoName}} (Status: {{status}})"
+  },
+  "infoAriaLabel": "Info",
+  "cloneDialog": {
+    "title": "Clone Git Repository",
+    "description": "Enter the repository URL. It will be cloned into a new folder named after the repository within <code>{{currentPath}}</code>.",
+    "cloneButton": "Clone",
+    "urlLabel": "URL",
+    "urlPlaceholder": "https://github.com/user/repo.git",
+    "branchLabel": "Branch",
+    "branchPlaceholder": "main (default)",
+    "httpsRecommendation": "Recommendation: Use HTTPS URLs for better browser compatibility and authentication (e.g., https://github.com/user/repo.git)"
+  },
+  "commitDialog": {
+    "title": "Commit Changes",
+    "description": "Enter a commit message for the changes in <code>{{commitPath}}</code>. All current changes in this directory will be staged and committed.",
+    "commitButton": "Commit",
+    "messageLabel": "Message",
+    "messagePlaceholder": "e.g., Add feature X"
   }
 }

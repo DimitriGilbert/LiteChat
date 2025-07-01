@@ -131,5 +131,14 @@
     "startChattingDescription": "¡Todo listo! Haga clic a continuación para iniciar su primer chat.",
     "launching": "Lanzando...",
     "startFirstChat": "Iniciar Primer Chat"
+  },
+  "aiActions": {
+    "repairCode": "Reparar código",
+    "enhanceCode": "Mejorar código",
+    "contextOptions": {
+      "entireCodeBlock": "Bloque de código completo",
+      "functionsAndClasses": "Funciones y clases",
+      "selection": "Selección"
+    }
   }
 }

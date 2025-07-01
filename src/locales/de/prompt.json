@@ -55,5 +55,29 @@
         "activateTags": "Tags aktivieren"
       }
     }
+  },
+  "toolSelector": {
+    "title": "Tool-Auswahl",
+    "filterPlaceholder": "Tools filtern...",
+    "allToolsFilter": "Alle Tools",
+    "enabledToolsFilter": "Aktivierte Tools",
+    "disabledToolsFilter": "Deaktivierte Tools",
+    "mcpToolsFilter": "MCP-Tools",
+    "systemToolsFilter": "System-Tools",
+    "refreshButton": "Tools aktualisieren",
+    "applyButton": "Anwenden",
+    "loadingTools": "Tools werden geladen...",
+    "noToolsAvailable": "Keine Tools verfügbar",
+    "noToolsMatchFilter": "Keine Tools entsprechen dem Filter '{{filter}}'",
+    "mcpServer": "MCP-Server",
+    "toolDescription": "Beschreibung: {{description}}",
+    "noDescription": "Keine Beschreibung verfügbar",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert"
+  },
+  "fileControl": {
+    "attachFiles": "Dateien anhängen",
+    "attachFilesTooltip": "Dateien an Prompt anhängen",
+    "filesAttached": "{{count}} Datei(en) angehängt"
   }
 }

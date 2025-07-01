@@ -55,5 +55,29 @@
         "activateTags": "Activer les tags"
       }
     }
+  },
+  "toolSelector": {
+    "title": "Sélecteur d'outils",
+    "filterPlaceholder": "Filtrer les outils...",
+    "allToolsFilter": "Tous les outils",
+    "enabledToolsFilter": "Outils activés",
+    "disabledToolsFilter": "Outils désactivés",
+    "mcpToolsFilter": "Outils MCP",
+    "systemToolsFilter": "Outils système",
+    "refreshButton": "Actualiser les outils",
+    "applyButton": "Appliquer",
+    "loadingTools": "Chargement des outils...",
+    "noToolsAvailable": "Aucun outil disponible",
+    "noToolsMatchFilter": "Aucun outil ne correspond au filtre '{{filter}}'",
+    "mcpServer": "Serveur MCP",
+    "toolDescription": "Description : {{description}}",
+    "noDescription": "Aucune description disponible",
+    "enabled": "Activé",
+    "disabled": "Désactivé"
+  },
+  "fileControl": {
+    "attachFiles": "Joindre des fichiers",
+    "attachFilesTooltip": "Joindre des fichiers au prompt",
+    "filesAttached": "{{count}} fichier(s) joint(s)"
   }
 }

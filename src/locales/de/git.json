@@ -159,5 +159,23 @@
     "needsSync": "Benötigt Synchronisierung mit {{repoName}}",
     "synced": "Synchronisiert mit {{repoName}}",
     "unknownStatus": "Verknüpft mit {{repoName}} (Status: {{status}})"
+  },
+  "infoAriaLabel": "Info",
+  "cloneDialog": {
+    "title": "Git Repository klonen",
+    "description": "Geben Sie die Repository-URL ein. Es wird in einen neuen Ordner geklont, der nach dem Repository benannt ist, innerhalb von <code>{{currentPath}}</code>.",
+    "cloneButton": "Klonen",
+    "urlLabel": "URL",
+    "urlPlaceholder": "https://github.com/user/repo.git",
+    "branchLabel": "Branch",
+    "branchPlaceholder": "main (Standard)",
+    "httpsRecommendation": "Empfehlung: Verwenden Sie HTTPS-URLs für bessere Browser-Kompatibilität und Authentifizierung (z.B. https://github.com/user/repo.git)"
+  },
+  "commitDialog": {
+    "title": "Änderungen committen",
+    "description": "Geben Sie eine Commit-Nachricht für die Änderungen in <code>{{commitPath}}</code> ein. Alle aktuellen Änderungen in diesem Verzeichnis werden gestaged und committet.",
+    "commitButton": "Committen",
+    "messageLabel": "Nachricht",
+    "messagePlaceholder": "z.B. Feature X hinzufügen"
   }
 }

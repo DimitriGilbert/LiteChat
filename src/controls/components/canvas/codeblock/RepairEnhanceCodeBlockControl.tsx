@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
+import { useTranslation } from "react-i18next";
 
 export interface RepairEnhanceCodeBlockControlProps {
   interactionId: string;
@@ -40,6 +41,8 @@ export const RepairEnhanceCodeBlockControl: React.FC<
   errorMessage,
   disabled,
 }) => {
+  const { t } = useTranslation('canvas');
+
   const handleRequest = (
     mode:
       | "repair"
@@ -65,7 +68,7 @@ export const RepairEnhanceCodeBlockControl: React.FC<
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <ActionTooltipButton
-          tooltipText="AI Actions"
+          tooltipText={t('actions.aiActions')}
           icon={<Wand2 className="h-4 w-4" />}
           disabled={disabled}
           tabIndex={-1}
@@ -83,39 +86,39 @@ export const RepairEnhanceCodeBlockControl: React.FC<
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>AI Actions</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('actions.aiActions')}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => handleRequest("repair")}>
           <Bug className="mr-2 h-4 w-4" />
-          <span>Repair Code</span>
+          <span>{t('actions.repairCode')}</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleRequest("enhance")}>
           <Wand2 className="mr-2 h-4 w-4" />
-          <span>Enhance Code</span>
+          <span>{t('actions.enhanceCode')}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Enhance with Context</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('actions.enhanceWithContext')}</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => handleRequest("other-blocks-message")}>
           <MessageCircle className="mr-2 h-4 w-4" />
-          <span>This Message's Blocks</span>
+          <span>{t('actions.thisMessageBlocks')}</span>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => handleRequest("other-blocks-conversation")}
         >
           <MessagesSquare className="mr-2 h-4 w-4" />
-          <span>This Conversation's Blocks</span>
+          <span>{t('actions.thisConversationBlocks')}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Complete from Context</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('actions.completeFromContext')}</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => handleRequest("complete-message")}>
           <FileText className="mr-2 h-4 w-4" />
-          <span>This Message's Blocks</span>
+          <span>{t('actions.thisMessageBlocks')}</span>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => handleRequest("complete-conversation")}
         >
           <Files className="mr-2 h-4 w-4" />
-          <span>This Conversation's Blocks</span>
+          <span>{t('actions.thisConversationBlocks')}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

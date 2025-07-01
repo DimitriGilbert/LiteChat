@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { FileControlModule } from "@/controls/modules/FileControlModule";
+import { useTranslation } from "react-i18next";
 
 interface FileControlTriggerProps {
   module: FileControlModule;
@@ -19,6 +20,7 @@ interface FileControlTriggerProps {
 export const FileControlTrigger: React.FC<FileControlTriggerProps> = ({
   module,
 }) => {
+  const { t } = useTranslation('prompt');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, forceUpdate] = useState({});
 
@@ -70,9 +72,10 @@ export const FileControlTrigger: React.FC<FileControlTriggerProps> = ({
         } catch (error) {
           console.error(`Error processing file ${file.name}:`, error);
           toast.error(
-            `Failed to process file "${file.name}": ${
-              error instanceof Error ? error.message : String(error)
-            }`
+            t('fileControl.processingError', {
+              fileName: file.name,
+              error: error instanceof Error ? error.message : String(error)
+            })
           );
         }
       }
@@ -80,7 +83,7 @@ export const FileControlTrigger: React.FC<FileControlTriggerProps> = ({
         event.target.value = "";
       }
     },
-    [module, modelSupportsNonText]
+    [module, modelSupportsNonText, t]
   );
 
   const handleButtonClick = () => {
@@ -88,8 +91,8 @@ export const FileControlTrigger: React.FC<FileControlTriggerProps> = ({
   };
 
   const tooltipText = modelSupportsNonText
-    ? "Attach Files (Text, Images, etc.)"
-    : "Attach Text Files";
+    ? t('fileControl.attachFilesWithImages')
+    : t('fileControl.attachTextFiles');
 
   return (
     <>

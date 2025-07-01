@@ -55,5 +55,20 @@
         "activateTags": "Activate Tags"
       }
     }
+  },
+  "toolSelector": {
+    "title": "Available Tools",
+    "filterPlaceholder": "Filter tools...",
+    "toolsShown": "{{count}} tools shown",
+    "enableAll": "Enable All",
+    "disableAll": "Disable All",
+    "noToolsRegistered": "No tools registered.",
+    "noToolsMatchFilter": "No tools match filter.",
+    "noDescription": "No description provided."
+  },
+  "fileControl": {
+    "attachFilesWithImages": "Attach Files (Text, Images, etc.)",
+    "attachTextFiles": "Attach Text Files",
+    "processingError": "Failed to process file \"{{fileName}}\": {{error}}"
   }
 }

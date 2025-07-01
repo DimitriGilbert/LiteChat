@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface ToolSelectorControlComponentProps {
   enabledTools: Set<string>;
@@ -18,6 +19,7 @@ interface ToolSelectorControlComponentProps {
 export const ToolSelectorControlComponent: React.FC<
   ToolSelectorControlComponentProps
 > = ({ enabledTools, setEnabledTools, className }) => {
+  const { t } = useTranslation('prompt');
   const allTools = useControlRegistryStore((state) => state.tools);
   const [filterText, setFilterText] = useState("");
 
@@ -25,11 +27,11 @@ export const ToolSelectorControlComponent: React.FC<
     return Object.entries(allTools)
       .map(([name, { definition, modId }]) => ({
         name,
-        description: definition.description ?? "No description provided.",
+        description: definition.description ?? t('toolSelector.noDescription'),
         modId,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [allTools]);
+  }, [allTools, t]);
 
   const filteredTools = useMemo(() => {
     if (!filterText.trim()) {
@@ -74,12 +76,12 @@ export const ToolSelectorControlComponent: React.FC<
 
   return (
     <div className={cn("p-4 w-96 space-y-3", className)}>
-      <h4 className="text-sm font-medium">Available Tools</h4>
+      <h4 className="text-sm font-medium">{t('toolSelector.title')}</h4>
       <div className="relative">
         <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Filter tools..."
+          placeholder={t('toolSelector.filterPlaceholder')}
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
           className="pl-8 h-9"
@@ -87,7 +89,7 @@ export const ToolSelectorControlComponent: React.FC<
       </div>
       <div className="flex justify-between items-center">
         <Label className="text-xs text-muted-foreground">
-          {filteredTools.length} tools shown
+          {t('toolSelector.toolsShown', { count: filteredTools.length })}
         </Label>
         <div className="space-x-2">
           <Button
@@ -96,7 +98,7 @@ export const ToolSelectorControlComponent: React.FC<
             onClick={() => handleToggleAll(true)}
             disabled={availableTools.length === 0}
           >
-            Enable All
+            {t('toolSelector.enableAll')}
           </Button>
           <Button
             variant="outline"
@@ -104,18 +106,18 @@ export const ToolSelectorControlComponent: React.FC<
             onClick={() => handleToggleAll(false)}
             disabled={availableTools.length === 0 || enabledTools.size === 0}
           >
-            Disable All
+            {t('toolSelector.disableAll')}
           </Button>
         </div>
       </div>
       <ScrollArea className="h-64 border rounded-md p-2 bg-background/50">
         {availableTools.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            No tools registered.
+            {t('toolSelector.noToolsRegistered')}
           </p>
         ) : filteredTools.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            No tools match filter.
+            {t('toolSelector.noToolsMatchFilter')}
           </p>
         ) : (
           <div className="space-y-1">

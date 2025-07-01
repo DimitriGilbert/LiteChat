@@ -39,19 +39,51 @@
       "selectFile": "Seleccionar {{name}}",
       "gitRepository": "Repositorio Git",
       "folder": "Carpeta",
+      "file": "Archivo",
       "saveName": "Guardar nombre",
       "cancelEdit": "Cancelar edición",
       "moreActions": "Más acciones",
       "download": "Descargar",
+      "downloadFile": "Descargar archivo",
+      "downloadFolder": "Descargar carpeta (.zip)",
+      "downloadFolderZip": "Descargar carpeta como ZIP",
       "rename": "Renombrar",
       "delete": "Eliminar",
+      "deleteItem": "Eliminar {{type}}",
       "initializeGitRepo": "Inicializar Repositorio Git",
       "pull": "Pull",
       "commit": "Commit",
       "push": "Push",
       "status": "Estado",
-      "filePreview": "Vista Previa del Archivo"
+      "filePreview": "Vista Previa del Archivo",
+      "contextMenu": {
+        "openFolder": "Abrir Carpeta",
+        "gitPull": "Git Pull",
+        "gitCommit": "Git Commit...",
+        "gitPush": "Git Push",
+        "gitStatus": "Git Status",
+        "initializeGitRepo": "Inicializar Repositorio Git",
+        "rename": "Renombrar",
+        "downloadAsZip": "Descargar como ZIP",
+        "deleteFolder": "Eliminar Carpeta",
+        "selectFile": "Seleccionar Archivo",
+        "deselectFile": "Deseleccionar Archivo",
+        "downloadFile": "Descargar Archivo",
+        "deleteFile": "Eliminar Archivo"
+      }
     }
+  },
+  "fileManagerBanner": {
+    "sharedVfs": "<b>VFS Compartido:</b> Todos los chats <i>no</i> en un proyecto comparten este sistema de archivos.",
+    "projectSharedVfs": "<b>VFS Compartido de Proyecto:</b> Todos los chats en este proyecto comparten este sistema de archivos.",
+    "projectVfs": "<b>VFS de Proyecto:</b> Sistema de archivos para este proyecto y todos sus chats."
+  },
+  "newFolder": {
+    "placeholder": "Nombre de nueva carpeta",
+    "createFolder": "Crear carpeta",
+    "cancelCreate": "Cancelar creación de carpeta",
+    "createTooltip": "Crear (Enter)",
+    "cancelTooltip": "Cancelar (Esc)"
   },
   "modal": {
     "title": "Sistema de Archivos Virtual",

@@ -39,19 +39,51 @@
       "selectFile": "Select {{name}}",
       "gitRepository": "Git Repository",
       "folder": "Folder",
+      "file": "File",
       "saveName": "Save name",
       "cancelEdit": "Cancel edit",
       "moreActions": "More actions",
       "download": "Download",
+      "downloadFile": "Download file",
+      "downloadFolder": "Download folder (.zip)",
+      "downloadFolderZip": "Download folder as ZIP",
       "rename": "Rename",
       "delete": "Delete",
+      "deleteItem": "Delete {{type}}",
       "initializeGitRepo": "Initialize Git Repo",
       "pull": "Pull",
       "commit": "Commit",
       "push": "Push",
       "status": "Status",
-      "filePreview": "File Preview"
+      "filePreview": "File Preview",
+      "contextMenu": {
+        "openFolder": "Open Folder",
+        "gitPull": "Git Pull",
+        "gitCommit": "Git Commit...",
+        "gitPush": "Git Push",
+        "gitStatus": "Git Status",
+        "initializeGitRepo": "Initialize Git Repository",
+        "rename": "Rename",
+        "downloadAsZip": "Download as ZIP",
+        "deleteFolder": "Delete Folder",
+        "selectFile": "Select File",
+        "deselectFile": "Deselect File",
+        "downloadFile": "Download File",
+        "deleteFile": "Delete File"
+      }
     }
+  },
+  "fileManagerBanner": {
+    "sharedVfs": "<b>Shared VFS:</b> All chats <i>not</i> in a project share this filesystem.",
+    "projectSharedVfs": "<b>Project-shared VFS:</b> All chats in this project share this filesystem.",
+    "projectVfs": "<b>Project VFS:</b> Filesystem for this project and all its chats."
+  },
+  "newFolder": {
+    "placeholder": "New folder name",
+    "createFolder": "Create folder",
+    "cancelCreate": "Cancel create folder",
+    "createTooltip": "Create (Enter)",
+    "cancelTooltip": "Cancel (Esc)"
   },
   "modal": {
     "title": "Virtual Filesystem",

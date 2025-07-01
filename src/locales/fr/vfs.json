@@ -39,19 +39,51 @@
       "selectFile": "Sélectionner {{name}}",
       "gitRepository": "Dépôt Git",
       "folder": "Dossier",
+      "file": "Fichier",
       "saveName": "Enregistrer le nom",
       "cancelEdit": "Annuler la modification",
       "moreActions": "Plus d'actions",
       "download": "Télécharger",
+      "downloadFile": "Télécharger le fichier",
+      "downloadFolder": "Télécharger le dossier (.zip)",
+      "downloadFolderZip": "Télécharger le dossier en ZIP",
       "rename": "Renommer",
       "delete": "Supprimer",
+      "deleteItem": "Supprimer {{type}}",
       "initializeGitRepo": "Initialiser le dépôt Git",
       "pull": "Pull",
       "commit": "Commit",
       "push": "Push",
       "status": "Statut",
-      "filePreview": "Aperçu du fichier"
+      "filePreview": "Aperçu du fichier",
+      "contextMenu": {
+        "openFolder": "Ouvrir le Dossier",
+        "gitPull": "Git Pull",
+        "gitCommit": "Git Commit...",
+        "gitPush": "Git Push",
+        "gitStatus": "Git Status",
+        "initializeGitRepo": "Initialiser Dépôt Git",
+        "rename": "Renommer",
+        "downloadAsZip": "Télécharger en ZIP",
+        "deleteFolder": "Supprimer le Dossier",
+        "selectFile": "Sélectionner le Fichier",
+        "deselectFile": "Désélectionner le Fichier",
+        "downloadFile": "Télécharger le Fichier",
+        "deleteFile": "Supprimer le Fichier"
+      }
     }
+  },
+  "fileManagerBanner": {
+    "sharedVfs": "<b>VFS Partagé:</b> Tous les chats <i>non</i> dans un projet partagent ce système de fichiers.",
+    "projectSharedVfs": "<b>VFS Partagé de Projet:</b> Tous les chats de ce projet partagent ce système de fichiers.",
+    "projectVfs": "<b>VFS de Projet:</b> Système de fichiers pour ce projet et tous ses chats."
+  },
+  "newFolder": {
+    "placeholder": "Nom du nouveau dossier",
+    "createFolder": "Créer le dossier",
+    "cancelCreate": "Annuler la création du dossier",
+    "createTooltip": "Créer (Entrée)",
+    "cancelTooltip": "Annuler (Échap)"
   },
   "modal": {
     "title": "Système de Fichiers Virtuel",

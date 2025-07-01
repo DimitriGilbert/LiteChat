@@ -39,19 +39,51 @@
       "selectFile": "{{name}} auswählen",
       "gitRepository": "Git-Repository",
       "folder": "Ordner",
+      "file": "Datei",
       "saveName": "Namen speichern",
       "cancelEdit": "Bearbeitung abbrechen",
       "moreActions": "Weitere Aktionen",
       "download": "Herunterladen",
+      "downloadFile": "Datei herunterladen",
+      "downloadFolder": "Ordner herunterladen (.zip)",
+      "downloadFolderZip": "Ordner als ZIP herunterladen",
       "rename": "Umbenennen",
       "delete": "Löschen",
+      "deleteItem": "{{type}} löschen",
       "initializeGitRepo": "Git-Repo initialisieren",
       "pull": "Pull",
       "commit": "Commit",
       "push": "Push",
       "status": "Status",
-      "filePreview": "Dateivorschau"
+      "filePreview": "Dateivorschau",
+      "contextMenu": {
+        "openFolder": "Ordner Öffnen",
+        "gitPull": "Git Pull",
+        "gitCommit": "Git Commit...",
+        "gitPush": "Git Push",
+        "gitStatus": "Git Status",
+        "initializeGitRepo": "Git Repository Initialisieren",
+        "rename": "Umbenennen",
+        "downloadAsZip": "Als ZIP Herunterladen",
+        "deleteFolder": "Ordner Löschen",
+        "selectFile": "Datei Auswählen",
+        "deselectFile": "Datei Abwählen",
+        "downloadFile": "Datei Herunterladen",
+        "deleteFile": "Datei Löschen"
+      }
     }
+  },
+  "fileManagerBanner": {
+    "sharedVfs": "<b>Gemeinsames VFS:</b> Alle Chats <i>nicht</i> in einem Projekt teilen dieses Dateisystem.",
+    "projectSharedVfs": "<b>Projekt-gemeinsames VFS:</b> Alle Chats in diesem Projekt teilen dieses Dateisystem.",
+    "projectVfs": "<b>Projekt VFS:</b> Dateisystem für dieses Projekt und alle seine Chats."
+  },
+  "newFolder": {
+    "placeholder": "Neuer Ordnername",
+    "createFolder": "Ordner erstellen",
+    "cancelCreate": "Ordner-Erstellung abbrechen",
+    "createTooltip": "Erstellen (Enter)",
+    "cancelTooltip": "Abbrechen (Esc)"
   },
   "modal": {
     "title": "Virtuelles Dateisystem",
