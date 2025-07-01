@@ -311,6 +311,11 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
         return;
       }
 
+      // Check for explicit positions on original data nodes BEFORE converting
+      const hasExplicitPositions = data.nodes.some(node => 
+        node.position && (node.position.x !== 0 || node.position.y !== 0)
+      );
+
       // Convert flow nodes to ReactFlow nodes
       let reactFlowNodes = data.nodes.map(node => ({
         id: node.id,
@@ -324,11 +329,6 @@ const FlowBlockRendererComponent: React.FC<FlowBlockRendererProps> = ({
         ...edge, // Preserve all original edge properties
         markerEnd: edge.markerEnd || { type: XYMarkerType.ArrowClosed }
       })) as Edge[];
-
-      // Determine if we need auto-layout
-      const hasExplicitPositions = reactFlowNodes.some(node => 
-        node.position && (node.position.x !== 0 || node.position.y !== 0)
-      );
       
       if (!hasExplicitPositions) {
         // Use the tree layout for nodes without explicit positions

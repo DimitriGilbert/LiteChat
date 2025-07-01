@@ -50,27 +50,68 @@ function buildTree(nodes: Node[], edges: Edge[], nodeSizeMap: Record<string, [nu
     parents[nodeId] = [];
   });
   
-  // Build relationships
+  // Build relationships - break cycles by detecting them
+  // const visitedInPath = new Set<string>();
   edges.forEach(e => {
     if (nodeMap[e.source] && nodeMap[e.target]) {
-      children[e.source].push(nodeMap[e.target]);
-      parents[e.target].push(e.source);
+      // Simple cycle detection: if target is already an ancestor of source, skip this edge
+      const wouldCreateCycle = isAncestor(e.target, e.source, children);
+      if (!wouldCreateCycle) {
+        children[e.source].push(nodeMap[e.target]);
+        parents[e.target].push(e.source);
+      }
     }
   });
+  
+  // Helper function to check if a node is an ancestor of another
+  function isAncestor(ancestorId: string, descendantId: string, childrenMap: Record<string, any[]>): boolean {
+    const visited = new Set<string>();
+    const stack = [descendantId];
+    
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      
+      if (current === ancestorId) return true;
+      
+      const currentChildren = childrenMap[current] || [];
+      for (const child of currentChildren) {
+        if (child && child.id) {
+          stack.push(child.id);
+        }
+      }
+    }
+    return false;
+  }
+  
+  // Recursively build tree structure
+  function buildTreeRecursive(nodeId: string, visited: Set<string>): any {
+    if (visited.has(nodeId)) return null; // Prevent infinite recursion
+    visited.add(nodeId);
+    
+    const node = nodeMap[nodeId];
+    if (!node) return null;
+    
+    // Build children recursively
+    node.children = children[nodeId]
+      .map(childNode => childNode ? buildTreeRecursive(childNode.id, new Set(visited)) : null)
+      .filter(Boolean);
+    
+    return node;
+  }
   
   // Find root nodes (nodes with no parents)
   const rootCandidates = nodes.filter(n => parents[n.id].length === 0);
   
   if (rootCandidates.length === 0) {
     // Handle circular references by picking the first node
-    return nodeMap[nodes[0].id];
+    return buildTreeRecursive(nodes[0].id, new Set());
   }
   
   if (rootCandidates.length === 1) {
-    // Single root - standard tree
-    const root = nodeMap[rootCandidates[0].id];
-    root.children = children[root.id];
-    return root;
+    // Single root - build tree recursively
+    return buildTreeRecursive(rootCandidates[0].id, new Set());
   }
   
   // Multiple roots - create virtual root
@@ -79,11 +120,7 @@ function buildTree(nodes: Node[], edges: Edge[], nodeSizeMap: Record<string, [nu
     label: '',
     width: 0,
     height: 0,
-    children: rootCandidates.map(n => {
-      const node = nodeMap[n.id];
-      node.children = children[n.id];
-      return node;
-    })
+    children: rootCandidates.map(n => buildTreeRecursive(n.id, new Set())).filter(Boolean)
   };
   
   return virtualRoot;
@@ -102,7 +139,9 @@ export function getTreeLayout(nodes: Node[], edges: Edge[], defaultNodeSize: [nu
   });
 
   const root = buildTree(nodes, edges, nodeSizeMap);
-  if (!root) return nodes;
+  if (!root) {
+    return nodes;
+  }
 
   const rootHierarchy = hierarchy<any>(root);
   // Use dynamic spacing based on node sizes
