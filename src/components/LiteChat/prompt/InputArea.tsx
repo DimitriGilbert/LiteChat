@@ -34,7 +34,7 @@ export const InputArea = memo(
         initialValue = "",
         onSubmit,
         disabled,
-        placeholder = "Type message... (Shift+Enter for new line)",
+        placeholder = "",
         className,
         onValueChange,
         ...rest
@@ -45,8 +45,12 @@ export const InputArea = memo(
       const [internalValue, setInternalValue] = useState(initialValue);
       const setPromptInputValue = usePromptInputValueStore((state) => state.setValue);
       const { t } = useTranslation('prompt');
+      if (!placeholder || placeholder === "") {
+        placeholder = t('inputAreaPlaceholder');
+      }
 
       useImperativeHandle(ref, () => ({
+        
         getValue: () => internalValue,
         setValue: (value: string) => {
           setInternalValue(value);
@@ -165,7 +169,7 @@ export const InputArea = memo(
           onChange={handleTextareaChange}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          placeholder={t('inputAreaPlaceholder')}
+          placeholder={placeholder}
           rows={1}
           className={cn(
             "w-full p-3 border rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto",
