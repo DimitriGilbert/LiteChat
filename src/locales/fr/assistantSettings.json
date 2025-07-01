@@ -254,5 +254,21 @@
     "instructionsLabel": "Instructions",
     "addNew": "Add New Variable",
     "addButton": "Add Variable"
+  },
+  "assistantTabs": {
+    "systemPrompt": "Prompt Système",
+    "library": "Bibliothèque",
+    "agents": "Agents",
+    "autoTitles": "Titres Auto",
+    "tools": "Outils",
+    "mcp": "MCP",
+    "parameters": "Paramètres",
+    "forkCompact": "Fork Compact"
+  },
+  "assistantPrompts": {
+    "templates": "Modèles",
+    "newTemplate": "Nouveau Modèle",
+    "editTemplate": "Modifier: {{name}}",
+    "deleteConfirmation": "Êtes-vous sûr de vouloir supprimer ce modèle?"
   }
 } 

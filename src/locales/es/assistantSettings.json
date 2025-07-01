@@ -254,5 +254,21 @@
     "instructionsLabel": "Instrucciones",
     "addNew": "Agregar Nueva Variable",
     "addButton": "Agregar Variable"
+  },
+  "assistantTabs": {
+    "systemPrompt": "Prompt del Sistema",
+    "library": "Biblioteca",
+    "agents": "Agentes",
+    "autoTitles": "Títulos Automáticos",
+    "tools": "Herramientas",
+    "mcp": "MCP",
+    "parameters": "Parámetros",
+    "forkCompact": "Fork Compact"
+  },
+  "assistantPrompts": {
+    "templates": "Plantillas",
+    "newTemplate": "Nueva Plantilla",
+    "editTemplate": "Editar: {{name}}",
+    "deleteConfirmation": "¿Está seguro de que desea eliminar esta plantilla?"
   }
 } 

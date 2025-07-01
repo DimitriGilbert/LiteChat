@@ -21,7 +21,7 @@ import { SettingsAssistantForkCompact } from "./SettingsAssistantForkCompact";
 import { useTranslation } from "react-i18next";
 
 const SettingsAssistantComponent: React.FC = () => {
-  const { t } = useTranslation('settings');
+  const { t } = useTranslation('assistantSettings');
 
   const { enableAdvancedSettings } = useSettingsStore(
     useShallow((state) => ({

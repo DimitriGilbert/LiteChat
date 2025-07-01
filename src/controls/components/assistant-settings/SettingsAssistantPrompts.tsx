@@ -17,7 +17,7 @@ import { TemplateList } from "./common/TemplateList";
 
 
 export const SettingsAssistantPrompts: React.FC = () => {
-  const { t } = useTranslation('settings');
+  const { t } = useTranslation('assistantSettings');
   const [activeTab, setActiveTab] = useState("templates");
   const [editingTemplate, setEditingTemplate] = useState<
     PromptTemplate | undefined

@@ -216,9 +216,9 @@
     "noAgents": "Noch keine Agenten",
     "noTasks": "Noch keine Aufgaben",
     "noTemplates": "Noch keine Vorlagen",
-    "noAgentsDescription": "Verwenden Sie den Tab „Neuer Agent“, um Ihren ersten Agenten zu erstellen",
+    "noAgentsDescription": "Verwenden Sie den Tab \"Neuer Agent\" um Ihren ersten Agenten zu erstellen",
     "noTasksDescription": "Erstellen Sie Aufgaben, um zu definieren, was dieser Agent tun kann",
-    "noTemplatesDescription": "Verwenden Sie den Tab „Neue Vorlage“, um Ihre erste Vorlage zu erstellen",
+    "noTemplatesDescription": "Verwenden Sie den Tab \"Neue Vorlage\" um Ihre erste Vorlage zu erstellen",
     "nameColumn": "Name",
     "descriptionColumn": "Beschreibung",
     "variablesColumn": "Variablen",
@@ -254,5 +254,21 @@
     "instructionsLabel": "Anweisungen",
     "addNew": "Neue Variable hinzufügen",
     "addButton": "Variable hinzufügen"
+  },
+  "assistantTabs": {
+    "systemPrompt": "System-Prompt",
+    "library": "Bibliothek",
+    "agents": "Agenten",
+    "autoTitles": "Auto-Titel",
+    "tools": "Tools",
+    "mcp": "MCP",
+    "parameters": "Parameter",
+    "forkCompact": "Fork Compact"
+  },
+  "assistantPrompts": {
+    "templates": "Vorlagen",
+    "newTemplate": "Neue Vorlage",
+    "editTemplate": "Bearbeiten: {{name}}",
+    "deleteConfirmation": "Sind Sie sicher, dass Sie diese Vorlage löschen möchten?"
   }
 } 
