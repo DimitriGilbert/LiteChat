@@ -9,6 +9,7 @@ import ai_en from '../locales/en/ai.json';
 import tools_en from '../locales/en/tools.json';
 import renderers_en from '../locales/en/renderers.json';
 import welcome_en from '../locales/en/welcome.json';
+import assistantSettings_en from '../locales/en/assistantSettings.json';
 
 // Add other languages as needed
 import common_fr from '../locales/fr/common.json';
@@ -22,6 +23,7 @@ import ai_fr from '../locales/fr/ai.json';
 import tools_fr from '../locales/fr/tools.json';
 import renderers_fr from '../locales/fr/renderers.json';
 import welcome_fr from '../locales/fr/welcome.json';
+import assistantSettings_fr from '../locales/fr/assistantSettings.json';
 
 // German
 import common_de from '../locales/de/common.json';
@@ -35,6 +37,7 @@ import ai_de from '../locales/de/ai.json';
 import tools_de from '../locales/de/tools.json';
 import renderers_de from '../locales/de/renderers.json';
 import welcome_de from '../locales/de/welcome.json';
+import assistantSettings_de from '../locales/de/assistantSettings.json';
 
 // Spanish
 import common_es from '../locales/es/common.json';
@@ -48,6 +51,7 @@ import ai_es from '../locales/es/ai.json';
 import tools_es from '../locales/es/tools.json';
 import renderers_es from '../locales/es/renderers.json';
 import welcome_es from '../locales/es/welcome.json';
+import assistantSettings_es from '../locales/es/assistantSettings.json';
 
 // Italian
 import common_it from '../locales/it/common.json';
@@ -61,6 +65,7 @@ import ai_it from '../locales/it/ai.json';
 import tools_it from '../locales/it/tools.json';
 import renderers_it from '../locales/it/renderers.json';
 import welcome_it from '../locales/it/welcome.json';
+import assistantSettings_it from '../locales/it/assistantSettings.json';
 
 export const resources = {
   en: {
@@ -75,6 +80,7 @@ export const resources = {
     tools: tools_en,
     renderers: renderers_en,
     welcome: welcome_en,
+    assistantSettings: assistantSettings_en,
   },
   fr: {
     common: common_fr,
@@ -88,6 +94,7 @@ export const resources = {
     tools: tools_fr,
     renderers: renderers_fr,
     welcome: welcome_fr,
+    assistantSettings: assistantSettings_fr,
   },
   de: {
     common: common_de,
@@ -101,6 +108,7 @@ export const resources = {
     tools: tools_de,
     renderers: renderers_de,
     welcome: welcome_de,
+    assistantSettings: assistantSettings_de,
   },
   es: {
     common: common_es,
@@ -114,6 +122,7 @@ export const resources = {
     tools: tools_es,
     renderers: renderers_es,
     welcome: welcome_es,
+    assistantSettings: assistantSettings_es,
   },
   it: {
     common: common_it,
@@ -127,5 +136,6 @@ export const resources = {
     tools: tools_it,
     renderers: renderers_it,
     welcome: welcome_it,
+    assistantSettings: assistantSettings_it,
   },
 } as const;

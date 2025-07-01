@@ -78,7 +78,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt}'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB limit
         runtimeCaching: [
           // {
           //   urlPattern: /^https:\/\/api\.openai\.com\/.*/i,
