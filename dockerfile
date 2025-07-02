@@ -1,20 +1,10 @@
-FROM nginx:alpine
+FROM lipanski/docker-static-website:latest
 
-# Create app directory
-WORKDIR /usr/share/nginx/html
+# Copy the built application files
+COPY build/ .
 
-# Install necessary tools
-RUN apk add --no-cache curl unzip
+# Create httpd.conf for SPA routing and any needed configuration
+COPY docker/httpd.conf .
 
-# Download and extract the latest LiteChat release
-RUN curl -L https://litechat.dbuild.dev/release/latest.zip -o litechat.zip && \
-    unzip -o litechat.zip && \
-    rm litechat.zip
-
-# Copy nginx configuration for SPA and potential API proxy
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# The base image already exposes port 3000 and runs the httpd server
+# No additional configuration needed

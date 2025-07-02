@@ -22,6 +22,7 @@ DIST_DIR="dist"
 # Parse command line arguments
 RELEASE_NAME=""
 NO_PUBLISH=false
+DOCKER_REPO=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -33,18 +34,24 @@ while [[ $# -gt 0 ]]; do
       NO_PUBLISH=true
       shift
       ;;
+    --docker-repo)
+      DOCKER_REPO="$2"
+      shift 2
+      ;;
     -h|--help)
-      echo "Usage: $0 [--release <name>] [--no-publish]"
+      echo "Usage: $0 [--release <name>] [--no-publish] [--docker-repo <repo>]"
       echo ""
       echo "Options:"
-      echo "  --release <name>  Create a release with the specified name"
-      echo "  --no-publish      Create release files but don't publish to GitHub"
-      echo "  -h, --help        Show this help message"
+      echo "  --release <name>     Create a release with the specified name"
+      echo "  --no-publish         Create release files but don't publish to GitHub"
+      echo "  --docker-repo <repo> Docker repository for image (e.g., 'myuser/litechat')"
+      echo "  -h, --help           Show this help message"
       echo ""
       echo "Examples:"
-      echo "  $0                                    # Build only"
-      echo "  $0 --release v1.0.0                  # Build and create GitHub release"
-      echo "  $0 --release cloneathon --no-publish # Build and create release files without publishing"
+      echo "  $0                                                # Build only"
+      echo "  $0 --release v1.0.0                              # Build and create GitHub release"
+      echo "  $0 --release v1.0.0 --docker-repo myuser/litechat # Build, release, and push Docker image"
+      echo "  $0 --release cloneathon --no-publish              # Build and create release files without publishing"
       exit 0
       ;;
     *)
@@ -197,6 +204,156 @@ build_project() {
   fi
 }
 
+create_language_specific_dockerfile() {
+  local lang="$1"
+  local temp_dockerfile="dockerfile.tmp.$lang"
+  
+  cat > "$temp_dockerfile" << EOF
+FROM lipanski/docker-static-website:latest
+
+# Copy the built application files for specific language
+COPY build/$lang/ .
+
+# Create httpd.conf for SPA routing and any needed configuration
+COPY docker/httpd.conf .
+
+# The base image already exposes port 3000 and runs the httpd server
+# No additional configuration needed
+EOF
+
+  echo "$temp_dockerfile"
+}
+
+create_docker_image() {
+  if [[ -z "$RELEASE_NAME" ]]; then
+    log_info "No release name provided, skipping Docker image creation"
+    return
+  fi
+  
+  if [[ -z "$DOCKER_REPO" ]]; then
+    log_info "No Docker repository provided, skipping Docker image creation"
+    return
+  fi
+  
+  # Check if Docker is available
+  if ! command -v docker &> /dev/null; then
+    log_error "Docker is not installed. Please install Docker to create images."
+    return 1
+  fi
+  
+  # Check if Dockerfile exists
+  if [[ ! -f "dockerfile" ]]; then
+    log_error "Dockerfile not found. Please ensure 'dockerfile' exists in the project root."
+    return 1
+  fi
+  
+  if [ ${#LANGUAGES[@]} -eq 0 ]; then
+    # Single build mode - create one image
+    log_info "Creating Docker image: $DOCKER_REPO:$RELEASE_NAME"
+    
+    # Build the Docker image
+    log_info "Building Docker image..."
+    if ! docker build -t "$DOCKER_REPO:$RELEASE_NAME" -t "$DOCKER_REPO:latest" .; then
+      log_error "Docker build failed"
+      return 1
+    fi
+    
+    log_success "Docker image built successfully: $DOCKER_REPO:$RELEASE_NAME"
+    
+    # Push to Docker registry if not in no-publish mode
+    if [[ "$NO_PUBLISH" == true ]]; then
+      log_warning "Docker image created but not pushed (--no-publish flag used)"
+      return
+    fi
+    
+    log_info "Pushing Docker image to registry..."
+    
+    # Push both tags
+    if docker push "$DOCKER_REPO:$RELEASE_NAME" && docker push "$DOCKER_REPO:latest"; then
+      log_success "Docker image pushed successfully!"
+      log_info "Image available at: $DOCKER_REPO:$RELEASE_NAME"
+      log_info "Latest tag updated: $DOCKER_REPO:latest"
+    else
+      log_error "Failed to push Docker image. Please check your Docker Hub credentials and repository permissions."
+      log_info "You can manually push with: docker push $DOCKER_REPO:$RELEASE_NAME"
+      return 1
+    fi
+  else
+    # Multi-language mode - create images for each language
+    local created_images=()
+    local temp_dockerfiles=()
+    
+    # Create default language image (without language suffix)
+    log_info "Creating default Docker image: $DOCKER_REPO:$RELEASE_NAME"
+    if ! docker build -t "$DOCKER_REPO:$RELEASE_NAME" -t "$DOCKER_REPO:latest" .; then
+      log_error "Docker build failed for default image"
+      return 1
+    fi
+    created_images+=("$DOCKER_REPO:$RELEASE_NAME" "$DOCKER_REPO:latest")
+    log_success "Default Docker image built successfully: $DOCKER_REPO:$RELEASE_NAME"
+    
+    # Create language-specific images
+    for lang in "${LANGUAGES[@]}"; do
+      if [[ "$lang" == "$DEFAULT_LANG" ]]; then
+        continue # Skip default language as it's already built
+      fi
+      
+      log_info "Creating language-specific Docker image: $DOCKER_REPO:$RELEASE_NAME-$lang"
+      
+      # Create temporary Dockerfile for this language
+      local temp_dockerfile=$(create_language_specific_dockerfile "$lang")
+      temp_dockerfiles+=("$temp_dockerfile")
+      
+      # Build language-specific image
+      if ! docker build -f "$temp_dockerfile" -t "$DOCKER_REPO:$RELEASE_NAME-$lang" .; then
+        log_error "Docker build failed for language: $lang"
+        # Clean up temp files before returning
+        for tf in "${temp_dockerfiles[@]}"; do
+          rm -f "$tf"
+        done
+        return 1
+      fi
+      
+      created_images+=("$DOCKER_REPO:$RELEASE_NAME-$lang")
+      log_success "Language-specific Docker image built successfully: $DOCKER_REPO:$RELEASE_NAME-$lang"
+    done
+    
+    # Clean up temporary Dockerfiles
+    for temp_dockerfile in "${temp_dockerfiles[@]}"; do
+      rm -f "$temp_dockerfile"
+    done
+    
+    # Push all images if not in no-publish mode
+    if [[ "$NO_PUBLISH" == true ]]; then
+      log_warning "Docker images created but not pushed (--no-publish flag used)"
+      log_info "Created images: ${created_images[*]}"
+      return
+    fi
+    
+    log_info "Pushing Docker images to registry..."
+    local failed_pushes=()
+    
+    for image in "${created_images[@]}"; do
+      log_info "Pushing $image..."
+      if docker push "$image"; then
+        log_success "Successfully pushed: $image"
+      else
+        log_error "Failed to push: $image"
+        failed_pushes+=("$image")
+      fi
+    done
+    
+    if [ ${#failed_pushes[@]} -eq 0 ]; then
+      log_success "All Docker images pushed successfully!"
+      log_info "Available images: ${created_images[*]}"
+    else
+      log_error "Some pushes failed: ${failed_pushes[*]}"
+      log_info "You can manually retry with: docker push <image_name>"
+      return 1
+    fi
+  fi
+}
+
 create_github_release() {
   if [[ -z "$RELEASE_NAME" ]]; then
     return
@@ -301,6 +458,25 @@ show_summary() {
     echo ""
     echo "📦 Release sizes:"
     du -sh "$RELEASE_DIR"/* 2>/dev/null || true
+    
+    if [[ -n "$DOCKER_REPO" ]]; then
+      echo ""
+      echo "🐳 Docker images:"
+      # Show all images for this repository
+      docker images "$DOCKER_REPO" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" 2>/dev/null || echo "No Docker images found"
+      
+      if [ ${#LANGUAGES[@]} -gt 0 ]; then
+        echo ""
+        echo "📋 Available image tags:"
+        echo "  • $DOCKER_REPO:$RELEASE_NAME (default: $DEFAULT_LANG)"
+        echo "  • $DOCKER_REPO:latest (always points to default)"
+        for lang in "${LANGUAGES[@]}"; do
+          if [[ "$lang" != "$DEFAULT_LANG" ]]; then
+            echo "  • $DOCKER_REPO:$RELEASE_NAME-$lang ($lang version)"
+          fi
+        done
+      fi
+    fi
   fi
 }
 
@@ -313,6 +489,9 @@ main() {
     log_info "Building for release: $RELEASE_NAME"
     if [[ "$NO_PUBLISH" == true ]]; then
       log_info "Release will be created locally only (--no-publish)"
+    fi
+    if [[ -n "$DOCKER_REPO" ]]; then
+      log_info "Docker image will be created: $DOCKER_REPO:$RELEASE_NAME"
     fi
   else
     log_info "Building without release"
@@ -336,6 +515,7 @@ main() {
   cleanup_dirs
   create_directories
   build_project
+  create_docker_image
   create_github_release
   show_summary
   

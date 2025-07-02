@@ -1,0 +1,39 @@
+services:
+  litechat:
+    build: .
+    ports:
+      - "${LITECHAT_PORT:-8080}:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - mcp-bridge
+    
+  # Alternative: Use pre-built image from Docker Hub
+  # litechat-hub:
+  #   image: myuser/litechat:latest
+  #   ports:
+  #     - "${LITECHAT_PORT:-8080}:3000"
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - mcp-bridge
+
+  mcp-bridge:
+    image: node:20-alpine
+    working_dir: /app
+    command: ["node", "bin/mcp-bridge.js", "--host", "0.0.0.0"]
+    ports:
+      - "${MCP_BRIDGE_PORT:-3001}:${MCP_BRIDGE_INTERNAL_PORT:-3001}"
+    environment:
+      - MCP_BRIDGE_PORT=${MCP_BRIDGE_INTERNAL_PORT:-3001}
+      - MCP_BRIDGE_HOST=0.0.0.0
+      - MCP_BRIDGE_VERBOSE=${MCP_BRIDGE_VERBOSE:-false}
+    volumes:
+      - ./bin/mcp-bridge.js:/app/bin/mcp-bridge.js:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${MCP_BRIDGE_INTERNAL_PORT:-3001}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s 

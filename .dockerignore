@@ -1,0 +1,74 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts (except the build directory we want to copy)
+dist/
+coverage/
+
+# Development files
+src/
+public/
+*.config.js
+*.config.ts
+*.config.mjs
+tsconfig.json
+vite.config.ts
+eslint.config.js
+
+# Version control
+.git/
+.gitignore
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
+
+# Release artifacts that aren't needed in the image
+release/
+*.zip
+
+# Documentation and scripts
+docs/
+README.md
+bin/
+*.md
+
+# Environment files
+.env*
+.env.example
+
+# Other build artifacts
+bad_docs/
+raw_assets/
+runner/
+liteChat-turbo/
+racebench/
+
+# Package files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Docker files (not needed in the image)
+dockerfile
+dockerfile.tmp.*
+docker-compose.yml
+.dockerignore 
