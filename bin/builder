@@ -23,6 +23,10 @@ DIST_DIR="dist"
 RELEASE_NAME=""
 NO_PUBLISH=false
 DOCKER_REPO=""
+SKIP_BUILD=false
+SKIP_DOCKER=false
+SKIP_GITHUB=false
+BUILD_DOCKER=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -38,20 +42,42 @@ while [[ $# -gt 0 ]]; do
       DOCKER_REPO="$2"
       shift 2
       ;;
+    --skip-build)
+      SKIP_BUILD=true
+      shift
+      ;;
+    --skip-docker)
+      SKIP_DOCKER=true
+      shift
+      ;;
+    --skip-github)
+      SKIP_GITHUB=true
+      shift
+      ;;
+    --build-docker)
+      BUILD_DOCKER=true
+      shift
+      ;;
     -h|--help)
-      echo "Usage: $0 [--release <name>] [--no-publish] [--docker-repo <repo>]"
+      echo "Usage: $0 [options]"
       echo ""
       echo "Options:"
       echo "  --release <name>     Create a release with the specified name"
       echo "  --no-publish         Create release files but don't publish to GitHub"
       echo "  --docker-repo <repo> Docker repository for image (e.g., 'myuser/litechat')"
+      echo "  --skip-build         Skip the application build step"
+      echo "  --skip-docker        Skip Docker image creation"
+      echo "  --skip-github        Skip GitHub release creation"
+      echo "  --build-docker       Force Docker image creation (uses 'litechat' as default repo)"
       echo "  -h, --help           Show this help message"
       echo ""
       echo "Examples:"
       echo "  $0                                                # Build only"
       echo "  $0 --release v1.0.0                              # Build and create GitHub release"
       echo "  $0 --release v1.0.0 --docker-repo myuser/litechat # Build, release, and push Docker image"
-      echo "  $0 --release cloneathon --no-publish              # Build and create release files without publishing"
+      echo "  $0 --release v1.0.0 --build-docker               # Build, release, and create Docker images with default repo"
+      echo "  $0 --skip-build --build-docker --release v1.0.0  # Skip build, create Docker images from existing build"
+      echo "  $0 --skip-build --skip-github --build-docker     # Only create Docker images"
       exit 0
       ;;
     *)
@@ -136,6 +162,11 @@ create_directories() {
 }
 
 build_project() {
+  if [[ "$SKIP_BUILD" == true ]]; then
+    log_info "Skipping application build (--skip-build flag)"
+    return
+  fi
+  
   if [ ${#LANGUAGES[@]} -eq 0 ]; then
     # Single build mode
     log_info "Performing single, language-agnostic build..."
@@ -159,7 +190,9 @@ build_project() {
     # Build default language (en) first and put it at the root
     log_info "Building default language: $DEFAULT_LANG (will be placed at build root)"
     rm -rf "$DIST_DIR"
-    export VITE_APP_LANG="$DEFAULT_LANG" && export VITE_BASE="/" && npm run build
+    export VITE_APP_LANG="$DEFAULT_LANG"
+    export VITE_BASE="/"
+    npm run build
     if [[ ! -d "$DIST_DIR" ]]; then
       log_error "Build failed for default language $DEFAULT_LANG - dist directory not found"
       exit 1
@@ -168,6 +201,9 @@ build_project() {
     # Copy default language to build root
     log_info "Copying default language build ($DEFAULT_LANG) to $BUILD_DIR/ root"
     cp -r "$DIST_DIR"/* "$BUILD_DIR/"
+    # Also copy to language-specific directory for consistency
+    mkdir -p "$BUILD_DIR/$DEFAULT_LANG"
+    cp -r "$DIST_DIR"/* "$BUILD_DIR/$DEFAULT_LANG/"
     
     # Create default release zip
     if [[ -n "$RELEASE_NAME" ]]; then
@@ -182,9 +218,11 @@ build_project() {
         continue # Skip default language as it's already built
       fi
       
-             log_info "Building language: $lang (will be placed in $BUILD_DIR/$lang/)"
-       rm -rf "$DIST_DIR"
-       export VITE_APP_LANG="$lang" && export VITE_BASE="/$lang/" && npm run build
+      log_info "Building language: $lang (will be placed in $BUILD_DIR/$lang/)"
+      rm -rf "$DIST_DIR"
+      export VITE_APP_LANG="$lang"
+      export VITE_BASE="/"
+      npm run build
       if [[ ! -d "$DIST_DIR" ]]; then
         log_error "Build failed for language $lang - dist directory not found"
         exit 1
@@ -214,7 +252,7 @@ FROM lipanski/docker-static-website:latest
 # Copy the built application files for specific language
 COPY build/$lang/ .
 
-# Create httpd.conf for SPA routing and any needed configuration
+# Copy httpd.conf for SPA routing and any needed configuration
 COPY docker/httpd.conf .
 
 # The base image already exposes port 3000 and runs the httpd server
@@ -225,14 +263,25 @@ EOF
 }
 
 create_docker_image() {
-  if [[ -z "$RELEASE_NAME" ]]; then
-    log_info "No release name provided, skipping Docker image creation"
+  if [[ "$SKIP_DOCKER" == true ]]; then
+    log_info "Skipping Docker image creation (--skip-docker flag)"
     return
   fi
   
-  if [[ -z "$DOCKER_REPO" ]]; then
-    log_info "No Docker repository provided, skipping Docker image creation"
+  if [[ "$BUILD_DOCKER" != true && -z "$DOCKER_REPO" ]]; then
+    log_info "No Docker repository provided and --build-docker not specified, skipping Docker image creation"
     return
+  fi
+  
+  # Use default repo if --build-docker is specified but no repo provided
+  if [[ "$BUILD_DOCKER" == true && -z "$DOCKER_REPO" ]]; then
+    DOCKER_REPO="litechat"
+    log_info "Using default Docker repository: $DOCKER_REPO"
+  fi
+  
+  if [[ -z "$RELEASE_NAME" ]]; then
+    log_error "Release name is required for Docker image creation"
+    return 1
   fi
   
   # Check if Docker is available
@@ -355,6 +404,11 @@ create_docker_image() {
 }
 
 create_github_release() {
+  if [[ "$SKIP_GITHUB" == true ]]; then
+    log_info "Skipping GitHub release creation (--skip-github flag)"
+    return
+  fi
+  
   if [[ -z "$RELEASE_NAME" ]]; then
     return
   fi
@@ -490,11 +544,23 @@ main() {
     if [[ "$NO_PUBLISH" == true ]]; then
       log_info "Release will be created locally only (--no-publish)"
     fi
-    if [[ -n "$DOCKER_REPO" ]]; then
-      log_info "Docker image will be created: $DOCKER_REPO:$RELEASE_NAME"
+    if [[ "$BUILD_DOCKER" == true || -n "$DOCKER_REPO" ]]; then
+      local docker_repo="${DOCKER_REPO:-litechat}"
+      log_info "Docker image will be created: $docker_repo:$RELEASE_NAME"
     fi
   else
     log_info "Building without release"
+  fi
+  
+  # Show what will be skipped
+  if [[ "$SKIP_BUILD" == true ]]; then
+    log_info "Application build will be skipped"
+  fi
+  if [[ "$SKIP_DOCKER" == true ]]; then
+    log_info "Docker image creation will be skipped"
+  fi
+  if [[ "$SKIP_GITHUB" == true ]]; then
+    log_info "GitHub release creation will be skipped"
   fi
   
   echo ""
