@@ -19,7 +19,7 @@ import { useConversationStore } from "@/store/conversation.store";
 
 interface OrchestrationBlockProps {
   code: string;
-  isStreaming: boolean;
+  isStreaming?: boolean;
 }
 
 function parseWorkflow(code: string): { workflow?: WorkflowTemplate; error?: string } {
@@ -82,11 +82,12 @@ export const OrchestrationBlockRenderer: React.FC<OrchestrationBlockProps> = ({ 
   const { workflow, error } = useMemo(() => {
     if (isStreaming) {
         const trimmedCode = code.trim();
-        const isLikelyJson = (trimmedCode.startsWith('{') && trimmedCode.endsWith('}'));
-        if (!isLikelyJson) return {}; // Wait for more complete structure
-        const openBraces = (trimmedCode.match(/[{[]/g) || []).length;
-        const closeBraces = (trimmedCode.match(/[}\]]/g) || []).length;
-        if (openBraces !== closeBraces) return {}; // Still incomplete
+        // Try parsing directly and return empty if it fails during streaming
+        try {
+          JSON.parse(trimmedCode);
+        } catch {
+          return {}; // Still incomplete or invalid
+        }
     }
     return parseWorkflow(code);
   }, [code, isStreaming]);
@@ -164,8 +165,11 @@ export const OrchestrationBlockRenderer: React.FC<OrchestrationBlockProps> = ({ 
 
   const foldedPreviewText = useMemo(() => {
     if (!code) return "";
+    if (workflow) {
+      return `${workflow.name}\n${workflow.description}\n${workflow.steps.length} steps`;
+    }
     return code.split("\n").slice(0, 3).join("\n");
-  }, [code]);
+  }, [code, workflow]);
 
   const codeBlockHeaderActions = renderSlotForCodeBlock(
     "codeblock-header-actions",
