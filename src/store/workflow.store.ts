@@ -3,7 +3,6 @@ import { immer } from "zustand/middleware/immer";
 import type { WorkflowRun, WorkflowRunStatus } from "@/types/litechat/workflow";
 import type { RegisteredActionHandler } from "@/types/litechat/control";
 import { workflowEvent, type WorkflowEventPayloads } from "@/types/litechat/events/workflow.events";
-// import { emitter } from "@/lib/litechat/event-emitter";
 
 export interface WorkflowState {
   activeRun: WorkflowRun | null;

@@ -80,7 +80,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
   if (isOperationLoading && entries.length === 0 && !creatingFolder) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
-        {t("table.loading")}
+        {t("fileManager.table.loading")}
       </div>
     );
   }
@@ -94,10 +94,10 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
           <TableRow className="hover:bg-card">
             <TableHead className="w-[40px] px-2"></TableHead>
             <TableHead className="w-[40px] px-2"></TableHead>
-            <TableHead>{t("table.name")}</TableHead>
-            <TableHead className="w-[100px] text-right">{t("table.size")}</TableHead>
-            <TableHead className="w-[150px] text-right">{t("table.modified")}</TableHead>
-            <TableHead className="w-[100px] text-right pr-4">{t("table.actions")}</TableHead>
+            <TableHead>{t("fileManager.table.name")}</TableHead>
+            <TableHead className="w-[100px] text-right">{t("fileManager.table.size")}</TableHead>
+            <TableHead className="w-[150px] text-right">{t("fileManager.table.modified")}</TableHead>
+            <TableHead className="w-[100px] text-right pr-4">{t("fileManager.table.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -150,7 +150,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
                 colSpan={6}
                 className="h-24 text-center text-muted-foreground"
               >
-                {t("table.folderIsEmpty")}
+                {t("fileManager.table.folderIsEmpty")}
               </TableCell>
             </TableRow>
           )}

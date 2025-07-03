@@ -181,35 +181,30 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         </PopoverTrigger>
       <PopoverContent
         className="p-4 space-y-4 w-72 bg-popover shadow-lg relative"
-        style={{ zIndex: 9999, pointerEvents: 'auto' }}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-        onPointerDownCapture={(e) => e.stopPropagation()}
         align="end"
       >
         {showStatusFilter && currentEnabledFilter !== undefined && onEnabledFilterChange && (
-          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+          <div className="space-y-2">
             <Label className="text-xs font-semibold">{t('modelFilter.status', 'Status')}</Label>
             <div className="flex gap-1">
               <Button
                 variant={currentEnabledFilter === "all" ? "secondary" : "outline"}
                 size="sm"
-                onClick={(e) => { e.stopPropagation(); onEnabledFilterChange("all"); }}
+                onClick={() => onEnabledFilterChange("all")}
               >
                 {t('modelFilter.all', 'All')}
               </Button>
               <Button
                 variant={currentEnabledFilter === "enabled" ? "secondary" : "outline"}
                 size="sm"
-                onClick={(e) => { e.stopPropagation(); onEnabledFilterChange("enabled"); }}
+                onClick={() => onEnabledFilterChange("enabled")}
               >
                 <CheckIcon className="h-3 w-3 mr-1" /> {t('modelFilter.enabled', 'Enabled')}
               </Button>
               <Button
                 variant={currentEnabledFilter === "disabled" ? "secondary" : "outline"}
                 size="sm"
-                onClick={(e) => { e.stopPropagation(); onEnabledFilterChange("disabled"); }}
+                onClick={() => onEnabledFilterChange("disabled")}
               >
                 <BanIcon className="h-3 w-3 mr-1" /> {t('modelFilter.disabled', 'Disabled')}
               </Button>
@@ -218,7 +213,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         )}
 
         {showProviderFilter && currentSelectedProviders && allProviders && onProviderFilterChange && (
-          <div onClick={(e) => e.stopPropagation()}>
+          <div>
             <Label className="text-xs px-2 font-semibold block mb-1">
               {t('modelFilter.providers', 'Providers')}
             </Label>
@@ -248,14 +243,14 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         )}
 
         {showCapabilityFilters && (
-          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+          <div className="space-y-2">
             <Label className="text-xs font-semibold">{t('modelFilter.capabilities', 'Capabilities')}</Label>
             <div className="flex flex-wrap gap-1">
               <ActionTooltipButton
                 tooltipText={t('modelFilter.reasoning', 'Reasoning')}
                 aria-label="Reasoning"
                 icon={<BrainCircuitIcon />}
-                onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("reasoning"); }}
+                onClick={() => toggleCapabilityFilter("reasoning")}
                 variant={currentCapabilityFilters.reasoning ? "secondary" : "outline"}
                 className={cn(currentCapabilityFilters.reasoning && "text-primary")}
               />
@@ -263,7 +258,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 tooltipText={t('modelFilter.webSearch', 'Web Search')}
                 aria-label="Web Search"
                 icon={<SearchIcon />}
-                onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("webSearch"); }}
+                onClick={() => toggleCapabilityFilter("webSearch")}
                 variant={currentCapabilityFilters.webSearch ? "secondary" : "outline"}
                 className={cn(currentCapabilityFilters.webSearch && "text-primary")}
               />
@@ -271,7 +266,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 tooltipText={t('modelFilter.tools', 'Tools')}
                 aria-label="Tools"
                 icon={<WrenchIcon />}
-                onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("tools"); }}
+                onClick={() => toggleCapabilityFilter("tools")}
                 variant={currentCapabilityFilters.tools ? "secondary" : "outline"}
                 className={cn(currentCapabilityFilters.tools && "text-primary")}
               />
@@ -279,7 +274,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 tooltipText={t('modelFilter.multimodal', 'Multimodal')}
                 aria-label="Multimodal"
                 icon={<ImageIcon />}
-                onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("multimodal"); }}
+                onClick={() => toggleCapabilityFilter("multimodal")}
                 variant={currentCapabilityFilters.multimodal ? "secondary" : "outline"}
                 className={cn(currentCapabilityFilters.multimodal && "text-primary")}
               />
@@ -288,7 +283,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         )}
 
         {showPriceFilters && currentMinInputPrice !== undefined && onPriceFilterChange && (
-          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+          <div className="space-y-2">
             <Label className="text-xs font-semibold flex items-center gap-1">
               <DollarSignIcon className="h-3 w-3" /> {t('modelFilter.priceRange', 'Price Range ($ / 1M Tokens)')}
             </Label>
@@ -299,7 +294,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 step="0.01"
                 placeholder={t('modelFilter.minInput', 'Min Input')}
                 value={currentMinInputPrice}
-                onChange={(e) => { e.stopPropagation(); handlePriceInputChange('minInput', e.target.value); }}
+                onChange={(e) => handlePriceInputChange('minInput', e.target.value)}
                 className="h-8 text-xs"
               />
               <Input
@@ -308,7 +303,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 step="0.01"
                 placeholder={t('modelFilter.maxInput', 'Max Input')}
                 value={currentMaxInputPrice}
-                onChange={(e) => { e.stopPropagation(); handlePriceInputChange('maxInput', e.target.value); }}
+                onChange={(e) => handlePriceInputChange('maxInput', e.target.value)}
                 className="h-8 text-xs"
               />
               <Input
@@ -317,7 +312,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 step="0.01"
                 placeholder={t('modelFilter.minOutput', 'Min Output')}
                 value={currentMinOutputPrice}
-                onChange={(e) => { e.stopPropagation(); handlePriceInputChange('minOutput', e.target.value); }}
+                onChange={(e) => handlePriceInputChange('minOutput', e.target.value)}
                 className="h-8 text-xs"
               />
               <Input
@@ -326,7 +321,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 step="0.01"
                 placeholder={t('modelFilter.maxOutput', 'Max Output')}
                 value={currentMaxOutputPrice}
-                onChange={(e) => { e.stopPropagation(); handlePriceInputChange('maxOutput', e.target.value); }}
+                onChange={(e) => handlePriceInputChange('maxOutput', e.target.value)}
                 className="h-8 text-xs"
               />
             </div>

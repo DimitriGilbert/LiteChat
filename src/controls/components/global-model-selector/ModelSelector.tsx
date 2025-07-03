@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -75,6 +75,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     multimodal: false,
     imageGeneration: false,
   });
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const getModelPrice = useCallback(
     (model: ModelListItem, type: "input" | "output"): number => {
@@ -222,6 +223,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             "w-auto justify-between h-9 text-sm font-normal relative",
             className
           )}
+          ref={triggerRef}
         >
           <span className="truncate max-w-[200px] sm:max-w-[300px]">
             {selectedModelDetails
@@ -241,14 +243,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         style={{
           maxHeight: "min(40vh, 400px)",
           overflow: "hidden",
-          zIndex: 9999,
-          pointerEvents: "auto",
         }}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-        onPointerDownCapture={(e) => e.stopPropagation()}
-        onWheel={(e) => e.stopPropagation()}
       >
         <Command shouldFilter={false}>
           <div className="flex items-center border-b px-3 gap-2">
