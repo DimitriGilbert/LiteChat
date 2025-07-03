@@ -104,7 +104,8 @@
   --z-sticky: 10;
   --z-sidebar: 40;
   --z-dialog: 50;
-  --z-popover: 60;
+  --z-popover: 70;
+  --z-modal-popover: 100;
   --z-toast: 999;
 }
 

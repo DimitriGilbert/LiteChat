@@ -6,12 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { GlobalModelSelector } from "@/controls/components/global-model-selector/GlobalModelSelector";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import { useForm, type AnyFieldApi } from "@tanstack/react-form";
 import { z } from "zod";
 import { toast } from "sonner";
+import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector";
+import { useProviderStore } from "@/store/provider.store";
 
 const assistantTitlesSchema = z.object({
   autoTitleEnabled: z.boolean(),
@@ -51,6 +52,12 @@ export const SettingsAssistantTitles: React.FC = () => {
       setAutoTitleIncludeFiles: state.setAutoTitleIncludeFiles,
       autoTitleIncludeRules: state.autoTitleIncludeRules,
       setAutoTitleIncludeRules: state.setAutoTitleIncludeRules,
+    }))
+  );
+
+  const { globallyEnabledModels } = useProviderStore(
+    useShallow((state) => ({
+      globallyEnabledModels: state.getGloballyEnabledModelDefinitions(),
     }))
   );
 
@@ -153,15 +160,16 @@ export const SettingsAssistantTitles: React.FC = () => {
           <form.Field
             name="autoTitleModelId"
             children={(field) => (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 overflow-visible">
                 <Label htmlFor={field.name}>{t('titles.modelForGeneration')}</Label>
                 <p className="text-xs text-muted-foreground">
                   {t('titles.modelDescription')}
                 </p>
-                <GlobalModelSelector
+                <ModelSelector
                   value={field.state.value}
                   onChange={(modelId: string | null) => field.handleChange(modelId)}
-                  className="w-full"
+                  className="w-full z-500"
+                  models={globallyEnabledModels}
                 />
                 <FieldMetaMessages field={field} />
               </div>

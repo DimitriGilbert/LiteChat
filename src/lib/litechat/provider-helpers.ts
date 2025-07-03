@@ -123,6 +123,13 @@ export const ensureV1Path = (baseUrl: string): string => {
   }
 };
 
+// --- NEW: Ensure Ollama base URL always includes /api ---
+export function ensureOllamaApiBase(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  if (trimmed.endsWith("/api")) return trimmed;
+  return trimmed + "/api";
+}
+
 export function instantiateModelInstance(
   config: DbProviderConfig,
   modelId: string,
@@ -182,7 +189,8 @@ export function instantiateModelInstance(
         
         return model;
       case "ollama":
-        return createOllama({ baseURL: config.baseURL ?? undefined })(modelId);
+        // Always ensure /api is present in the base URL
+        return createOllama({ baseURL: config.baseURL ? ensureOllamaApiBase(config.baseURL) : undefined })(modelId);
       case "openai-compatible":
         if (!config.baseURL) throw new Error("Base URL required");
         return createOpenAICompatible({
