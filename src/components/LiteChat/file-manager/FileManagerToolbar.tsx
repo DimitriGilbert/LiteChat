@@ -108,7 +108,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               handleNavigateHome();
             }}
             disabled={currentPath === "/" || isAnyLoading}
-            title={t("toolbar.goToRootDir")}
+            title={t("fileManager.toolbar.goToRootDir")}
             className="h-8 w-8"
             type="button"
           >
@@ -123,7 +123,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               handleNavigateUp();
             }}
             disabled={currentPath === "/" || isAnyLoading}
-            title={t("toolbar.goUpOneLevel")}
+            title={t("fileManager.toolbar.goUpOneLevel")}
             className="h-8 w-8"
             type="button"
           >
@@ -153,7 +153,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               handleRefresh();
             }}
             disabled={isAnyLoading} // Disable on any loading
-            title={t("toolbar.refreshCurrentDir")}
+            title={t("fileManager.toolbar.refreshCurrentDir")}
             className="h-8 w-8"
             type="button"
           >
@@ -174,7 +174,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading || creatingFolder || !!editingPath}
             className="h-8"
-            title={t("toolbar.createNewFolder")}
+            title={t("fileManager.toolbar.createNewFolder")}
             type="button"
           >
             {/* Spinner logic remains the same */}
@@ -183,7 +183,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <FolderPlusIcon className="h-4 w-4 mr-1" />
             )}
-            <span className="hidden sm:inline">{t("toolbar.folder")}</span>{" "}
+            <span className="hidden sm:inline">{t("fileManager.toolbar.folder")}</span>{" "}
             {/* Hide text on small screens */}
           </Button>
           <Button
@@ -196,7 +196,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading}
             className="h-8"
-            title={t("toolbar.uploadFiles")}
+            title={t("fileManager.toolbar.uploadFiles")}
             type="button"
           >
             {/* Spinner logic remains the same */}
@@ -205,7 +205,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <FileUpIcon className="h-4 w-4 mr-1" />
             )}
-            <span className="hidden sm:inline">{t("toolbar.files")}</span>{" "}
+            <span className="hidden sm:inline">{t("fileManager.toolbar.files")}</span>{" "}
             {/* Hide text on small screens */}
           </Button>
           <Button
@@ -218,7 +218,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading}
             className="h-8"
-            title={t("toolbar.uploadFolder")}
+            title={t("fileManager.toolbar.uploadFolder")}
             type="button"
           >
             {/* Spinner logic remains the same */}
@@ -227,7 +227,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <FolderUpIcon className="h-4 w-4 mr-1" />
             )}
-            <span className="hidden sm:inline">{t("toolbar.folder")}</span>{" "}
+            <span className="hidden sm:inline">{t("fileManager.toolbar.folder")}</span>{" "}
             {/* Hide text on small screens */}
           </Button>
           <Button
@@ -240,7 +240,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading}
             className="h-8"
-            title={t("toolbar.uploadAndExtractZip")}
+            title={t("fileManager.toolbar.uploadAndExtractZip")}
             type="button"
           >
             {/* Spinner logic remains the same */}
@@ -249,7 +249,7 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             ) : (
               <ArchiveIcon className="h-4 w-4 mr-1" />
             )}
-            <span className="hidden sm:inline">{t("toolbar.zip")}</span>{" "}
+            <span className="hidden sm:inline">{t("fileManager.toolbar.zip")}</span>{" "}
             {/* Hide text on small screens */}
           </Button>
           <Button
@@ -262,11 +262,11 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading}
             className="h-8"
-            title={t("toolbar.cloneRepository")}
+            title={t("fileManager.toolbar.cloneRepository")}
             type="button"
           >
             <GitBranchIcon className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">{t("toolbar.cloneRepository")}</span>{" "}
+            <span className="hidden sm:inline">{t("fileManager.toolbar.cloneRepository")}</span>{" "}
           </Button>
           {/* Git Operations Button (conditionally rendered) */}
           {entries.some((entry) => gitRepoStatus[entry.path]) && (
@@ -276,11 +276,11 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
               onClick={(e) => e.preventDefault()} // Placeholder, actual menu in dropdown
               disabled={isAnyLoading}
               className="h-8"
-              title={t("toolbar.gitOperations")}
+              title={t("fileManager.toolbar.gitOperations")}
               type="button"
             >
               <GitBranchIcon className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">{t("toolbar.gitOperations")}</span>{" "}
+              <span className="hidden sm:inline">{t("fileManager.toolbar.gitOperations")}</span>{" "}
             </Button>
           )}
           <Button
@@ -293,11 +293,11 @@ export const FileManagerToolbar: React.FC<FileManagerToolbarProps> = ({
             }}
             disabled={isAnyLoading || entries.length === 0}
             className="h-8"
-            title={t("toolbar.downloadAll")}
+            title={t("fileManager.toolbar.downloadAll")}
             type="button"
           >
             <ArchiveIcon className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">{t("toolbar.downloadAll")}</span>{" "}
+            <span className="hidden sm:inline">{t("fileManager.toolbar.downloadAll")}</span>{" "}
           </Button>
         </div>
       </div>
