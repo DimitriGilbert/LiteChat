@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { CodeIcon, PlayIcon, SaveIcon, EditIcon, ChevronDownIcon, ChevronRightIcon, AlertCircleIcon } from "lucide-react";
+import { CodeIcon, PlayIcon, SaveIcon, EditIcon, AlertCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { PersistenceService } from "@/services/persistence.service";
@@ -9,16 +9,26 @@ import type { WorkflowTemplate } from "@/types/litechat/workflow";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { nanoid } from "nanoid";
+import { workflowEvent } from "@/types/litechat/events/workflow.events";
+import { useControlRegistryStore } from "@/store/control.store";
+import { useSettingsStore } from "@/store/settings.store";
+import { useShallow } from "zustand/react/shallow";
+import { CodeBlockRenderer } from "./CodeBlockRenderer";
+import type { CanvasControl } from "@/types/litechat/canvas/control";
+import { useConversationStore } from "@/store/conversation.store";
 
-interface OrchestrationBlockRendererProps {
+interface OrchestrationBlockProps {
   code: string;
-  isStreaming?: boolean;
+  isStreaming: boolean;
 }
 
 function parseWorkflow(code: string): { workflow?: WorkflowTemplate; error?: string } {
+  if (!code.trim()) {
+    return {};
+  }
   try {
     const parsed = JSON.parse(code);
-    // Basic validation (reuse logic from WorkflowRawEditor)
+    // Basic validation
     if (!parsed.id || typeof parsed.id !== "string") return { error: 'Workflow must have a valid "id" field (string)' };
     if (!parsed.name || typeof parsed.name !== "string") return { error: 'Workflow must have a valid "name" field (string)' };
     if (!parsed.description || typeof parsed.description !== "string") return { error: 'Workflow must have a valid "description" field (string)' };
@@ -34,185 +44,217 @@ function parseWorkflow(code: string): { workflow?: WorkflowTemplate; error?: str
     }
     return { workflow: parsed as WorkflowTemplate };
   } catch (e) {
+    // Only show parse errors if not streaming, to avoid flicker with incomplete JSON
     return { error: `Invalid workflow JSON: ${(e as Error).message}` };
   }
 }
 
 function checkIfWorkflowNeedsInput(workflow: WorkflowTemplate): boolean {
-  // Check if trigger needs input
   if (workflow.triggerType === 'custom' && !workflow.triggerPrompt) {
-    return true; // Custom trigger without prompt
+    return true;
   }
   if (workflow.triggerType === 'template' && workflow.triggerRef) {
-    // Check if template has variables that need values
     const templates = usePromptTemplateStore.getState().promptTemplates;
     const template = templates.find(t => t.id === workflow.triggerRef);
-    if (template && template.variables && template.variables.length > 0) {
-      // Check if templateVariables has all required values
-      const hasAllValues = template.variables.every(variable => {
+    if (template?.variables?.length) {
+      return !template.variables.every(variable => {
         const value = workflow.templateVariables?.[variable.name];
         return value !== undefined && value !== null && value !== '';
       });
-      if (!hasAllValues) return true;
     }
   }
-  // Workflow is ready to run
   return false;
 }
 
-export const OrchestrationBlockRenderer: React.FC<OrchestrationBlockRendererProps> = ({ code, isStreaming = false }) => {
-  const { t } = useTranslation();
-  const [isFolded, setIsFolded] = useState(isStreaming);
+export const OrchestrationBlockRenderer: React.FC<OrchestrationBlockProps> = ({ code, isStreaming = false }) => {
+  const { t } = useTranslation('renderers');
+  const { foldStreamingCodeBlocks } = useSettingsStore(
+    useShallow((state) => ({
+      foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
+    }))
+  );
+  const conversationId = useConversationStore(state => state.selectedItemId);
+
+  const [isFolded, setIsFolded] = useState(isStreaming ? foldStreamingCodeBlocks : false);
   const [showCode, setShowCode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const { workflow, error } = useMemo(() => parseWorkflow(code), [code]);
 
-  const handleRun = useCallback(async () => {
-    if (!workflow) return;
-    const needsInput = checkIfWorkflowNeedsInput(workflow);
-    if (needsInput) {
-      // Open the workflow builder modal for configuration
+  const { workflow, error } = useMemo(() => {
+    if (isStreaming) {
+        const trimmedCode = code.trim();
+        const isLikelyJson = (trimmedCode.startsWith('{') && trimmedCode.endsWith('}'));
+        if (!isLikelyJson) return {}; // Wait for more complete structure
+        const openBraces = (trimmedCode.match(/[{[]/g) || []).length;
+        const closeBraces = (trimmedCode.match(/[}\]]/g) || []).length;
+        if (openBraces !== closeBraces) return {}; // Still incomplete
+    }
+    return parseWorkflow(code);
+  }, [code, isStreaming]);
+
+  const canvasControls = useControlRegistryStore(
+    useShallow((state) => Object.values(state.canvasControls))
+  );
+
+  const toggleFold = () => setIsFolded((prev) => !prev);
+  const toggleView = () => setShowCode((prev) => !prev);
+
+  const handleRun = useCallback(() => {
+    if (!workflow || !conversationId) return;
+    if (checkIfWorkflowNeedsInput(workflow)) {
       emitter.emit(uiEvent.openModalRequest, {
         modalId: "workflowBuilderModal",
         modalProps: { workflow },
       });
-      return;
+    } else {
+      emitter.emit(workflowEvent.startRequest, { template: workflow, initialPrompt: workflow.triggerPrompt || "", conversationId });
+      toast.success(t('orchestrationBlock.runRequestSent', { name: workflow.name }));
     }
-    // Always create a temporary workflow in the DB with __TEMP__ prefix
-    const tempWorkflow = {
-      ...workflow,
-      id: nanoid(),
-      name: `__TEMP__-${workflow.name}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    let tempId = tempWorkflow.id;
-    try {
-      await PersistenceService.saveWorkflow(tempWorkflow);
-      // Run using the event system, passing the temp workflow's ID
-      emitter.emit("workflow.run.orchestration", { workflowId: tempId });
-      toast.success(`Workflow "${workflow.name}" started!`);
-    } catch (e) {
-      toast.error("Failed to run workflow: " + (e instanceof Error ? e.message : String(e)));
-      // Attempt cleanup if save failed
-      try { await PersistenceService.deleteWorkflow(tempId); } catch {}
-      return;
-    }
-    // Always delete the temp workflow after a short delay to allow runner to fetch it
-    setTimeout(async () => {
-      try { await PersistenceService.deleteWorkflow(tempId); } catch {}
-    }, 5000);
-  }, [workflow]);
+  }, [workflow, t, conversationId]);
 
   const handleSave = useCallback(async () => {
     if (!workflow) return;
     setIsSaving(true);
     try {
-      // Check if this workflow already exists in the DB
-      let existing: WorkflowTemplate | null = null;
-      try {
-        existing = await PersistenceService.loadWorkflows().then(ws => ws.find(w => w.id === workflow.id) || null);
-      } catch (e) {
-        existing = null;
-      }
-      let workflowToSave: WorkflowTemplate;
-      if (existing) {
-        // Editing existing: preserve all step IDs
-        workflowToSave = { ...workflow };
-      } else {
-        // New workflow: assign IDs according to the strict plan
-        workflowToSave = {
-          ...workflow,
-          steps: workflow.steps.map(step => {
-            if (
-              (step.type === 'prompt' && step.templateId) ||
-              (step.type === 'agent-task' && step.taskId)
-            ) {
-              // Preserve the step id as-is
-              return { ...step };
-            } else {
-              // Assign a new nanoid for all other cases
-              return { ...step, id: nanoid() };
-            }
-          })
-        };
-      }
+      const existing = await PersistenceService.loadWorkflows().then(ws => ws.find(w => w.id === workflow.id) || null);
+      const workflowToSave: WorkflowTemplate = existing ? { ...workflow } : {
+        ...workflow,
+        steps: workflow.steps.map(step => ({ ...step, id: nanoid() }))
+      };
       await PersistenceService.saveWorkflow(workflowToSave);
-      toast.success("Workflow saved to library");
+      toast.success(t('orchestrationBlock.saveSuccess'));
     } catch (e) {
-      toast.error("Failed to save workflow: " + (e instanceof Error ? e.message : String(e)));
+      toast.error(t('orchestrationBlock.saveFailed', { message: (e as Error).message }));
     } finally {
       setIsSaving(false);
     }
-  }, [workflow]);
+  }, [workflow, t]);
 
   const handleEdit = useCallback(() => {
     if (!workflow) return;
-    // Open the workflow builder modal with the workflow as modalProps
     emitter.emit(uiEvent.openModalRequest, {
       modalId: "workflowBuilderModal",
       modalProps: { workflow },
     });
   }, [workflow]);
 
-  if (error) {
+  const renderSlotForCodeBlock = useCallback(
+    (
+      targetSlotName: CanvasControl["targetSlot"],
+      currentCode: string,
+      currentLang?: string,
+      currentIsFolded?: boolean,
+      currentToggleFold?: () => void
+    ): React.ReactNode[] => {
+      return canvasControls
+        .filter(c => c.type === "codeblock" && c.targetSlot === targetSlotName && c.renderer)
+        .map((control) => (
+          <React.Fragment key={control.id}>
+            {control.renderer!({
+              codeBlockContent: currentCode,
+              codeBlockLang: currentLang,
+              isFolded: currentIsFolded,
+              toggleFold: currentToggleFold,
+              canvasContextType: "codeblock",
+            })}
+          </React.Fragment>
+        ));
+    },
+    [canvasControls]
+  );
+
+  const foldedPreviewText = useMemo(() => {
+    if (!code) return "";
+    return code.split("\n").slice(0, 3).join("\n");
+  }, [code]);
+
+  const codeBlockHeaderActions = renderSlotForCodeBlock(
+    "codeblock-header-actions",
+    code,
+    "orchestration",
+    isFolded,
+    toggleFold
+  );
+
+  if (error && !isStreaming) {
     return (
-      <div className="border border-red-400 bg-red-50 text-red-700 rounded p-4 flex items-center gap-2">
-        <AlertCircleIcon className="w-5 h-5" />
-        <span>{error}</span>
+      <div className="p-4 border border-destructive/20 bg-destructive/10 rounded-md">
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertCircleIcon className="h-5 w-5 flex-shrink-0" />
+          <div className="font-medium">{t('orchestrationBlock.dataErrorTitle')}</div>
+        </div>
+        <pre className="text-xs mt-2 p-2 bg-black/20 rounded font-mono whitespace-pre-wrap">{error}</pre>
       </div>
     );
   }
 
-  if (!workflow) return null;
+  if (!workflow) {
+    return isStreaming ? (
+        <div className="code-block-container group/codeblock my-4 max-w-full">
+            <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                    <div className="text-sm font-medium">{t('orchestrationBlock.header')}</div>
+                </div>
+            </div>
+            <div className="p-4 text-muted-foreground">{t('orchestrationBlock.waitingForData')}</div>
+        </div>
+    ) : null;
+  }
 
   return (
-    <div className="border rounded bg-muted p-4 mb-2">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setIsFolded(f => !f)} aria-label="Toggle fold">
-            {isFolded ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
-          </Button>
-          <span className="font-bold text-lg">{workflow.name}</span>
-          <span className="text-xs text-muted-foreground">Orchestration Workflow</span>
+    <div className="code-block-container group/codeblock my-4 max-w-full">
+      <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <div className="text-sm font-medium">{t('orchestrationBlock.header')}</div>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
+            {codeBlockHeaderActions}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={handleRun} title="Run Workflow">
-            <PlayIcon className="w-4 h-4 mr-1" /> {t("Run")}
+        <div className="flex items-center gap-1 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
+          <Button size="sm" variant="ghost" onClick={handleRun} title={t('orchestrationBlock.runTitle')}>
+            <PlayIcon className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="outline" onClick={handleSave} disabled={isSaving} title="Save Workflow">
-            <SaveIcon className="w-4 h-4 mr-1" /> {t("Save")}
+          <Button size="sm" variant="ghost" onClick={handleSave} disabled={isSaving} title={t('orchestrationBlock.saveTitle')}>
+            <SaveIcon className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="outline" onClick={handleEdit} title="Edit Workflow">
-            <EditIcon className="w-4 h-4 mr-1" /> {t("Edit")}
+          <Button size="sm" variant="ghost" onClick={handleEdit} title={t('orchestrationBlock.editTitle')}>
+            <EditIcon className="w-4 h-4" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setShowCode(c => !c)} title="Show code">
+          <Button size="sm" variant="ghost" onClick={toggleView} title={showCode ? t('orchestrationBlock.showWorkflowTitle') : t('orchestrationBlock.showCodeTitle')}>
             <CodeIcon className="w-4 h-4" />
           </Button>
         </div>
       </div>
-      {/* Preview Area */}
+
       {!isFolded && (
-        <div className="mb-2">
-          <div className="text-sm text-muted-foreground mb-1">{workflow.description}</div>
-          <div className="border rounded bg-background p-2">
-            <div className="font-semibold mb-1">Steps:</div>
-            <ol className="list-decimal ml-5">
-              {workflow.steps.map((step) => (
-                <li key={step.id} className="mb-1">
-                  <span className="font-medium">{step.name}</span> <span className="text-xs text-muted-foreground">[{step.type}]</span>
-                </li>
-              ))}
-            </ol>
-          </div>
+        <div className="overflow-hidden w-full">
+          {showCode ? (
+            <CodeBlockRenderer lang="json" code={code} isStreaming={isStreaming} />
+          ) : (
+            <div className="p-4">
+              <div className="font-bold text-lg">{workflow.name}</div>
+              <div className="text-sm text-muted-foreground mb-2">{workflow.description}</div>
+              <div className="border rounded bg-background/50 p-2">
+                <div className="font-semibold mb-1">{t('orchestrationBlock.stepsHeader')}:</div>
+                <ol className="list-decimal ml-5 space-y-1">
+                  {workflow.steps.map((step) => (
+                    <li key={step.id}>
+                      <span className="font-medium">{step.name}</span>{' '}
+                      <span className="text-xs text-muted-foreground">[{step.type}]</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          )}
         </div>
       )}
-      {/* Code View */}
-      {showCode && (
-        <pre className="mt-2 p-2 bg-background border rounded text-xs overflow-x-auto">
-          <code>{code}</code>
-        </pre>
+
+      {isFolded && (
+        <div className="folded-content-preview p-4 cursor-pointer w-full box-border" onClick={toggleFold}>
+          <pre className="whitespace-pre-wrap break-words text-muted-foreground font-mono text-sm">
+            {foldedPreviewText}
+          </pre>
+        </div>
       )}
     </div>
   );

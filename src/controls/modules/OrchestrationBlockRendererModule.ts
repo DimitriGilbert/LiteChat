@@ -106,20 +106,20 @@ function getCanonicalExamples(): string {
 function getMainRuleContent(): string {
   return `# Orchestration Workflow Block (LLM Guide)
 
-You can output a workflow definition using a markdown code block with the language identifier \`orchestration\`.
+You can output a workflow definition using a markdown code block with the language identifier \u0060orchestration\u0060.
 
 ## Step Types
-- **prompt**: Runs a prompt template. Fields: \`templateId\`, \`modelId\`, \`outputVar\` (optional).
-- **transform**: Runs a transform step. Fields: \`modelId\`, \`transformMappings\` (object mapping output fields).
-- **code**: Runs code in a language. Fields: \`language\`, \`code\`, \`inputVar\`, \`outputVar\`.
+- **prompt**: Runs a prompt template. Fields: \u0060templateId\u0060, \u0060modelId\u0060, \u0060outputVar\u0060 (optional).
+- **transform**: Runs a transform step. Fields: \u0060modelId\u0060, \u0060transformMappings\u0060 (object mapping output fields).
+- **code**: Runs code in a language. Fields: \u0060language\u0060, \u0060code\u0060, \u0060inputVar\u0060, \u0060outputVar\u0060.
 
 ## Referencing Templates
-- Use \`templateId\` to reference a prompt, agent, or task from the [Orchestration Template Library] control rule (see below).
+- Use \u0060templateId\u0060 to reference a prompt, agent, or task from the [Orchestration Template Library] control rule (see below).
 - Do **not** include the full template list in your block—just reference by ID.
 
 ## Variable Passing
-- Use \`outputVar\` to name the output of a step.
-- Use \`inputVar\` to consume the output of a previous step.
+- Use \u0060outputVar\u0060 to name the output of a step.
+- Use \u0060inputVar\u0060 to consume the output of a previous step.
 - You can pass objects as input/output.
 
 ## Canonical Examples
@@ -153,7 +153,7 @@ export class OrchestrationBlockRendererModule implements ControlModule {
       renderer: (context: BlockRendererContext) => {
         return React.createElement(OrchestrationBlockRenderer, {
           code: context.code,
-          isStreaming: context.isStreaming,
+          isStreaming: context.isStreaming ?? false,
         });
       },
     };
