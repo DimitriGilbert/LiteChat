@@ -26,318 +26,300 @@ The Block Renderer System allows you to:
 3. **Rendering**: The selected renderer processes the code and returns React components
 4. **Fallback**: If no specific renderer is found, falls back to the default code renderer
 
-## Creating a Custom Block Renderer
+## How to Create a Custom Block Renderer: A Detailed Guide
 
-### Step 1: Define Your Renderer
+This guide provides a comprehensive walkthrough for creating a new block renderer, from basic setup to advanced features, based on an analysis of all existing renderers in the project.
+
+### Step 1: Create the Renderer Module
+
+First, create a new TypeScript file for your control module in `src/controls/modules/`. The convention is to name it `[MyRenderer]BlockRendererModule.ts`.
+
+This module is responsible for registering your renderer with the application.
+
+**Example: `src/controls/modules/MyCustomBlockRendererModule.ts`**
 
 ```typescript
-// src/controls/modules/MyCustomRendererModule.ts
 import type { ControlModule } from "@/types/litechat/control";
 import type { LiteChatModApi } from "@/types/litechat/modding";
 import type { BlockRenderer, BlockRendererContext } from "@/types/litechat/canvas/block-renderer";
+import { MyCustomBlockRenderer } from "@/components/LiteChat/common/MyCustomBlockRenderer";
 import React from "react";
 
-export class MyCustomRendererModule implements ControlModule {
-  readonly id = "my-custom-renderer";
+export class MyCustomBlockRendererModule implements ControlModule {
+  // A unique ID for your module
+  readonly id = "my-custom-block-renderer";
+  
+  // Store the unregister function for cleanup
   private unregisterCallback?: () => void;
 
-  async initialize(): Promise<void> {
-    // Setup if needed
+  // Optional: If your renderer needs a control rule for the AI
+  private unregisterRuleCallback?: () => void;
+
+  async initialize(modApi: LiteChatModApi): Promise<void> {
+    // Perform any async setup here if needed.
+    // Most renderers will not need this.
   }
 
   register(modApi: LiteChatModApi): void {
-    const customRenderer: BlockRenderer = {
+    // Define the renderer object
+    const myCustomRenderer: BlockRenderer = {
       id: this.id,
-      supportedLanguages: ["mylang", "custom"], // Languages this renderer handles
-      priority: 10, // Higher priority = preferred over other renderers
+      // The language identifiers this renderer will handle
+      supportedLanguages: ["my-lang", "custom-data"],
+      // Higher priority renderers are chosen over lower ones for the same language
+      priority: 15, 
+      // The function that returns the React component
       renderer: (context: BlockRendererContext) => {
-        return React.createElement(MyCustomComponent, {
+        // Pass the context to your component
+        return React.createElement(MyCustomBlockRenderer, {
           code: context.code,
-          lang: context.lang,
-          filepath: context.filepath,
-          isStreaming: context.isStreaming,
+          isStreaming: context.isStreaming ?? false,
+          // Pass other context properties as needed
+          interactionId: context.interactionId,
           blockId: context.blockId,
         });
       },
     };
 
-    this.unregisterCallback = modApi.registerBlockRenderer(customRenderer);
+    // Register the renderer and store the cleanup function
+    this.unregisterCallback = modApi.registerBlockRenderer(myCustomRenderer);
+
+    // (Optional) Register a control rule to guide the AI
+    const controlRuleContent = `
+      When you need to display data in a special format, use the 'my-lang' code block.
+      ```my-lang
+      { "key": "value" }
+      ```
+    `;
+    this.unregisterRuleCallback = modApi.registerRule({
+      id: `${this.id}-rule`,
+      name: "My Custom Renderer Guide",
+      content: controlRuleContent,
+      type: "control",
+      alwaysOn: true, // Or false if it should be user-configurable
+      moduleId: this.id,
+    });
   }
 
   destroy(): void {
-    if (this.unregisterCallback) {
-      this.unregisterCallback();
-      this.unregisterCallback = undefined;
-    }
+    // Cleanup on module destruction
+    this.unregisterCallback?.();
+    this.unregisterRuleCallback?.();
   }
 }
 ```
 
-### Step 2: Create Your Renderer Component
+### Step 2: Create the Renderer React Component
+
+Next, create the React component that will render your block. Place this file in `src/components/LiteChat/common/` with the name `[MyRenderer]BlockRenderer.tsx`.
+
+This component receives props from the module and handles the actual rendering logic.
+
+**Key UI/UX Patterns to Follow:**
+
+- **Main Container:** Wrap your component in a `div` with `className="code-block-container group/codeblock my-4 max-w-full"`.
+- **Header:** Implement a consistent header that is visible on hover.
+- **Actions:** Provide actions like "view code" or "download" in the header.
+- **Folding:** Support a folded state, especially for streaming or large content.
+- **Loading/Error States:** Display clear loading indicators and user-friendly error messages.
+
+**Example: `src/components/LiteChat/common/MyCustomBlockRenderer.tsx`**
 
 ```typescript
-interface MyCustomComponentProps {
+import React, { useState, useMemo, useCallback, memo } from "react";
+import { useTranslation } from "react-i18next";
+import { useSettingsStore } from "@/store/settings.store";
+import { useShallow } from "zustand/react/shallow";
+import { CodeBlockRenderer } from "./CodeBlockRenderer";
+import { AlertCircleIcon, Loader2Icon, CodeIcon, ImageIcon } from "lucide-react";
+
+interface MyCustomBlockRendererProps {
   code: string;
-  lang?: string;
-  filepath?: string;
-  isStreaming?: boolean;
-  blockId?: string;
+  isStreaming: boolean;
 }
 
-const MyCustomComponent: React.FC<MyCustomComponentProps> = ({
-  code,
-  lang,
-  filepath,
-  isStreaming,
-  blockId,
-}) => {
-  // Your custom rendering logic here
+const MyCustomBlockRendererComponent: React.FC<MyCustomBlockRendererProps> = ({ code, isStreaming }) => {
+  const { t } = useTranslation('renderers');
+  const { foldStreamingCodeBlocks } = useSettingsStore(
+    useShallow((state) => ({ foldStreamingCodeBlocks: state.foldStreamingCodeBlocks }))
+  );
+
+  // State Management
+  const [isFolded, setIsFolded] = useState(isStreaming ? foldStreamingCodeBlocks : false);
+  const [showCode, setShowCode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [parsedData, setParsedData] = useState<any>(null);
+
+  // Parsing Logic (runs when code changes and is not folded/streaming)
+  const parseData = useCallback(() => {
+    if (!code.trim() || isFolded || isStreaming) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = JSON.parse(code);
+      setParsedData(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Invalid data format");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [code, isFolded, isStreaming]);
+
+  useEffect(() => {
+    parseData();
+  }, [parseData]);
+
+  // Event Handlers
+  const toggleFold = () => setIsFolded(p => !p);
+  const toggleView = () => setShowCode(p => !p);
+
+  // Memoized preview for folded state
+  const foldedPreviewText = useMemo(() => code.split('\n').slice(0, 3).join('\n'), [code]);
+
   return (
-    <div className="code-block-container my-4 max-w-full">
-      <div className="code-block-header">
-        <div className="text-sm font-medium">
-          {lang?.toUpperCase() || "CUSTOM"}
+    <div className="code-block-container group/codeblock my-4 max-w-full">
+      {/* Consistent Header */}
+      <div className="code-block-header sticky top-0 z-10 flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <div className="text-sm font-medium">{t('myCustomBlock.header')}</div>
         </div>
-        {filepath && (
-          <div className="text-xs text-muted-foreground">{filepath}</div>
-        )}
+        <div className="flex items-center gap-1 opacity-0 group-hover/codeblock:opacity-100 focus-within:opacity-100 transition-opacity">
+          <button onClick={toggleView} className="p-1.5 rounded-md hover:bg-muted/50" title={showCode ? "Show Visual" : "Show Code"}>
+            {showCode ? <ImageIcon className="h-4 w-4" /> : <CodeIcon className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
-      <div className="code-content">
-        {/* Your custom rendering */}
-        <pre>{code}</pre>
-      </div>
+
+      {/* Content Area */}
+      {!isFolded && (
+        <div className="overflow-hidden w-full">
+          {showCode ? (
+            <CodeBlockRenderer lang="json" code={code} isStreaming={isStreaming} />
+          ) : (
+            <>
+              {isLoading && <div className="p-8 flex justify-center"><Loader2Icon className="animate-spin" /></div>}
+              {error && (
+                <div className="p-4 border border-destructive/20 bg-destructive/10 rounded-md text-destructive flex items-center gap-2">
+                  <AlertCircleIcon className="h-5 w-5" />
+                  <div>{error}</div>
+                </div>
+              )}
+              {parsedData && !isLoading && !error && (
+                <div className="p-4 border rounded-md bg-background">
+                  {/* Your custom visualization here */}
+                  <pre>{JSON.stringify(parsedData, null, 2)}</pre>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Folded State */}
+      {isFolded && (
+        <div className="folded-content-preview p-4 cursor-pointer" onClick={toggleFold}>
+          <pre className="whitespace-pre-wrap text-muted-foreground font-mono text-sm">{foldedPreviewText}</pre>
+        </div>
+      )}
     </div>
   );
 };
+
+export const MyCustomBlockRenderer = memo(MyCustomBlockRendererComponent);
 ```
 
-### Step 3: Register Your Module
+### Step 3: Register Your Module in `App.tsx`
 
-Add your module to `src/App.tsx`:
+Finally, import and add your new module to the `controlModulesToRegister` array in `src/App.tsx`. The order matters for dependencies, but for most block renderers, the order is not critical. It's good practice to group them together.
 
 ```typescript
-import { MyCustomRendererModule } from "@/controls/modules/MyCustomRendererModule";
+// src/App.tsx
+import { MyCustomBlockRendererModule } from "@/controls/modules/MyCustomBlockRendererModule";
 
 const controlModulesToRegister: ControlModuleConstructor[] = [
-  // ... existing modules
-  MyCustomRendererModule, // Add your module
+  // ... other modules
+  CodeBlockRendererModule,
+  MermaidBlockRendererModule,
+  ChartBlockRendererModule,
+  FlowBlockRendererModule,
+  FormedibleBlockRendererModule,
+  OrchestrationBlockRendererModule,
+  JsRunnableBlockRendererModule,
+  PythonRunnableBlockRendererModule,
+  MyCustomBlockRendererModule, // Add your new module here
   // ... rest of modules
 ];
 ```
 
-## BlockRenderer Interface
+### Advanced Concepts and Best Practices
+
+#### Handling Streaming Content
+
+If `isStreaming` is true, your renderer should be careful about parsing. The code is likely incomplete.
+- **Fold by default:** Set `useState(isStreaming ? foldStreamingCodeBlocks : false)`.
+- **Debounce parsing:** Use a `setTimeout` in an effect to avoid parsing on every single character change.
+- **Validate structure:** Before parsing, check if the code has a chance of being valid (e.g., starts with `{` and ends with `}`).
 
 ```typescript
-interface BlockRenderer {
-  id: string;
-  // Languages this renderer handles (e.g., ["mermaid"], ["typescript", "javascript"])
-  // Empty array or undefined means it handles all languages (fallback renderer)
-  supportedLanguages?: string[];
-  // Priority for renderer selection (higher = more priority)
-  priority?: number;
-  // The actual renderer component
-  renderer: (context: BlockRendererContext) => React.ReactNode;
-  // Optional lifecycle hooks
-  onMounted?: (context: BlockRendererContext & { element: HTMLElement }) => void;
-  onUnmounted?: (context: BlockRendererContext) => void;
-}
-```
-
-### BlockRendererContext
-
-```typescript
-interface BlockRendererContext {
-  lang: string | undefined;
-  code: string;
-  filepath?: string;
-  isStreaming?: boolean;
-  blockId?: string;
-}
-```
-
-## Renderer Selection Logic
-
-The system selects renderers using the following priority:
-
-1. **Specific Language Match**: Renderers that explicitly support the block's language
-2. **Priority**: Among matching renderers, higher priority wins
-3. **Fallback**: Renderers with no `supportedLanguages` (or empty array) serve as fallbacks
-4. **Default**: If no renderers match, uses a simple pre/code fallback
-
-### Example Priority Scenarios
-
-```typescript
-// Scenario: Rendering a "mermaid" block
-
-// Renderer A: Mermaid-specific (priority 10)
-{ supportedLanguages: ["mermaid"], priority: 10 }
-
-// Renderer B: General fallback (priority 0)
-{ supportedLanguages: undefined, priority: 0 }
-
-// Result: Renderer A is selected (specific match + higher priority)
-```
-
-## Built-in Renderers
-
-### CodeBlockRendererModule
-- **Languages**: All (fallback)
-- **Priority**: 0
-- **Features**: Syntax highlighting, copy/fold actions, file path display
-
-### MermaidBlockRendererModule
-- **Languages**: `["mermaid"]`
-- **Priority**: 10
-- **Features**: Diagram rendering, error handling, loading states
-
-## Advanced Features
-
-### Dynamic Language Support
-
-You can create renderers that handle multiple related languages:
-
-```typescript
-const multiLangRenderer: BlockRenderer = {
-  id: "web-languages",
-  supportedLanguages: ["html", "css", "javascript", "typescript"],
-  priority: 5,
-  renderer: (context) => {
-    // Handle different web languages with specialized rendering
-    switch (context.lang) {
-      case "html":
-        return renderHtml(context);
-      case "css":
-        return renderCss(context);
-      default:
-        return renderJavaScript(context);
+// From ChartBlockRenderer.tsx
+const parseChart = useCallback(async () => {
+  if (isStreaming) {
+    const trimmedCode = code.trim();
+    if (!(trimmedCode.startsWith('{') && trimmedCode.endsWith('}'))) {
+      return; // Incomplete, don't attempt to parse
     }
-  },
-};
-```
-
-### Conditional Registration
-
-Register renderers based on settings or conditions:
-
-```typescript
-register(modApi: LiteChatModApi): void {
-  const enableAdvancedRendering = this.getAdvancedRenderingSetting();
-  
-  if (enableAdvancedRendering) {
-    this.unregisterCallback = modApi.registerBlockRenderer(advancedRenderer);
   }
-}
+  // ... parsing logic
+}, [code, isStreaming]);
+
+useEffect(() => {
+  const handle = setTimeout(parseChart, isStreaming ? 300 : 0);
+  return () => clearTimeout(handle);
+}, [code, isStreaming, parseChart]);
 ```
 
-### Interactive Renderers
+#### Integrating with Canvas Controls
 
-Create renderers with interactive features:
+Your renderer can and should integrate with other canvas controls, like "Copy" or "Edit". This is done by rendering slots.
 
 ```typescript
-const interactiveRenderer: BlockRenderer = {
-  id: "interactive-sql",
-  supportedLanguages: ["sql"],
-  priority: 8,
-  renderer: (context) => {
-    return React.createElement(InteractiveSqlRenderer, {
-      query: context.code,
-      onExecute: (query) => {
-        // Handle SQL execution
-      },
+// From CodeBlockRenderer.tsx
+const canvasControls = useControlRegistryStore(
+  useShallow((state) => Object.values(state.canvasControls))
+);
+
+const renderSlotForCodeBlock = useCallback((targetSlotName, ...) => {
+  return canvasControls
+    .filter(c => c.type === "codeblock" && c.targetSlot === targetSlotName)
+    .map(control => {
+      const context: CanvasControlRenderContext = { ... };
+      return <React.Fragment key={control.id}>{control.renderer!(context)}</React.Fragment>;
     });
-  },
-};
+}, [canvasControls]);
+
+// In your JSX:
+<div className="opacity-0 group-hover/codeblock:opacity-100">
+  {renderSlotForCodeBlock("codeblock-header-actions", ...)}
+</div>
 ```
 
-## Best Practices
+#### Creating Interactive Renderers (e.g., Runnable Code)
 
-### 1. Follow UI Patterns
-- Use consistent CSS classes (`code-block-container`, `code-block-header`)
-- Support the existing action system (copy, fold, download)
-- Maintain responsive design
+For renderers that execute code (`runjs`, `runpy`):
+- **Security First:** Implement a security check (`CodeSecurityService`) and a multi-click confirmation for risky code.
+- **Execution Modes:** Offer a "safe mode" (sandboxed, e.g., QuickJS) and an "unsafe mode" (direct `eval`).
+- **DOM Target:** Provide a `litechat.target` DOM element for the code to manipulate. This is crucial for visualizations.
+- **Output Capture:** Capture `stdout`, `stderr`, and logs to display in a console view.
+- **Global Manager:** Use a singleton pattern (e.g., `GlobalPythonManager`) to manage the runtime environment (Pyodide, QuickJS) across all blocks, preventing redundant loading.
 
-### 2. Handle Edge Cases
-- Empty code blocks
-- Invalid syntax
-- Streaming content
-- Large content
+#### Parsing Complex or Unsafe Code
 
-### 3. Performance Considerations
-- Use React.memo for expensive renderers
-- Implement lazy loading for heavy visualizations
-- Debounce updates during streaming
-
-### 4. Error Handling
-- Gracefully handle rendering errors
-- Provide fallback rendering
-- Log errors for debugging
-
-### Example Error Handling
-
-```typescript
-renderer: (context) => {
-  try {
-    return renderComplexVisualization(context);
-  } catch (error) {
-    console.error(`[${this.id}] Rendering error:`, error);
-    // Fallback to simple rendering
-    return React.createElement("pre", {}, context.code);
-  }
-},
-```
-
-## Integration with Canvas Controls
-
-Block renderers work seamlessly with existing canvas controls:
-
-- **Copy Actions**: Automatically available in block headers
-- **Fold Controls**: Integrated with streaming settings
-- **Download Actions**: Support file export functionality
-
-## Event System Integration
-
-Block renderers can interact with the event system:
-
-```typescript
-// Listen for theme changes
-modApi.on(settingsEvent.themeChanged, (payload) => {
-  // Update renderer styling
-  this.updateTheme(payload.theme);
-});
-
-// Emit custom events
-modApi.emit("blockRenderer.customEvent", {
-  rendererId: this.id,
-  data: customData,
-});
-```
-
-## Testing Your Renderer
-
-1. **Create test content** with your target language
-2. **Verify selection logic** - ensure your renderer is chosen
-3. **Test edge cases** - empty blocks, invalid syntax, streaming
-4. **Check responsiveness** - test on different screen sizes
-5. **Validate accessibility** - ensure proper ARIA labels and keyboard navigation
-
-## Migration from Direct Renderers
-
-If you have existing direct renderer usage, migrate to the new system:
-
-### Before (Direct Usage)
-```typescript
-// Old way - direct component usage
-<CodeBlockRenderer lang="javascript" code={code} />
-```
-
-### After (Universal System)
-```typescript
-// New way - universal renderer with registered modules
-<UniversalBlockRenderer lang="javascript" code={code} />
-```
-
-The Universal Block Renderer automatically selects the appropriate registered renderer based on the language and priority system.
+For renderers that parse complex data structures (like `FormedibleBlockRenderer` or `FlowBlockRenderer`), implement a safe parser class.
+- **Sanitize Input:** Remove comments and potentially malicious code before parsing.
+- **Validate Structure:** Recursively validate the parsed object against an allowlist of keys and types.
+- **Graceful Errors:** Provide specific error messages to help the user (or AI) correct the input.
 
 ## Conclusion
 
-The Block Renderer System provides a powerful, extensible foundation for handling diverse code block types in LiteChat. By following the established patterns and best practices, you can create rich, interactive renderers that enhance the user experience while maintaining consistency with the application's architecture. 
+The Block Renderer System provides a powerful, extensible foundation for handling diverse code block types in LiteChat. By following the established patterns and best practices, you can create rich, interactive renderers that enhance the user experience while maintaining consistency with the application's architecture.

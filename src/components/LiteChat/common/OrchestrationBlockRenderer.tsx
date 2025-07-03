@@ -15,7 +15,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import { CodeBlockRenderer } from "./CodeBlockRenderer";
 import type { CanvasControl } from "@/types/litechat/canvas/control";
-import { useConversationStore } from "@/store/conversation.store";
+import { useInteractionStore } from "@/store/interaction.store";
 
 interface OrchestrationBlockProps {
   code: string;
@@ -73,7 +73,7 @@ export const OrchestrationBlockRenderer: React.FC<OrchestrationBlockProps> = ({ 
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
     }))
   );
-  const conversationId = useConversationStore(state => state.selectedItemId);
+  const conversationId = useInteractionStore(state => state.currentConversationId);
 
   const [isFolded, setIsFolded] = useState(isStreaming ? foldStreamingCodeBlocks : false);
   const [showCode, setShowCode] = useState(false);
