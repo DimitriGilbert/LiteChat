@@ -118,6 +118,17 @@ export function base64ToUint8Array(base64: string): Uint8Array {
   }
 }
 
+/**
+ * Filters out file content from text for display purposes
+ * File content is wrapped in <!--FILE_CONTENT_START:filename--> ... <!--FILE_CONTENT_END:filename--> markers
+ * This content is still sent to AI but hidden from user display
+ */
+export function filterFileContentFromDisplay(text: string): string {
+  // Remove file content blocks using regex
+  const fileContentRegex = /<!--FILE_CONTENT_START:[^>]*-->\n?.*?\n?<!--FILE_CONTENT_END:[^>]*-->/gs;
+  return text.replace(fileContentRegex, '').trim();
+}
+
 export function processFileMetaToUserContent(
   fileMeta: AttachedFileMetadata & { contentBytes?: Uint8Array }
 ): TextPart | ImagePart | null {
@@ -129,9 +140,12 @@ export function processFileMetaToUserContent(
     if (fileMeta.contentBytes !== undefined) {
       if (isText) {
         const textDecoder = new TextDecoder();
+        const textContent = textDecoder.decode(fileMeta.contentBytes);
+        
+        // Wrap ALL text file content (both VFS and uploaded) in hidden markers for display filtering
         return {
           type: "text",
-          text: textDecoder.decode(fileMeta.contentBytes),
+          text: `<!--FILE_CONTENT_START:${fileMeta.name}-->\n${textContent}\n<!--FILE_CONTENT_END:${fileMeta.name}-->`,
         };
       } else if (isImage) {
         return {
@@ -141,15 +155,19 @@ export function processFileMetaToUserContent(
         };
       } else {
         console.warn(
-          `AIService: Unsupported VFS file type "${mimeType}" for direct inclusion. Sending note.`
+          `AIService: Unsupported file type "${mimeType}" for direct inclusion. Sending note.`
         );
         return {
           type: "text",
-          text: `[Attached VFS file: ${fileMeta.name} (${mimeType})]`,
+          text: `[Attached file: ${fileMeta.name} (${mimeType})]`,
         };
       }
     } else if (fileMeta.contentText !== undefined && isText) {
-      return { type: "text", text: fileMeta.contentText };
+      // Wrap ALL text file content (both VFS and uploaded) in hidden markers for display filtering
+      return { 
+        type: "text", 
+        text: `<!--FILE_CONTENT_START:${fileMeta.name}-->\n${fileMeta.contentText}\n<!--FILE_CONTENT_END:${fileMeta.name}-->` 
+      };
     } else if (fileMeta.contentBase64 !== undefined && isImage) {
       const buffer = base64ToUint8Array(fileMeta.contentBase64);
       return { type: "image", image: buffer, mimeType: mimeType };

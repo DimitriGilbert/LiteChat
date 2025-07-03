@@ -27,6 +27,8 @@ SKIP_BUILD=false
 SKIP_DOCKER=false
 SKIP_GITHUB=false
 BUILD_DOCKER=false
+GH_PAGES_DIR=""
+VERSION_BUMP_LEVEL=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -58,6 +60,14 @@ while [[ $# -gt 0 ]]; do
       BUILD_DOCKER=true
       shift
       ;;
+    --gh-pages-dir)
+      GH_PAGES_DIR="$2"
+      shift 2
+      ;;
+    --version-bump)
+      VERSION_BUMP_LEVEL="$2"
+      shift 2
+      ;;
     -h|--help)
       echo "Usage: $0 [options]"
       echo ""
@@ -69,14 +79,18 @@ while [[ $# -gt 0 ]]; do
       echo "  --skip-docker        Skip Docker image creation"
       echo "  --skip-github        Skip GitHub release creation"
       echo "  --build-docker       Force Docker image creation (uses 'litechat' as default repo)"
+      echo "  --gh-pages-dir <path> Deploy build to a GitHub Pages repository path"
+      echo "  --version-bump <level> Automatically bump version (patch, minor, major) and use it as release name"
       echo "  -h, --help           Show this help message"
       echo ""
       echo "Examples:"
       echo "  $0                                                # Build only"
       echo "  $0 --release v1.0.0                              # Build and create GitHub release"
       echo "  $0 --release v1.0.0 --docker-repo myuser/litechat # Build, release, and push Docker image"
+      echo "  $0 --version-bump patch --build-docker           # Bump patch version, build, and create Docker image"
       echo "  $0 --release v1.0.0 --build-docker               # Build, release, and create Docker images with default repo"
       echo "  $0 --skip-build --build-docker --release v1.0.0  # Skip build, create Docker images from existing build"
+      echo "  $0 --release v1.0.0 --gh-pages-dir ../litechat.dev # Build and deploy to GitHub pages"
       echo "  $0 --skip-build --skip-github --build-docker     # Only create Docker images"
       exit 0
       ;;
@@ -403,6 +417,126 @@ create_docker_image() {
   fi
 }
 
+deploy_gh_pages() {
+  if [[ -z "$GH_PAGES_DIR" ]]; then
+    return
+  fi
+
+  if [[ "$NO_PUBLISH" == true ]]; then
+    log_warning "Skipping GitHub Pages deployment (--no-publish flag used)"
+    return
+  fi
+
+  if [[ -z "$RELEASE_NAME" ]]; then
+    log_info "Skipping GitHub Pages deployment (missing --release flag)"
+    return
+  fi
+
+  if [[ ! -d "$GH_PAGES_DIR" ]]; then
+    log_error "GitHub Pages directory not found: $GH_PAGES_DIR"
+    exit 1
+  fi
+
+  if ! (cd "$GH_PAGES_DIR" && git rev-parse --is-inside-work-tree > /dev/null 2>&1); then
+    log_error "GitHub Pages directory is not a git repository: $GH_PAGES_DIR"
+    exit 1
+  fi
+
+  if [[ ! -d "$BUILD_DIR" || -z "$(ls -A "$BUILD_DIR"/*.html 2>/dev/null)" ]]; then
+    log_error "Build directory '$BUILD_DIR' is empty or does not contain build artifacts. Run build first."
+    exit 1
+  fi
+
+  local absolute_build_dir
+  absolute_build_dir="$(pwd)/$BUILD_DIR"
+
+  log_info "Deploying release $RELEASE_NAME to GitHub Pages at $GH_PAGES_DIR"
+
+  local CNAME_CONTENT=""
+
+  pushd "$GH_PAGES_DIR" > /dev/null
+
+  if [[ -f "./CNAME" ]]; then
+    log_info "Backing up existing CNAME file..."
+    CNAME_CONTENT=$(cat ./CNAME)
+  fi
+
+  log_info "Cleaning deployment directory..."
+  # Deletes everything except the .git directory
+  find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+  
+  log_info "Copying build files..."
+  # Copies from the build dir using an absolute path
+  cp -r "$absolute_build_dir"/* .
+
+  if [[ -n "$CNAME_CONTENT" ]]; then
+    log_info "Restoring CNAME file..."
+    echo "$CNAME_CONTENT" > ./CNAME
+  fi
+
+  log_info "Committing and pushing to GitHub Pages..."
+  git add .
+  
+  if git diff-index --quiet HEAD --; then
+      log_warning "No changes detected in GitHub Pages repo. Nothing to deploy."
+      popd > /dev/null
+      return
+  fi
+
+  git commit -m "Deploy: $RELEASE_NAME"
+  
+  if git push origin main; then
+    log_success "Successfully deployed to GitHub Pages."
+  else
+    log_error "Failed to push to GitHub Pages repository."
+    popd > /dev/null
+    exit 1
+  fi
+
+  popd > /dev/null
+}
+
+handle_version_bump() {
+  if [[ -z "$VERSION_BUMP_LEVEL" ]]; then
+    return
+  fi
+
+  log_info "Performing version bump: $VERSION_BUMP_LEVEL"
+
+  # Check for a clean working directory, as npm version requires it
+  if ! git diff-index --quiet HEAD --; then
+    log_error "Git working directory is not clean. Please commit or stash changes before bumping the version."
+    exit 1
+  fi
+
+  # Check if the bump level is valid
+  if [[ ! "$VERSION_BUMP_LEVEL" =~ ^(patch|minor|major|prerelease)$ ]]; then
+    log_error "Invalid version bump level: '$VERSION_BUMP_LEVEL'. Use 'patch', 'minor', 'major', or 'prerelease'."
+    exit 1
+  fi
+
+  # npm version will update package.json, create a commit, and create a tag.
+  # It outputs the new version tag (e.g., v1.2.4) to stdout.
+  local new_version_tag
+  if ! new_version_tag=$(npm version "$VERSION_BUMP_LEVEL"); then
+    log_error "npm version bump failed."
+    exit 1
+  fi
+  
+  # Strip the leading 'v' to get the release name
+  RELEASE_NAME=${new_version_tag#v}
+  
+  log_success "Version bumped to $RELEASE_NAME. Git commit and tag created."
+  log_info "Pushing new commit and tag to origin..."
+
+  if git push --follow-tags; then
+    log_success "Successfully pushed commit and tags."
+  else
+    log_error "Failed to push commit and tags to origin."
+    exit 1
+  fi
+}
+
 create_github_release() {
   if [[ "$SKIP_GITHUB" == true ]]; then
     log_info "Skipping GitHub release creation (--skip-github flag)"
@@ -454,21 +588,9 @@ create_github_release() {
   # Create the release
   log_info "Creating release with assets: ${RELEASE_ASSETS[*]}"
   
-  # Generate release notes based on whether languages were built
-  NOTES="Release $RELEASE_NAME built from branch $CURRENT_BRANCH on $(date)"
-  if [ ${#LANGUAGES[@]} -gt 0 ]; then
-      NOTES+="\n\nAvailable builds:\n- $RELEASE_NAME.zip: Default language ($DEFAULT_LANG)"
-      for lang in "${LANGUAGES[@]}"; do
-          NOTES+="\n- $RELEASE_NAME.$lang.zip: $lang version"
-      done
-  else
-      NOTES+="\n\nSingle build asset:\n- $RELEASE_NAME.zip"
-  fi
-
   gh release create "$RELEASE_NAME" \
     "${RELEASE_ASSETS[@]}" \
     --title "$RELEASE_NAME" \
-    --notes-file <(echo -e "$NOTES") \
     --generate-notes
   
   log_success "GitHub release created successfully!"
@@ -539,6 +661,14 @@ main() {
   echo "🚀 LiteChat Build & Release Script"
   echo "=================================="
   
+  # Argument validation
+  if [[ -n "$RELEASE_NAME" && -n "$VERSION_BUMP_LEVEL" ]]; then
+    log_error "Cannot use --release and --version-bump at the same time. Choose one."
+    exit 1
+  fi
+
+  handle_version_bump
+  
   if [[ -n "$RELEASE_NAME" ]]; then
     log_info "Building for release: $RELEASE_NAME"
     if [[ "$NO_PUBLISH" == true ]]; then
@@ -581,6 +711,7 @@ main() {
   cleanup_dirs
   create_directories
   build_project
+  deploy_gh_pages
   create_docker_image
   create_github_release
   show_summary

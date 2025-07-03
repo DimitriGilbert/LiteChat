@@ -233,55 +233,91 @@ export const gitCloneOp = async (
 
     let branchToCheckout = branch;
     if (!branchToCheckout) {
-      try {
-        const remoteInfo = await git.getRemoteInfo({
-          http,
-          url,
-          corsProxy: CORS_PROXY,
-          onAuth: (authUrl) => onAuth(authUrl, credentials),
-          onAuthFailure,
-          onAuthSuccess,
-        });
-        branchToCheckout = remoteInfo.HEAD?.replace("refs/heads/", "");
-        if (!branchToCheckout) {
-          throw new Error("Could not determine default branch from remote.");
+      // Instead of using git.getRemoteInfo() which can fail with Buffer issues,
+      // use common default branch names as fallbacks
+      const commonDefaultBranches = ['main', 'master', 'develop', 'dev'];
+      console.log(
+        `[VFS Git Op] No branch specified, will try common default branches: ${commonDefaultBranches.join(', ')}`,
+      );
+      
+      // Try cloning with each common default branch until one succeeds
+      let cloneSuccess = false;
+      let lastError: any = null;
+      
+      for (const defaultBranch of commonDefaultBranches) {
+        try {
+          console.log(`[VFS Git Op] Attempting clone with branch: ${defaultBranch}`);
+          
+          await git.clone({
+            fs: fsToUse,
+            http,
+            dir,
+            corsProxy: CORS_PROXY,
+            url,
+            ref: defaultBranch,
+            singleBranch: true,
+            depth: 10,
+            onAuth: (authUrl) => onAuth(authUrl, credentials),
+            onAuthFailure,
+            onAuthSuccess,
+            onProgress: (e) => {
+              if (e.phase === "counting objects" && e.total) {
+                console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
+              } else if (e.phase === "receiving objects" && e.total) {
+                console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
+              } else {
+                console.log(`Clone progress: ${e.phase}`);
+              }
+            },
+          });
+          
+          branchToCheckout = defaultBranch;
+          cloneSuccess = true;
+          console.log(`[VFS Git Op] Successfully cloned using branch: ${defaultBranch}`);
+          break;
+        } catch (branchError: any) {
+          console.warn(`[VFS Git Op] Failed to clone with branch ${defaultBranch}:`, branchError);
+          lastError = branchError;
+          
+          // Clean up partial clone attempt if it exists
+          try {
+            await fsToUse.promises.rm(dir, { recursive: true, force: true });
+          } catch (cleanupErr) {
+            console.warn(`[VFS Git Op] Failed cleanup after branch attempt:`, cleanupErr);
+          }
         }
-        console.log(
-          `[VFS Git Op] No branch specified, using remote default: ${branchToCheckout}`,
-        );
-      } catch (infoErr) {
-        console.error(
-          `[VFS Git Op] Failed to get remote info to determine default branch:`,
-          infoErr,
-        );
+      }
+      
+      if (!cloneSuccess) {
         throw new Error(
-          `Failed to determine default branch: ${formatGitHttpError(infoErr)}`,
+          `Failed to clone with any common default branch (${commonDefaultBranches.join(', ')}). Last error: ${formatGitHttpError(lastError)}`
         );
       }
+    } else {
+      // If branch is specified, clone with that specific branch
+      await git.clone({
+        fs: fsToUse,
+        http,
+        dir,
+        corsProxy: CORS_PROXY,
+        url,
+        ref: branchToCheckout,
+        singleBranch: true,
+        depth: 10,
+        onAuth: (authUrl) => onAuth(authUrl, credentials),
+        onAuthFailure,
+        onAuthSuccess,
+        onProgress: (e) => {
+          if (e.phase === "counting objects" && e.total) {
+            console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
+          } else if (e.phase === "receiving objects" && e.total) {
+            console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
+          } else {
+            console.log(`Clone progress: ${e.phase}`);
+          }
+        },
+      });
     }
-
-    await git.clone({
-      fs: fsToUse,
-      http,
-      dir,
-      corsProxy: CORS_PROXY,
-      url,
-      ref: branchToCheckout,
-      singleBranch: true,
-      depth: 10,
-      onAuth: (authUrl) => onAuth(authUrl, credentials),
-      onAuthFailure,
-      onAuthSuccess,
-      onProgress: (e) => {
-        if (e.phase === "counting objects" && e.total) {
-          console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
-        } else if (e.phase === "receiving objects" && e.total) {
-          console.log(`Clone progress: ${e.phase} ${e.loaded}/${e.total}`);
-        } else {
-          console.log(`Clone progress: ${e.phase}`);
-        }
-      },
-    });
 
     await fsToUse.promises.stat(joinPath(dir, ".git"));
 

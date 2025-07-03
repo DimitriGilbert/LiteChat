@@ -168,7 +168,7 @@ export const SettingsAssistantTitles: React.FC = () => {
                 <ModelSelector
                   value={field.state.value}
                   onChange={(modelId: string | null) => field.handleChange(modelId)}
-                  className="w-full z-500"
+                  className="w-full"
                   models={globallyEnabledModels}
                 />
                 <FieldMetaMessages field={field} />
