@@ -2,6 +2,7 @@ import React, { useCallback } from "react";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { DownloadIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 interface DownloadCodeBlockControlProps {
   interactionId?: string;
@@ -20,9 +21,21 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
   filepath,
   disabled,
 }) => {
+  const { t } = useTranslation('canvas');
   const handleDownload = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      e.preventDefault();
+      
+      // Mark as codeblock button interaction to prevent scroll interference
+      const viewport = document.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+      if (viewport) {
+        (viewport as any)._isCodeblockButtonInteraction = true;
+        setTimeout(() => {
+          (viewport as any)._isCodeblockButtonInteraction = false;
+        }, 100);
+      }
+      
       if (disabled || !codeToDownload) return;
 
       try {
@@ -52,13 +65,13 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
         // Clean up
         URL.revokeObjectURL(url);
         
-        toast.success(`Downloaded ${filename}`);
+        toast.success(t('actions.downloaded', `Downloaded {{filename}}`, { filename }));
       } catch (error) {
         console.error('Download failed:', error);
-        toast.error('Failed to download file');
+        toast.error(t('actions.downloadFailed', 'Failed to download file'));
       }
     },
-    [interactionId, codeBlockId, language, codeToDownload, filepath, disabled]
+    [interactionId, codeBlockId, language, codeToDownload, filepath, disabled, t]
   );
 
   // Only show download button if there's a filepath or if the code is substantial
@@ -70,13 +83,14 @@ export const DownloadCodeBlockControl: React.FC<DownloadCodeBlockControlProps> =
 
   return (
     <ActionTooltipButton
-      tooltipText="Download File"
+      tooltipText={t('actions.downloadFile', 'Download File')}
       onClick={handleDownload}
-      aria-label="Download code as file"
+      aria-label={t('actions.downloadFileAriaLabel', 'Download code as file')}
       disabled={disabled || !codeToDownload}
       icon={<DownloadIcon />}
       iconClassName="h-3.5 w-3.5"
       className="h-6 w-6 text-muted-foreground hover:text-foreground"
+      tabIndex={-1}
     />
   );
 };

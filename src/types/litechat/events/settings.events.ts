@@ -23,14 +23,18 @@ export const settingsEvent = {
   streamingRenderFpsChanged: "settings.streaming.render.fps.changed",
   gitUserNameChanged: "settings.git.user.name.changed",
   gitUserEmailChanged: "settings.git.user.email.changed",
+  gitGlobalPatChanged: "settings.git.global.pat.changed",
   toolMaxStepsChanged: "settings.tool.max.steps.changed",
   prismThemeUrlChanged: "settings.prism.theme.url.changed",
   autoTitleEnabledChanged: "settings.auto.title.enabled.changed",
+  autoTitleAlwaysOnChanged: "settings.auto.title.always.on.changed",
   autoTitleModelIdChanged: "settings.auto.title.model.id.changed",
   autoTitlePromptMaxLengthChanged:
     "settings.auto.title.prompt.max.length.changed",
   autoTitleIncludeFilesChanged: "settings.auto.title.include.files.changed",
   autoTitleIncludeRulesChanged: "settings.auto.title.include.rules.changed",
+  forkCompactPromptChanged: "settings.fork.compact.prompt.changed",
+  forkCompactModelIdChanged: "settings.fork.compact.model.id.changed",
   customFontFamilyChanged: "settings.custom.font.family.changed",
   customFontSizeChanged: "settings.custom.font.size.changed",
   chatMaxWidthChanged: "settings.chat.max.width.changed",
@@ -42,6 +46,14 @@ export const settingsEvent = {
     "settings.auto.sync.on.stream.complete.changed",
   autoInitializeReposOnStartupChanged:
     "settings.auto.initialize.repos.on.startup.changed",
+  autoRuleSelectionEnabledChanged: "settings.auto.rule.selection.enabled.changed",
+  autoRuleSelectionModelIdChanged: "settings.auto.rule.selection.model.id.changed",
+  autoRuleSelectionPromptChanged: "settings.auto.rule.selection.prompt.changed",
+  runnableBlocksEnabledChanged: "settings.runnable.blocks.enabled.changed",
+  runnableBlocksSecurityCheckEnabledChanged: "settings.runnable.blocks.security.check.enabled.changed",
+  runnableBlocksSecurityModelIdChanged: "settings.runnable.blocks.security.model.id.changed",
+  runnableBlocksSecurityPromptChanged: "settings.runnable.blocks.security.prompt.changed",
+  controlRuleAlwaysOnChanged: "settings.control.rule.always.on.changed",
 
   // Action Request Events
   setThemeRequest: "settings.set.theme.request",
@@ -65,9 +77,11 @@ export const settingsEvent = {
   setStreamingRenderFpsRequest: "settings.set.streaming.render.fps.request",
   setGitUserNameRequest: "settings.set.git.user.name.request",
   setGitUserEmailRequest: "settings.set.git.user.email.request",
+  setGitGlobalPatRequest: "settings.set.git.global.pat.request",
   setToolMaxStepsRequest: "settings.set.tool.max.steps.request",
   setPrismThemeUrlRequest: "settings.set.prism.theme.url.request",
   setAutoTitleEnabledRequest: "settings.set.auto.title.enabled.request",
+  setAutoTitleAlwaysOnRequest: "settings.set.auto.title.always.on.request",
   setAutoTitleModelIdRequest: "settings.set.auto.title.model.id.request",
   setAutoTitlePromptMaxLengthRequest:
     "settings.set.auto.title.prompt.max.length.request",
@@ -75,6 +89,8 @@ export const settingsEvent = {
     "settings.set.auto.title.include.files.request",
   setAutoTitleIncludeRulesRequest:
     "settings.set.auto.title.include.rules.request",
+  setForkCompactPromptRequest: "settings.set.fork.compact.prompt.request",
+  setForkCompactModelIdRequest: "settings.set.fork.compact.model.id.request",
   setCustomFontFamilyRequest: "settings.set.custom.font.family.request",
   setCustomFontSizeRequest: "settings.set.custom.font.size.request",
   setChatMaxWidthRequest: "settings.set.chat.max.width.request",
@@ -87,11 +103,23 @@ export const settingsEvent = {
     "settings.set.auto.sync.on.stream.complete.request",
   setAutoInitializeReposOnStartupRequest:
     "settings.set.auto.initialize.repos.on.startup.request",
+  setAutoRuleSelectionEnabledRequest: "settings.set.auto.rule.selection.enabled.request",
+  setAutoRuleSelectionModelIdRequest: "settings.set.auto.rule.selection.model.id.request",
+  setAutoRuleSelectionPromptRequest: "settings.set.auto.rule.selection.prompt.request",
+  setRunnableBlocksEnabledRequest: "settings.set.runnable.blocks.enabled.request",
+  setRunnableBlocksSecurityCheckEnabledRequest: "settings.set.runnable.blocks.security.check.enabled.request",
+  setRunnableBlocksSecurityModelIdRequest: "settings.set.runnable.blocks.security.model.id.request",
+  setRunnableBlocksSecurityPromptRequest: "settings.set.runnable.blocks.security.prompt.request",
+  setControlRuleAlwaysOnRequest: "settings.set.control.rule.always.on.request",
+
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
   resetAssistantSettingsRequest: "settings.reset.assistant.settings.request",
   resetThemeSettingsRequest: "settings.reset.theme.settings.request",
+  settingsChanged: "settings.changed",
 } as const;
+
+export type SettingsEvent = (typeof settingsEvent)[keyof typeof settingsEvent];
 
 export interface SettingsEventPayloads {
   [settingsEvent.loaded]: { settings: SettingsState };
@@ -129,10 +157,14 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.gitUserNameChanged]: { name: SettingsState["gitUserName"] };
   [settingsEvent.gitUserEmailChanged]: { email: SettingsState["gitUserEmail"] };
+  [settingsEvent.gitGlobalPatChanged]: { pat: SettingsState["gitGlobalPat"] };
   [settingsEvent.toolMaxStepsChanged]: { steps: SettingsState["toolMaxSteps"] };
   [settingsEvent.prismThemeUrlChanged]: { url: SettingsState["prismThemeUrl"] };
   [settingsEvent.autoTitleEnabledChanged]: {
     enabled: SettingsState["autoTitleEnabled"];
+  };
+  [settingsEvent.autoTitleAlwaysOnChanged]: {
+    enabled: SettingsState["autoTitleAlwaysOn"];
   };
   [settingsEvent.autoTitleModelIdChanged]: {
     modelId: SettingsState["autoTitleModelId"];
@@ -145,6 +177,12 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.autoTitleIncludeRulesChanged]: {
     include: SettingsState["autoTitleIncludeRules"];
+  };
+  [settingsEvent.forkCompactPromptChanged]: {
+    prompt: SettingsState["forkCompactPrompt"];
+  };
+  [settingsEvent.forkCompactModelIdChanged]: {
+    modelId: SettingsState["forkCompactModelId"];
   };
   [settingsEvent.customFontFamilyChanged]: {
     fontFamily: SettingsState["customFontFamily"];
@@ -170,6 +208,14 @@ export interface SettingsEventPayloads {
   [settingsEvent.autoInitializeReposOnStartupChanged]: {
     enabled: SettingsState["autoInitializeReposOnStartup"];
   };
+  [settingsEvent.autoRuleSelectionEnabledChanged]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
+  [settingsEvent.autoRuleSelectionModelIdChanged]: { modelId: SettingsState["autoRuleSelectionModelId"] };
+  [settingsEvent.autoRuleSelectionPromptChanged]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
+  [settingsEvent.runnableBlocksEnabledChanged]: { enabled: SettingsState["runnableBlocksEnabled"] };
+  [settingsEvent.runnableBlocksSecurityCheckEnabledChanged]: { enabled: SettingsState["runnableBlocksSecurityCheckEnabled"] };
+  [settingsEvent.runnableBlocksSecurityModelIdChanged]: { modelId: SettingsState["runnableBlocksSecurityModelId"] };
+  [settingsEvent.runnableBlocksSecurityPromptChanged]: { prompt: SettingsState["runnableBlocksSecurityPrompt"] };
+  [settingsEvent.controlRuleAlwaysOnChanged]: { ruleId: string, alwaysOn: boolean };
 
   [settingsEvent.setThemeRequest]: { theme: SettingsState["theme"] };
   [settingsEvent.setGlobalSystemPromptRequest]: {
@@ -209,6 +255,7 @@ export interface SettingsEventPayloads {
   [settingsEvent.setGitUserEmailRequest]: {
     email: SettingsState["gitUserEmail"];
   };
+  [settingsEvent.setGitGlobalPatRequest]: { pat: SettingsState["gitGlobalPat"] };
   [settingsEvent.setToolMaxStepsRequest]: {
     steps: SettingsState["toolMaxSteps"];
   };
@@ -217,6 +264,9 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.setAutoTitleEnabledRequest]: {
     enabled: SettingsState["autoTitleEnabled"];
+  };
+  [settingsEvent.setAutoTitleAlwaysOnRequest]: {
+    enabled: SettingsState["autoTitleAlwaysOn"];
   };
   [settingsEvent.setAutoTitleModelIdRequest]: {
     modelId: SettingsState["autoTitleModelId"];
@@ -229,6 +279,12 @@ export interface SettingsEventPayloads {
   };
   [settingsEvent.setAutoTitleIncludeRulesRequest]: {
     include: SettingsState["autoTitleIncludeRules"];
+  };
+  [settingsEvent.setForkCompactPromptRequest]: {
+    prompt: SettingsState["forkCompactPrompt"];
+  };
+  [settingsEvent.setForkCompactModelIdRequest]: {
+    modelId: SettingsState["forkCompactModelId"];
   };
   [settingsEvent.setCustomFontFamilyRequest]: {
     fontFamily: SettingsState["customFontFamily"];
@@ -258,8 +314,18 @@ export interface SettingsEventPayloads {
   [settingsEvent.setAutoInitializeReposOnStartupRequest]: {
     enabled: SettingsState["autoInitializeReposOnStartup"];
   };
+  [settingsEvent.setAutoRuleSelectionEnabledRequest]: { enabled: SettingsState["autoRuleSelectionEnabled"] };
+  [settingsEvent.setAutoRuleSelectionModelIdRequest]: { modelId: SettingsState["autoRuleSelectionModelId"] };
+  [settingsEvent.setAutoRuleSelectionPromptRequest]: { prompt: SettingsState["autoRuleSelectionPrompt"] };
+  [settingsEvent.setRunnableBlocksEnabledRequest]: { enabled: SettingsState["runnableBlocksEnabled"] };
+  [settingsEvent.setRunnableBlocksSecurityCheckEnabledRequest]: { enabled: SettingsState["runnableBlocksSecurityCheckEnabled"] };
+  [settingsEvent.setRunnableBlocksSecurityModelIdRequest]: { modelId: SettingsState["runnableBlocksSecurityModelId"] };
+  [settingsEvent.setRunnableBlocksSecurityPromptRequest]: { prompt: SettingsState["runnableBlocksSecurityPrompt"] };
+  [settingsEvent.setControlRuleAlwaysOnRequest]: { ruleId: string, alwaysOn: boolean };
+
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;
   [settingsEvent.resetAssistantSettingsRequest]: undefined;
   [settingsEvent.resetThemeSettingsRequest]: undefined;
+  [settingsEvent.settingsChanged]: Partial<SettingsState>;
 }

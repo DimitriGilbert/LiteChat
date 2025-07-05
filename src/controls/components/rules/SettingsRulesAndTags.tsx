@@ -8,6 +8,7 @@ import {
   TabDefinition,
 } from "@/components/LiteChat/common/TabbedLayout";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
+import { useTranslation } from "react-i18next";
 
 interface SettingsRulesAndTagsProps {
   module: RulesControlModule;
@@ -17,6 +18,8 @@ export const SettingsRulesAndTags: React.FC<SettingsRulesAndTagsProps> = ({
   module,
 }) => {
   const [, forceUpdate] = useState({});
+  const { t } = useTranslation('controls');
+
   useEffect(() => {
     module.setNotifySettingsCallback(() => forceUpdate({}));
     return () => module.setNotifySettingsCallback(null);
@@ -26,12 +29,12 @@ export const SettingsRulesAndTags: React.FC<SettingsRulesAndTagsProps> = ({
     () => [
       {
         value: "rules",
-        label: "Rules",
+        label: t('rules'),
         content: <SettingsRules module={module} />,
       },
       {
         value: "tags",
-        label: "Tags",
+        label: t('tags'),
         content: <SettingsTags module={module} />,
       },
     ],

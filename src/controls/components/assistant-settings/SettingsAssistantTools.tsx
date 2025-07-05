@@ -1,6 +1,7 @@
 // src/components/LiteChat/settings/assistant/SettingsAssistantTools.tsx
 // FULL FILE
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ function FieldMetaMessages({ field }: { field: AnyFieldApi }) {
 }
 
 export const SettingsAssistantTools: React.FC = () => {
+  const { t } = useTranslation('assistantSettings');
   const { toolMaxSteps, setToolMaxSteps } = useSettingsStore(
     useShallow((state) => ({
       toolMaxSteps: state.toolMaxSteps,
@@ -52,9 +54,9 @@ export const SettingsAssistantTools: React.FC = () => {
     onSubmit: async ({ value }) => {
       try {
         setToolMaxSteps(value.toolMaxSteps);
-        toast.success("Tool settings updated!");
+        toast.success(t('tools.updateSuccess'));
       } catch (error) {
-        toast.error("Failed to update tool settings.");
+        toast.error(t('tools.updateError'));
         console.error("Error submitting tool settings form:", error);
       }
     },
@@ -80,12 +82,10 @@ export const SettingsAssistantTools: React.FC = () => {
         children={(field) => (
           <div>
             <Label htmlFor={field.name} className="text-sm mb-1 block">
-              Maximum Tool Steps per Turn
+              {t('tools.maxStepsLabel')}
             </Label>
             <p className="text-xs text-muted-foreground mb-2">
-              Limits the number of sequential tool calls the AI can make before
-              generating a final response (1-20). Higher values allow more complex
-              tasks but increase latency and cost. (Default: 5)
+              {t('tools.maxStepsDescription')}
             </p>
             <Input
               id={field.name}
@@ -119,7 +119,7 @@ export const SettingsAssistantTools: React.FC = () => {
               size="sm"
               disabled={!canSubmit || isSubmitting || isValidating || !isValid}
             >
-              {isSubmitting ? "Saving..." : isValidating ? "Validating..." : "Save Tool Settings"}
+              {isSubmitting ? t('common.saving') : isValidating ? t('common.validating') : t('tools.saveButton')}
             </Button>
           )}
         />

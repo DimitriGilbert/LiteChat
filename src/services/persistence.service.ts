@@ -153,6 +153,23 @@ export class PersistenceService {
     }
   }
 
+  // Add method for usage dashboard date range queries
+  static async getInteractionsByDateRange(
+    startDate: Date,
+    endDate: Date
+  ): Promise<Interaction[]> {
+    try {
+      const interactions = await db.interactions
+        .where('startedAt')
+        .between(startDate, endDate, true, true)
+        .toArray();
+      return interactions.map(i => ensureDateFields(i, ['startedAt', 'endedAt']));
+    } catch (error) {
+      console.error("PersistenceService: Error loading interactions by date range:", error);
+      throw error;
+    }
+  }
+
   // Mods
   static async loadMods(): Promise<DbMod[]> {
     try {
@@ -866,6 +883,22 @@ export class PersistenceService {
       );
     } catch (error) {
       console.error("PersistenceService: Error clearing all data:", error);
+      throw error;
+    }
+  }
+
+  static async clearTable(tableName: keyof typeof db): Promise<void> {
+    try {
+      if (db.table(tableName)) {
+        await db.table(tableName).clear();
+        console.log(`PersistenceService: Table "${tableName}" cleared.`);
+      } else {
+        const errMsg = `PersistenceService: Table "${tableName}" does not exist.`;
+        console.error(errMsg);
+        throw new Error(errMsg);
+      }
+    } catch (error) {
+      console.error(`PersistenceService: Error clearing table "${tableName}":`, error);
       throw error;
     }
   }

@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { BlockRendererService } from "@/services/block-renderer.service";
 import type { BlockRendererContext } from "@/types/litechat/canvas/block-renderer";
 import { nanoid } from "nanoid";
+import { useTranslation } from "react-i18next";
 
 interface UniversalBlockRendererProps {
   lang: string | undefined;
@@ -20,6 +21,7 @@ const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
   isStreaming = false,
   interactionId,
 }) => {
+  const { t } = useTranslation('common');
   const blockRenderers = useControlRegistryStore(
     useShallow((state) => state.blockRenderers)
   );
@@ -45,7 +47,7 @@ const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
         <div className="code-block-container my-4 max-w-full">
           <div className="code-block-header flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
             <div className="text-sm font-medium">
-              {lang ? lang.toUpperCase() : "CODE"}
+              {lang ? lang.toUpperCase() : t("universalBlockRenderer.code")}
             </div>
           </div>
           <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere border border-border rounded-b-lg bg-muted/20">
@@ -66,7 +68,7 @@ const UniversalBlockRenderer: React.FC<UniversalBlockRendererProps> = ({
         <div className="code-block-container my-4 max-w-full">
           <div className="code-block-header flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
             <div className="text-sm font-medium text-destructive">
-              {lang ? lang.toUpperCase() : "CODE"} (Render Error)
+              {lang ? lang.toUpperCase() : t("universalBlockRenderer.code")} ({t("universalBlockRenderer.renderError")})
             </div>
           </div>
           <pre className="overflow-x-auto w-full relative overflow-wrap-anywhere border border-border rounded-b-lg bg-muted/20">

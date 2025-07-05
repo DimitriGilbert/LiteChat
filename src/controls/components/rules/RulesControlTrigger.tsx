@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/tooltip";
 import { RulesControlDialogContent } from "./RulesControlDialogContent";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { settingsEvent } from "@/types/litechat/events/settings.events";
+import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
+import { useSettingsStore } from "@/store/settings.store";
+import { useTranslation } from "react-i18next";
 
 interface RulesControlTriggerProps {
   module: RulesControlModule;
@@ -24,10 +29,26 @@ interface RulesControlTriggerProps {
 export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
   module,
 }) => {
+  const { t } = useTranslation('prompt');
   const [, forceUpdate] = useState({});
+  const autoRuleSelectionEnabled = useSettingsStore((s) => s.autoRuleSelectionEnabled);
+  
   useEffect(() => {
+    // Listen to module notifications
     module.setNotifyCallback(() => forceUpdate({}));
-    return () => module.setNotifyCallback(null);
+    
+    // Listen to settings changes AND control rule changes
+    const handleSettingsChanged = () => forceUpdate({});
+    const handleControlRulesChanged = () => forceUpdate({});
+    
+    emitter.on(settingsEvent.loaded, handleSettingsChanged);
+    emitter.on(controlRegistryEvent.controlRulesChanged, handleControlRulesChanged);
+    
+    return () => {
+      module.setNotifyCallback(null);
+      emitter.off(settingsEvent.loaded, handleSettingsChanged);
+      emitter.off(controlRegistryEvent.controlRulesChanged, handleControlRulesChanged);
+    };
   }, [module]);
 
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -41,6 +62,9 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
   const allRules = module.getAllRules();
   const allTags = module.getAllTags();
   const getRulesForTag = module.getRulesForTag;
+
+  // console.log('RulesControlTrigger render, allRules:', allRules.map(r => ({ id: r.id, name: r.name, alwaysOn: r.alwaysOn, type: r.type })));
+  // console.log('RulesControlTrigger render, activeRuleIds:', Array.from(activeRuleIds));
 
   const handleToggleTag = useCallback(
     (tagId: string, isActive: boolean) => {
@@ -65,6 +89,17 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
     },
     [module]
   );
+
+  // const handleAutoSelectRules = useCallback(async () => {
+  //   // TODO: Implement AI-powered rule selection
+  //   // This would analyze the current prompt and suggest relevant rules
+  //   console.log('Auto-selecting rules based on prompt context...');
+  //   // Use toast instead of alert for better UX
+  //   toast.info('Auto-select rules feature coming soon!', {
+  //     description: 'This feature will be implemented in Issue #40 to automatically suggest relevant rules based on your prompt context.',
+  //     duration: 4000,
+  //   });
+  // }, []);
 
   const handleTriggerClick = () => {
     if (!hasRulesOrTags) {
@@ -92,7 +127,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
                   size="icon"
                   className="h-8 w-8"
                   disabled={isDisabled}
-                  aria-label="Configure Rules & Tags for Next Turn"
+                  aria-label={t('rulesControl.trigger.configureAria')}
                   onClick={handleTriggerClick}
                 >
                   <ShieldAlertIcon className="h-4 w-4" />
@@ -104,7 +139,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
                 size="icon"
                 className="h-8 w-8"
                 disabled={isDisabled}
-                aria-label="Add Rules & Tags (Opens Settings)"
+                aria-label={t('rulesControl.trigger.addAria')}
                 onClick={handleTriggerClick}
               >
                 <ShieldAlertIcon className="h-4 w-4" />
@@ -114,9 +149,9 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
           <TooltipContent side="top">
             {hasRulesOrTags
               ? hasActiveSettings
-                ? `Rules/Tags Active (${activeTagIds.size} tags, ${activeRuleIds.size} rules)`
-                : "Activate Rules/Tags (Next Turn)"
-              : "Add Rules/Tags (Opens Settings)"}
+                ? t('rulesControl.trigger.tooltipActive', { tagsCount: activeTagIds.size, rulesCount: activeRuleIds.size })
+                : t('rulesControl.trigger.tooltipInactive')
+              : t('rulesControl.trigger.tooltipAdd')}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -130,6 +165,7 @@ export const RulesControlTrigger: React.FC<RulesControlTriggerProps> = ({
             allRules={allRules}
             allTags={allTags}
             getRulesForTag={getRulesForTag}
+            onAutoSelectRules={autoRuleSelectionEnabled ? module.autoSelectRules : undefined}
           />
         </PopoverContent>
       )}

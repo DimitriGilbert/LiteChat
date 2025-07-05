@@ -6,7 +6,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SearchIcon } from "lucide-react";
+import { SearchIcon, InfoIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ModelFilterControls } from "@/controls/components/common/ModelFilterControls";
+import { useTranslation } from "react-i18next";
 
 interface ModelBrowserListProps {
   onSelectModelForDetails: (combinedModelId: string | null) => void;
@@ -24,6 +25,18 @@ type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
   onSelectModelForDetails,
 }) => {
+  const { t } = useTranslation('settings');
+
+  // Define formatPrice inside the component to use the `t` function
+  const formatPrice = useCallback((priceStr: string | null | undefined): string => {
+    if (!priceStr) return t('modelBrowser.notApplicable');
+    const priceNum = parseFloat(priceStr);
+    if (isNaN(priceNum)) return t('modelBrowser.notApplicable');
+    // OpenRouter pricing is per token, so multiply by 1M to show price per 1M tokens
+    const pricePerMillion = priceNum * 1_000_000;
+    return `$${pricePerMillion.toFixed(2)} ${t('modelBrowser.perMillionTokens')}`;
+  }, [t]);
+
   // @ts-expect-error we do not use it but cant remove, thank you unamed array destruct ! @AI DONT TOUCH !!
   const [scrollAreaContainer, setScrollAreaContainer] =
     useState<HTMLDivElement | null>(null);
@@ -185,7 +198,7 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
           <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Filter models by name or provider..."
+            placeholder={t('modelBrowser.filterPlaceholder')}
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             className="pl-8 w-full h-9"
@@ -218,7 +231,7 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
           >
             {filteredModels.length === 0 && !isLoading ? (
               <p className="text-sm text-muted-foreground text-center py-4 absolute inset-0 flex items-center justify-center">
-                No models match your filters.
+                {t('modelBrowser.noModelsMatchFilters')}
               </p>
             ) : (
               rowVirtualizer.getVirtualItems().map((virtualRow) => {
@@ -237,32 +250,42 @@ export const ModelBrowserList: React.FC<ModelBrowserListProps> = ({
                     }}
                     className="p-1"
                   >
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            className="w-full text-left p-1.5 rounded hover:bg-muted/50 flex flex-col"
-                            onClick={() => handleRowClick(model.id)}
-                          >
-                            <span className="text-sm font-medium truncate">
-                              {model.name}
-                            </span>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {model.providerName}
-                            </span>
-                          </button>
-                        </TooltipTrigger>
-                        {model.metadataSummary?.description && (
-                          <TooltipContent
-                            side="bottom"
-                            align="start"
-                            className="max-w-xs"
-                          >
-                            <p>{model.metadataSummary.description}</p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="flex-1 text-left p-1.5 rounded hover:bg-muted/50 flex flex-col"
+                        onClick={() => handleRowClick(model.id)}
+                      >
+                        <div className="flex flex-col items-start text-sm font-normal truncate">
+                          <p>{model.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {t('modelBrowser.byProvider', 'by {{providerName}}', { providerName: model.providerName })}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end text-xs w-28 flex-shrink-0">
+                          <p>
+                            <span className="font-semibold">{t('modelBrowser.inputAbbr', 'In:')}</span>{" "}
+                            {formatPrice(model.metadataSummary?.pricing?.prompt)}
+                          </p>
+                          <p>
+                            <span className="font-semibold">{t('modelBrowser.outputAbbr', 'Out:')}</span>{" "}
+                            {formatPrice(model.metadataSummary?.pricing?.completion)}
+                          </p>
+                        </div>
+                      </button>
+                      <div className="flex items-center w-12 flex-shrink-0 justify-end">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <InfoIcon className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{t('modelBrowser.context', 'Context')}: {model.metadataSummary?.context_length ?? t('modelBrowser.notApplicable', 'N/A')}</p>
+                              <p>{t('modelBrowser.releaseDate', 'Release Date')}: {model.metadataSummary?.created ? new Date(model.metadataSummary.created * 1000).toLocaleDateString() : t('modelBrowser.notApplicable', 'N/A')}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
                   </div>
                 );
               })

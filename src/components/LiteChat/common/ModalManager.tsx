@@ -5,6 +5,7 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent } from "@/types/litechat/events/ui.events";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { ModalProviderProps } from "@/types/litechat/modding";
+import { useTranslation } from "react-i18next";
 
 interface ActiveModal {
   modalId: string;
@@ -16,6 +17,7 @@ interface ActiveModal {
 }
 
 export const ModalManager: React.FC = () => {
+  const { t } = useTranslation('common');
   const [activeModals, setActiveModals] = useState<Record<string, ActiveModal>>(
     {}
   );
@@ -68,7 +70,7 @@ export const ModalManager: React.FC = () => {
         if (!modalState.isOpen) return null;
         const ProviderComponent = modalProviders[id];
         if (!ProviderComponent) {
-          console.warn(`[ModalManager] No provider for modalId: ${id}`);
+          console.warn(t("modalManager.noProvider", { id }));
           return null;
         }
         const props: ModalProviderProps = {

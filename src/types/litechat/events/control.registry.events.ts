@@ -9,6 +9,7 @@ import type {
 import type {
   ToolImplementation,
   ModalProvider,
+  ModControlRule, // Added
 } from "@/types/litechat/modding";
 import type { ModMiddlewareHookName } from "@/types/litechat/middleware.types";
 import type { Tool } from "ai";
@@ -21,6 +22,7 @@ export const controlRegistryEvent = {
   middlewareChanged: "control.registry.middleware.changed",
   toolsChanged: "control.registry.tools.changed",
   modalProvidersChanged: "control.registry.modal.providers.changed",
+  controlRulesChanged: "control.registry.control.rules.changed", // Added for control rules
 
   // Action Request Events
   registerPromptControlRequest:
@@ -42,6 +44,8 @@ export const controlRegistryEvent = {
     "control.registry.register.modal.provider.request",
   unregisterModalProviderRequest:
     "control.registry.unregister.modal.provider.request",
+  registerControlRuleRequest: "control.registry.register.control.rule.request", // Added for control rules
+  unregisterControlRuleRequest: "control.registry.unregister.control.rule.request", // Added for control rules
 } as const;
 
 export interface ControlRegistryEventPayloads {
@@ -61,6 +65,9 @@ export interface ControlRegistryEventPayloads {
   [controlRegistryEvent.toolsChanged]: { tools: ControlState["tools"] };
   [controlRegistryEvent.modalProvidersChanged]: {
     providers: Record<string, ModalProvider>;
+  };
+  [controlRegistryEvent.controlRulesChanged]: { // Added for control rules
+    controlRules: Record<string, ModControlRule>;
   };
   [controlRegistryEvent.registerPromptControlRequest]: {
     control: CorePromptControlAliased;
@@ -98,4 +105,8 @@ export interface ControlRegistryEventPayloads {
     provider: ModalProvider;
   };
   [controlRegistryEvent.unregisterModalProviderRequest]: { modalId: string };
+  [controlRegistryEvent.registerControlRuleRequest]: { // Added for control rules
+    rule: ModControlRule;
+  };
+  [controlRegistryEvent.unregisterControlRuleRequest]: { id: string }; // Added for control rules
 }

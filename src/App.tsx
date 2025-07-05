@@ -24,6 +24,7 @@ import { GlobalModelSelectorModule } from "@/controls/modules/GlobalModelSelecto
 import { SystemPromptControlModule } from "@/controls/modules/SystemPromptControlModule";
 import { StructuredOutputControlModule } from "@/controls/modules/StructuredOutputControlModule";
 import { UsageDisplayControlModule } from "@/controls/modules/UsageDisplayControlModule";
+import { UsageDashboardModule } from "@/controls/modules/UsageDashboardModule";
 import { ReasoningControlModule } from "@/controls/modules/ReasoningControlModule";
 import { WebSearchControlModule } from "@/controls/modules/WebSearchControlModule";
 import { RulesControlModule } from "@/controls/modules/RulesControlModule";
@@ -37,11 +38,13 @@ import { AgentControlModule } from "@/controls/modules/AgentControlModule";
 import { WorkflowControlModule } from "@/controls/modules/WorkflowControlModule";
 import { WorkflowDisplayModule } from "@/controls/modules/WorkflowDisplayModule";
 
+
 // Import new/updated Settings Modules
 import { GeneralSettingsModule } from "@/controls/modules/GeneralSettingsModule";
 import { ThemeSettingsControlModule } from "@/controls/modules/ThemeSettingsControlModule";
 import { ProviderSettingsModule } from "@/controls/modules/ProviderSettingsModule";
 import { AssistantSettingsModule } from "@/controls/modules/AssistantSettingsModule";
+import { RunnableBlocksSettingsModule } from "@/controls/modules/RunnableBlocksSettingsModule";
 import { DataSettingsModule } from "@/controls/modules/DataSettingsModule";
 import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
 
@@ -55,12 +58,15 @@ import { ForkCompactActionControlModule } from "@/controls/modules/canvas/ForkCo
 import { RatingActionControlModule } from "@/controls/modules/canvas/RatingActionControlModule";
 import { EditResponseControlModule } from "@/controls/modules/canvas/EditResponseControlModule";
 import { EditCodeBlockControlModule } from "@/controls/modules/canvas/EditCodeBlockControlModule";
+import { PromoteInteractionControlModule } from "@/controls/modules/canvas/PromoteInteractionControlModule";
+import { TableOfContentsControlModule } from "@/controls/modules/canvas/TableOfContentsControlModule";
 // import { ExampleCanvasControlModule } from "@/controls/modules/example";
 import { FoldInteractionControlModule } from "@/controls/modules/canvas/interaction/FoldInteractionControlModule";
 import { ZipDownloadControlModule } from "@/controls/modules/canvas/interaction/ZipDownloadControlModule";
 import { CopyCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/CopyCodeBlockControlModule";
 import { FoldCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/FoldCodeBlockControlModule";
 import { DownloadCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/DownloadCodeBlockControlModule";
+import { UniversalRepairEnhanceControlModule } from "@/controls/modules/canvas/codeblock/RepairEnhanceCodeBlockControlModule";
 import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCallStepControlModule";
 
 // Import block renderer modules
@@ -68,6 +74,10 @@ import { CodeBlockRendererModule } from "@/controls/modules/CodeBlockRendererMod
 import { MermaidBlockRendererModule } from "@/controls/modules/MermaidBlockRendererModule";
 import { FlowBlockRendererModule } from "@/controls/modules/FlowBlockRendererModule";
 import { FormedibleBlockRendererModule } from "@/controls/modules/FormedibleBlockRendererModule";
+import { ChartBlockRendererModule } from "@/controls/modules/ChartBlockRendererModule";
+import { JsRunnableBlockRendererModule } from "@/controls/modules/JsRunnableBlockRendererModule";
+import { PythonRunnableBlockRendererModule } from "@/controls/modules/PythonRunnableBlockRendererModule";
+import { BeatBlockRendererModule } from "@/controls/modules/BeatBlockRendererModule";
 
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
@@ -76,6 +86,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ThemeSettingsControlModule,
   ProviderSettingsModule,
   AssistantSettingsModule,
+  RunnableBlocksSettingsModule,
   DataSettingsModule,
   ModSettingsModule,
   ConversationListControlModule,
@@ -85,6 +96,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   GlobalModelSelectorModule,
   AutoTitleControlModule,
   UsageDisplayControlModule,
+  UsageDashboardModule,
   ReasoningControlModule,
   WebSearchControlModule,
   ImageGenerationControlModule,
@@ -111,10 +123,16 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   MermaidBlockRendererModule,
   FlowBlockRendererModule,
   FormedibleBlockRendererModule,
+  ChartBlockRendererModule,
+  JsRunnableBlockRendererModule,
+  PythonRunnableBlockRendererModule,
+  BeatBlockRendererModule,
   // Canvas Action Controls
   CopyActionControlModule, // For InteractionCard header
   FoldInteractionControlModule, // For InteractionCard header
   ZipDownloadControlModule, // For InteractionCard header
+  TableOfContentsControlModule, // For InteractionCard header
+  PromoteInteractionControlModule, // For InteractionCard header
   RegenerateActionControlModule, // For InteractionCard footer
   RegenerateWithModelActionControlModule, // For InteractionCard footer
   ForkActionControlModule, // For InteractionCard footer
@@ -125,6 +143,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   CopyCodeBlockControlModule, // For CodeBlockRenderer header
   FoldCodeBlockControlModule, // For CodeBlockRenderer header
   DownloadCodeBlockControlModule, // For CodeBlockRenderer header
+  UniversalRepairEnhanceControlModule, // For ALL block types (universal repair/enhance)
   EditCodeBlockControlModule, // For CodeBlockRenderer header
   // ExampleCanvasControlModule,
   ToolCallStepControlModule,

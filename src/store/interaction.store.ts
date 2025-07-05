@@ -44,6 +44,7 @@ interface InteractionActions {
   setActiveStreamBuffer: (id: string, content: string) => void;
   appendStreamBuffer: (id: string, chunk: string) => void;
   removeActiveStreamBuffer: (id: string) => void;
+  promoteChildToParent: (childId: string, currentParentId: string) => Promise<void>;
   getRegisteredActionHandlers: () => RegisteredActionHandler[];
 }
 
@@ -438,6 +439,70 @@ export const useInteractionStore = create(
       emitter.emit(interactionEvent.streamingIdsChanged, {
         streamingIds: get().streamingInteractionIds,
       });
+    },
+
+    promoteChildToParent: async (childId, currentParentId) => {
+      try {
+        if (!childId || !currentParentId) {
+          throw new Error('Child ID and parent ID are required');
+        }
+        
+        if (childId === currentParentId) {
+          throw new Error('Child and parent cannot be the same interaction');
+        }
+
+        set((state) => {
+          const child = state.interactions.find(i => i.id === childId);
+          const currentParent = state.interactions.find(i => i.id === currentParentId);
+          
+          if (!child) {
+            throw new Error(`Child interaction with ID ${childId} not found`);
+          }
+          
+          if (!currentParent) {
+            throw new Error(`Parent interaction with ID ${currentParentId} not found`);
+          }
+          
+          // Verify child is actually a child of the parent
+          if (child.parentId !== currentParentId) {
+            throw new Error(`Interaction ${childId} is not a child of ${currentParentId}`);
+          }
+
+          // Perform the promotion swap
+          child.parentId = null;                    // Child becomes parent
+          child.index = currentParent.index;        // Inherits position in conversation
+          
+          currentParent.parentId = childId;         // Parent becomes child
+          currentParent.index = 0;                  // First child tab
+          
+          // Reassign siblings under the new parent
+          state.interactions.forEach(interaction => {
+            if (interaction.parentId === currentParentId && interaction.id !== childId) {
+              interaction.parentId = childId;
+              interaction.index += 1; // Shift down in tab order
+            }
+          });
+        });
+        
+        // Persist all changes
+        const child = get().interactions.find(i => i.id === childId);
+        const currentParent = get().interactions.find(i => i.id === currentParentId);
+        
+        if (child && currentParent) {
+          await Promise.all([
+            PersistenceService.saveInteraction(child),
+            PersistenceService.saveInteraction(currentParent),
+            // Save all affected siblings
+            ...get().interactions
+              .filter(i => i.parentId === childId && i.id !== currentParentId)
+              .map(i => PersistenceService.saveInteraction(i))
+          ]);
+        }
+      } catch (error: any) {
+        console.error('Failed to promote child to parent:', error);
+        toast.error(`Failed to promote interaction: ${error?.message || typeof error === 'string' ? error : 'Unknown error'}`);
+        throw error;
+      }
     },
 
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {

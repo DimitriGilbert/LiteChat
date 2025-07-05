@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useShallow } from "zustand/react/shallow";
 import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
+import { useTranslation } from "react-i18next";
 
 const StaticContentView: React.FC<{ markdownContent: string | null, interactionId: string }> = ({
   markdownContent,
@@ -84,6 +85,8 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
   const [isReasoningFolded, setIsReasoningFolded] = useState(true);
   const [isReasoningCopied, setIsReasoningCopied] = useState(false);
 
+  const { t } = useTranslation('canvas');
+
   const canvasControls = useControlRegistryStore(
     useShallow((state) => Object.values(state.canvasControls))
   );
@@ -136,13 +139,13 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
     try {
       await navigator.clipboard.writeText(reasoning);
       setIsReasoningCopied(true);
-      toast.success("Reasoning copied!");
+      toast.success(t('reasoningCopiedSuccess'));
       setTimeout(() => setIsReasoningCopied(false), 1500);
     } catch (err) {
-      toast.error("Failed to copy reasoning.");
+      toast.error(t('failedToCopyReasoning'));
       console.error("Clipboard copy failed for reasoning:", err);
     }
-  }, [reasoning]);
+  }, [reasoning, t]);
 
   const hasReasoning = !!reasoning;
   const hasResponseContent =
@@ -155,13 +158,13 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
         className="text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20 p-1 rounded"
         onClick={toggleFold}
       >
-        {hasReasoning ? "[Reasoning] " : ""}
-        {hasToolCalls ? `[${parsedToolSteps?.length} Tool Call(s)] ` : ""}
+        {hasReasoning ? t('reasoningPrefix') : ""}
+        {hasToolCalls ? `${parsedToolSteps?.length} ${t('toolCallsPrefix')}` : ""}
         {hasResponseContent && typeof response === "string"
           ? `"${response.substring(0, 80)}${response.length > 80 ? "..." : ""}"`
           : hasToolCalls || hasReasoning
             ? ""
-            : "[No text response]"}
+            : t('noTextResponse')}
       </div>
     );
   }
@@ -170,7 +173,7 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
     <>
       {isError && errorMessage && (
         <div className="mb-2 rounded border border-destructive bg-destructive/10 p-2 text-xs text-destructive-foreground">
-          <p className="font-semibold">Error:</p>
+          <p className="font-semibold">{t('errorLabel')}</p>
           <p>{errorMessage}</p>
         </div>
       )}
@@ -181,16 +184,16 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
             onClick={toggleReasoningFold}
           >
             <span className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
-              <BrainCircuitIcon className="h-3.5 w-3.5" /> Reasoning
+              <BrainCircuitIcon className="h-3.5 w-3.5" /> {t('reasoningSectionTitle')}
             </span>
             <div className="flex items-center opacity-0 group-hover/reasoning:opacity-100 focus-within:opacity-100 transition-opacity">
               <ActionTooltipButton
-                tooltipText="Copy Reasoning"
+                tooltipText={t('copyReasoning')}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleCopyReasoning();
                 }}
-                aria-label="Copy reasoning"
+                aria-label={t('copyReasoning')}
                 icon={
                   isReasoningCopied ? (
                     <CheckIcon className="text-green-500" />

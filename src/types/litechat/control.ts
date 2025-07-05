@@ -12,6 +12,7 @@ import type {
   LiteChatModApi,
   ModalProvider,
   ModEventPayloadMap, // Import ModEventPayloadMap
+  ModControlRule, // Added for control rules
 } from "@/types/litechat/modding";
 import { Tool } from "ai";
 import type { z } from "zod";
@@ -54,6 +55,7 @@ export interface ControlState {
     }
   >;
   modalProviders: Record<string, ModalProvider>;
+  controlRules: Record<string, ModControlRule>; // Added for control rules
   // No need to store actionHandlers here, they are registered by stores directly with the coordinator
 }
 
@@ -93,6 +95,9 @@ export interface ControlActions {
     provider: ModalProvider
   ) => () => void;
   unregisterModalProvider: (modalId: string) => void;
+  registerControlRule: (rule: ModControlRule) => () => void; // Added for control rules
+  unregisterControlRule: (id: string) => void; // Added for control rules
+  getControlRules: () => Readonly<ControlState["controlRules"]>; // Added for control rules
 }
 
 export interface ControlModule {
@@ -103,8 +108,17 @@ export interface ControlModule {
   destroy(modApi: LiteChatModApi): void;
 }
 
-export type ControlModuleConstructor = new () => ControlModule;
-
 export type { CorePromptControlFromTypes as PromptControl };
 export type { CoreChatControlFromTypes as ChatControl };
 export type { CoreCanvasControlFromTypes as CanvasControl }; // Added
+
+export interface ControlTranslations {
+  [lang: string]: {
+    [namespace: string]: Record<string, string>;
+  };
+}
+
+export interface ControlModuleConstructor {
+  new (): ControlModule;
+  translations?: ControlTranslations;
+}

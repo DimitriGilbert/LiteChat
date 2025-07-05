@@ -524,6 +524,53 @@ export const renameOp = async (
   }
 };
 
+export const stat = async (
+  path: string,
+  options?: { fsInstance?: typeof fs }
+): Promise<Stats> => {
+  const fsToUse = options?.fsInstance ?? fs;
+  const normalized = normalizePath(path);
+  try {
+    return await fsToUse.promises.stat(normalized);
+  } catch (err: unknown) {
+    // This is often used for existence checks, so don't toast on error.
+    // Let the calling function decide how to handle a "not found" error.
+    throw err;
+  }
+};
+
+export const rmdirRecursive = async (
+  path: string,
+  options?: { fsInstance?: typeof fs }
+): Promise<void> => {
+  const fsToUse = options?.fsInstance ?? fs;
+  const normalized = normalizePath(path);
+  try {
+    // First, check if the path exists and is a directory
+    const stats = await fsToUse.promises.stat(normalized);
+    if (!stats.isDirectory()) {
+      throw new Error(`[VFS Op] Path is not a directory, cannot rmdir: ${normalized}`);
+    }
+    // Now, remove it recursively.
+    await fsToUse.promises.rm(normalized, { recursive: true });
+    emitter.emit(vfsEvent.fileDeleted, { path: normalized });
+  } catch (err: unknown) {
+    if (err instanceof Error && (err as any).code === 'ENOENT') {
+      // Path doesn't exist, so our job is done.
+      console.warn(`[VFS Op] rmdirRecursive called on non-existent path: ${normalized}`);
+      return;
+    }
+    // For other errors, log and re-throw
+    console.error(`[VFS Op] Failed to recursively delete directory ${normalized}:`, err);
+    toast.error(
+      `Error deleting directory "${basename(normalized)}": ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+    throw err;
+  }
+};
+
 export {
   _isGitRepoOp as isGitRepoOp,
   _gitCloneOp as gitCloneOp,

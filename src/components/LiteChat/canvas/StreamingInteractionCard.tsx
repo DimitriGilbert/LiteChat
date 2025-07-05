@@ -7,6 +7,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { UserPromptDisplay } from "./UserPromptDisplay";
 import { StreamingContentView } from "./StreamingContentView";
 import { StopButton } from "@/components/LiteChat/common/StopButton";
@@ -40,6 +41,7 @@ interface StreamingInteractionCardProps {
 
 export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
   React.memo(({ interactionId, className, renderSlot, showPrompt = true }) => {
+    const { t } = useTranslation('canvas');
     const { interaction, interactionStatus } = useInteractionStore(
       useShallow((state) => {
         const currentInteraction = state.interactions.find(
@@ -148,7 +150,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
 
     const displayModelName = useMemo(() => {
       const modelIdFromMeta = interaction?.metadata?.modelId;
-      if (!modelIdFromMeta) return "Loading Model...";
+      if (!modelIdFromMeta) return t('loadingModel');
       const { providerId, modelId: specificModelId } =
         splitModelId(modelIdFromMeta);
       if (!providerId || !specificModelId) return modelIdFromMeta;
@@ -161,6 +163,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
       interaction?.metadata?.modelId,
       dbProviderConfigs,
       getAllAvailableModelDefsForProvider,
+      t,
     ]);
 
     const toggleReasoningFold = useCallback(
@@ -197,10 +200,10 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             <div className="mt-3 pt-3 border-t border-border/50">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Assistant (Loading...)
+                  {t('assistantLoading')}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Streaming...
+                  {t('streamingStatus')}
                 </span>
               </div>
               <div className="space-y-2 mt-2">
@@ -221,10 +224,10 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
           >
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-medium text-muted-foreground">
-                Assistant (Loading...)
+                {t('assistantLoading')}
               </span>
               <span className="text-xs text-muted-foreground">
-                Streaming...
+                {t('streamingStatus')}
               </span>
             </div>
             <div className="space-y-2 mt-2">
@@ -259,6 +262,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
     return (
       <div
         ref={cardRef}
+        data-interaction-id={interaction.id}
         className={cn(
           "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm transition-colors",
           interactionStatus === "ERROR"
@@ -294,7 +298,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1">
                   <span className="text-xs font-semibold text-secondary truncate mr-1">
-                    Assistant ({displayModelName})
+                    {t('assistant')} ({displayModelName})
                   </span>
                   <div className="flex items-center gap-0.5 opacity-0 group-hover/assistant:opacity-100 focus-within:opacity-100 transition-opacity">
                     {headerActionsSlot}
@@ -304,7 +308,7 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
             </div>
             <div className="flex items-start flex-shrink-0 gap-1 self-end sm:self-start">
               <span className="text-xs text-muted-foreground mt-0.5">
-                Streaming...
+                {t('streamingStatus')}
               </span>
             </div>
           </div>
@@ -319,15 +323,15 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                     onClick={toggleReasoningFold}
                   >
                     <span className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
-                      <BrainCircuitIcon className="h-3.5 w-3.5" /> Reasoning
-                      (Streaming)
+                      <BrainCircuitIcon className="h-3.5 w-3.5" /> {t('reasoning')}
+                      ({t('streamingStatus')})
                     </span>
                     <div className="flex items-center opacity-0 group-hover/reasoning:opacity-100 focus-within:opacity-100 transition-opacity">
                       <ActionTooltipButton
                         tooltipText={
                           isReasoningFolded
-                            ? "Show Reasoning"
-                            : "Hide Reasoning"
+                            ? t('unfoldReasoning')
+                            : t('foldReasoning')
                         }
                         onClick={(e) => {
                           e.stopPropagation();
@@ -335,8 +339,8 @@ export const StreamingInteractionCard: React.FC<StreamingInteractionCardProps> =
                         }}
                         aria-label={
                           isReasoningFolded
-                            ? "Show reasoning"
-                            : "Hide reasoning"
+                            ? t('unfoldReasoning')
+                            : t('foldReasoning')
                         }
                         icon={
                           isReasoningFolded ? (

@@ -1,6 +1,7 @@
 // src/components/LiteChat/common/SortableModelItem.tsx
 // FULL FILE
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -46,6 +47,8 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
   isFirst,
   isLast,
 }) => {
+  const { t } = useTranslation('common');
+
   const {
     attributes,
     listeners,
@@ -58,7 +61,8 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 10 : undefined,
+    zIndex: isDragging ? 9999 : undefined,
+    position: isDragging ? ('relative' as const) : undefined,
   };
 
   const supportedParams = new Set(
@@ -82,18 +86,26 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
       style={style}
       className={cn(
         "flex items-center space-x-2 p-2 rounded border border-transparent bg-muted/50 hover:bg-muted mb-1",
-        isDragging && "shadow-lg border-primary bg-card",
+        isDragging && "shadow-2xl border-primary bg-card opacity-75 transform scale-105",
         "cursor-grab active:cursor-grabbing"
       )}
-      aria-label={`Drag to reorder model ${modelDetails.name}`}
+      aria-label={t('sortableModelItem.dragToReorder', { name: modelDetails.name })}
+      onMouseDown={(e) => {
+        // Only prevent default if not clicking on buttons
+        const target = e.target as HTMLElement;
+        if (!target.closest('button')) {
+          e.preventDefault();
+        }
+      }}
     >
       <button
         {...attributes}
         {...listeners}
         type="button"
-        className={cn("p-1 flex-shrink-0", "hover:text-foreground")}
+        className={cn("p-1 flex-shrink-0 touch-none", "hover:text-foreground")}
         aria-hidden="true"
         tabIndex={-1}
+        style={{ touchAction: 'none' }}
       >
         <GripVerticalIcon className="h-5 w-5 text-muted-foreground" />
       </button>
@@ -126,7 +138,7 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
               <TooltipTrigger asChild>
                 <span
                   className="p-1 text-muted-foreground hover:text-foreground cursor-default"
-                  aria-label="Model information"
+                  aria-label={t('sortableModelItem.modelInfo')}
                 >
                   <InfoIcon className="h-4 w-4" />
                 </span>
@@ -142,21 +154,21 @@ export const SortableModelItem: React.FC<SortableModelItemProps> = ({
           </TooltipProvider>
         )}
         <ActionTooltipButton
-          tooltipText="Move to Top"
+          tooltipText={t('sortableModelItem.moveToTop')}
           onClick={() => onMoveToTop(id)}
           disabled={isFirst || buttonsDisabled}
           icon={<ChevronsUpIcon />}
           className="h-6 w-6"
         />
         <ActionTooltipButton
-          tooltipText="Move Up"
+          tooltipText={t('sortableModelItem.moveUp')}
           onClick={() => onMoveUp(id)}
           disabled={isFirst || buttonsDisabled}
           icon={<ArrowUpIcon />}
           className="h-6 w-6"
         />
         <ActionTooltipButton
-          tooltipText="Move Down"
+          tooltipText={t('sortableModelItem.moveDown')}
           onClick={() => onMoveDown(id)}
           disabled={isLast || buttonsDisabled}
           icon={<ArrowDownIcon />}

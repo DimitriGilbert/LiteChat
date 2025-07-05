@@ -1,0 +1,74 @@
+{
+  "configureTheme": {
+    "title": "Configurer le thème",
+    "description": "Personnalisez les couleurs, les polices et l'apparence des blocs de code."
+  },
+  "manageRules": {
+    "title": "Gérer les règles et les balises",
+    "description": "Définissez des extraits de prompt réutilisables et organisez-les."
+  },
+  "addFiles": {
+    "title": "Ajouter des fichiers",
+    "description": "Téléversez ou gérez des fichiers dans le système de fichiers virtuel."
+  },
+  "addProvider": {
+    "title": "Ajouter un fournisseur",
+    "description": "Connectez-vous à des services d'IA comme OpenAI, Ollama, etc."
+  },
+  "addApiKey": {
+    "title": "Ajouter une clé API",
+    "description": "Stockez les clés API en toute sécurité dans votre navigateur."
+  },
+  "setupGitSync": {
+    "title": "Configurer la synchronisation Git",
+    "description": "Configurez des dépôts pour synchroniser les conversations avec Git."
+  },
+  "startChatting": {
+    "title": "Commencer à chatter",
+    "description": "Sélectionnez une conversation ou un projet existant dans la barre latérale, ou cliquez sur le bouton '+' pour démarrer un nouveau chat. Vous pouvez également explorer ces options de configuration :"
+  },
+  "clickToExpand": "Cliquez pour déplier",
+  "loadingTitle": "Chargement de votre configuration...",
+  "loadingDescription": "Préparation de votre environnement. Cela ne devrait prendre qu'un instant.",
+  "progressTitle": "Progression de la configuration",
+  "progressDescription": "Suivez ces étapes pour débloquer toute la puissance de LiteChat.",
+  "stepsComplete": "étapes terminées",
+  "complete": "terminé",
+  "orSkipSetup": "Ou ignorez la configuration et explorez",
+  "newConversationName": "Nouvelle conversation",
+  "toasts": {
+    "providerAddedSuccess": "Le fournisseur '{{name}}' a été ajouté avec succès !",
+    "providerAddedError": "Échec de l'ajout du fournisseur.",
+    "modelsUpdatedSuccess": "Modèles pour '{{name}}' mis à jour.",
+    "modelsUpdatedError": "Échec de la mise à jour des modèles.",
+    "startChatError": "Échec du démarrage du nouveau chat."
+  },
+  "steps": {
+    "apiKey": {
+      "title": "Ajouter une clé API",
+      "description": "Pour vous connecter à des services comme OpenAI, vous avez besoin d'une clé API. Vos clés sont stockées en toute sécurité dans le stockage local de votre navigateur et ne quittent jamais votre machine.",
+      "submitButton": "Enregistrer la clé API"
+    },
+    "provider": {
+      "title": "Configurer un fournisseur",
+      "description": {
+        "part1": "Un fournisseur est un service d'IA (comme OpenAI, Google, Ollama, etc.). Vous pouvez en ajouter un nouveau ici ou gérer les fournisseurs existants dans les ",
+        "link": "Paramètres.",
+        "part2": ""
+      },
+      "alreadyConfigured": "Vous avez déjà configuré un fournisseur ! Vous pouvez en ajouter d'autres ou gérer les existants depuis les paramètres.",
+      "manageButton": "Gérer les fournisseurs"
+    },
+    "enableModels": {
+      "title": "Activer les modèles",
+      "description": "Choisissez les modèles que vous souhaitez utiliser depuis votre fournisseur configuré. Seuls les modèles activés apparaîtront dans le sélecteur de modèles.",
+      "noProvider": "Veuillez d'abord ajouter et configurer un fournisseur pour voir les modèles disponibles."
+    }
+  },
+  "allStepsComplete": {
+    "title": "Configuration terminée !",
+    "description": "Vous êtes prêt à commencer. Lancez votre première conversation maintenant.",
+    "startButton": "Commencer le premier chat",
+    "startingButton": "Démarrage..."
+  }
+} 

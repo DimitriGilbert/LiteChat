@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/store/settings.store";
 import { useProviderStore } from "@/store/provider.store";
 import { useShallow } from "zustand/react/shallow";
@@ -21,6 +22,7 @@ const DEFAULT_FORK_COMPACT_PROMPT = `Please provide a detailed but concise summa
 Keep the summary comprehensive enough that someone could understand the full context and continue our conversation seamlessly, but concise enough to be easily digestible. Focus on actionable information and key insights rather than verbose details.`;
 
 export const SettingsAssistantForkCompact: React.FC = () => {
+  const { t } = useTranslation('assistantSettings');
   const [isSaving, setIsSaving] = useState(false);
   const [localPrompt, setLocalPrompt] = useState("");
   const [localModelId, setLocalModelId] = useState<string | null>(null);
@@ -56,22 +58,22 @@ export const SettingsAssistantForkCompact: React.FC = () => {
     try {
       setForkCompactPrompt(localPrompt);
       setForkCompactModelId(localModelId);
-      toast.success("Fork Compact settings saved!");
+      toast.success(t('forkCompact.saveSuccess'));
     } catch (error) {
       console.error("Failed to save fork compact settings:", error);
-      toast.error("Failed to save settings");
+      toast.error(t('forkCompact.saveError'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleReset = () => {
-    if (confirm("Reset Fork Compact settings to defaults?")) {
+    if (confirm(t('forkCompact.resetConfirm'))) {
       setLocalPrompt(DEFAULT_FORK_COMPACT_PROMPT);
       setLocalModelId(null);
       setForkCompactPrompt(DEFAULT_FORK_COMPACT_PROMPT);
       setForkCompactModelId(null);
-      toast.success("Fork Compact settings reset to defaults");
+      toast.success(t('forkCompact.resetSuccess'));
     }
   };
 
@@ -83,25 +85,24 @@ export const SettingsAssistantForkCompact: React.FC = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Fork Compact Configuration</CardTitle>
+          <CardTitle>{t('forkCompact.title')}</CardTitle>
           <CardDescription>
-            Configure the model and prompt used when creating compact conversation summaries.
-            Fork Compact creates a new conversation with a summary of the current conversation history.
+            {t('forkCompact.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Model Selection */}
           <div className="space-y-2">
-            <Label htmlFor="fork-compact-model">Default Model</Label>
+            <Label htmlFor="fork-compact-model">{t('forkCompact.defaultModel')}</Label>
             <Select 
               value={localModelId || "__default__"} 
               onValueChange={(value) => setLocalModelId(value === "__default__" ? null : value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Use conversation's current model" />
+                <SelectValue placeholder={t('forkCompact.useCurrentModel')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__default__">Use conversation's current model</SelectItem>
+                <SelectItem value="__default__">{t('forkCompact.useCurrentModel')}</SelectItem>
                 {globallyEnabledModels.map((model) => (
                   <SelectItem key={model.id} value={model.id}>
                     {model.name} ({model.providerName})
@@ -110,24 +111,22 @@ export const SettingsAssistantForkCompact: React.FC = () => {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Leave empty to use the same model as the current conversation. 
-              Select a specific model to always use that model for compact summaries.
+              {t('forkCompact.modelHelp')}
             </p>
           </div>
 
           {/* Prompt Configuration */}
           <div className="space-y-2">
-            <Label htmlFor="fork-compact-prompt">Compact Summary Prompt</Label>
+            <Label htmlFor="fork-compact-prompt">{t('forkCompact.promptLabel')}</Label>
             <Textarea
               id="fork-compact-prompt"
               value={localPrompt}
               onChange={(e) => setLocalPrompt(e.target.value)}
-              placeholder="Enter the prompt for generating compact summaries..."
+              placeholder={t('forkCompact.promptPlaceholder')}
               className="min-h-[200px] font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              This prompt will be sent to the AI along with the conversation history to generate a compact summary.
-              The summary will become the first assistant message in the new forked conversation.
+              {t('forkCompact.promptHelp')}
             </p>
           </div>
 
@@ -140,14 +139,14 @@ export const SettingsAssistantForkCompact: React.FC = () => {
               disabled={isSaving}
             >
               <RotateCcwIcon className="mr-2 h-4 w-4" />
-              Reset to Default
+              {t('forkCompact.resetToDefault')}
             </Button>
             
             <Button
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving ? t('common.saving') : t('common.saveChanges')}
             </Button>
           </div>
         </CardContent>

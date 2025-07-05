@@ -3,6 +3,8 @@
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsGeneral } from "@/controls/components/general-settings/SettingsGeneral";
+import i18next from 'i18next';
+import type { ControlModuleConstructor } from '@/types/litechat/control';
 
 export class GeneralSettingsModule implements ControlModule {
   readonly id = "core-settings-general";
@@ -19,7 +21,7 @@ export class GeneralSettingsModule implements ControlModule {
     }
     this.unregisterCallback = modApi.registerSettingsTab({
       id: "general",
-      title: "General",
+      title: i18next.t("controls:settings.tabs.general"),
       component: SettingsGeneral,
       order: 10,
     });
@@ -34,3 +36,16 @@ export class GeneralSettingsModule implements ControlModule {
     console.log(`[${this.id}] Destroyed.`);
   }
 }
+
+(GeneralSettingsModule as ControlModuleConstructor).translations = {
+  en: {
+    controls: {
+      "settings.tabs.general": "General"
+    }
+  },
+  fr: {
+    controls: {
+      "settings.tabs.general": "Général"
+    }
+  }
+};

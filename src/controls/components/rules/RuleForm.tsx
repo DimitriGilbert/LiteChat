@@ -10,6 +10,7 @@ import type { DbRule, RuleType } from "@/types/litechat/rules";
 import { TextField } from "@/components/LiteChat/common/form-fields/TextField";
 import { TextareaField } from "@/components/LiteChat/common/form-fields/TextareaField";
 import { SelectField, type SelectFieldOption } from "@/components/LiteChat/common/form-fields/SelectField";
+import { SwitchField } from "@/components/LiteChat/common/form-fields/SwitchField";
 
 interface RuleFormProps {
   initialData?: Partial<DbRule>;
@@ -26,6 +27,7 @@ const ruleSchema = z.object({
   type: z.enum(["system", "before", "after"], {
     errorMap: () => ({ message: "Rule Type is required." }),
   }),
+  alwaysOn: z.boolean(),
 });
 
 const ruleTypes: SelectFieldOption[] = [
@@ -45,6 +47,7 @@ export const RuleForm: React.FC<RuleFormProps> = ({
       name: initialData?.name || "",
       content: initialData?.content || "",
       type: initialData?.type || ("before" as RuleType),
+      alwaysOn: initialData?.alwaysOn || false,
     },
     validators: {
       onChangeAsync: ruleSchema,
@@ -55,6 +58,7 @@ export const RuleForm: React.FC<RuleFormProps> = ({
         name: value.name.trim(),
         content: value.content.trim(),
         type: value.type as RuleType,
+        alwaysOn: value.alwaysOn,
       });
     },
   });
@@ -64,6 +68,7 @@ export const RuleForm: React.FC<RuleFormProps> = ({
       name: initialData?.name || "",
       content: initialData?.content || "",
       type: initialData?.type || ("before" as RuleType),
+      alwaysOn: initialData?.alwaysOn || false,
     });
   }, [initialData, form]);
 
@@ -107,6 +112,13 @@ export const RuleForm: React.FC<RuleFormProps> = ({
         rows={4}
         disabled={isSavingExt}
         className="font-mono text-xs"
+      />
+      <SwitchField
+        form={form}
+        name="alwaysOn"
+        label="Always On"
+        description="Keep this rule active across all conversations without manual activation."
+        disabled={isSavingExt}
       />
       <div className="flex justify-end space-x-2 pt-2">
         <Button

@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FolderIcon, CheckIcon, XIcon, Loader2Icon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface NewFolderRowProps {
   newFolderName: string;
@@ -31,6 +32,8 @@ export const NewFolderRow: React.FC<NewFolderRowProps> = ({
   isOperationLoading,
   isMobile = false,
 }) => {
+  const { t } = useTranslation('vfs');
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleCreateFolder();
@@ -51,7 +54,7 @@ export const NewFolderRow: React.FC<NewFolderRowProps> = ({
           onBlur={handleCreateFolder}
           onKeyDown={handleKeyDown}
           className="h-7 px-2 py-1 text-sm bg-input border-border focus:ring-1 focus:ring-primary flex-grow"
-          placeholder="New folder name"
+          placeholder={t('newFolder.placeholder')}
           disabled={isOperationLoading}
         />
         <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -60,7 +63,7 @@ export const NewFolderRow: React.FC<NewFolderRowProps> = ({
             size="icon"
             className="h-7 w-7 text-green-500 hover:text-green-400"
             onClick={handleCreateFolder}
-            aria-label="Create folder"
+            aria-label={t('newFolder.createFolder')}
             disabled={isOperationLoading || !newFolderName.trim()}
           >
             {isOperationLoading ? (
@@ -74,7 +77,7 @@ export const NewFolderRow: React.FC<NewFolderRowProps> = ({
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={cancelCreatingFolder}
-            aria-label="Cancel create folder"
+            aria-label={t('newFolder.cancelCreate')}
             disabled={isOperationLoading}
           >
             <XIcon className="h-4 w-4" />
@@ -101,7 +104,7 @@ export const NewFolderRow: React.FC<NewFolderRowProps> = ({
           onBlur={handleCreateFolder} // Consider if onBlur is the best trigger
           onKeyDown={handleKeyDown}
           className="h-7 px-2 py-1 text-sm bg-input border-border focus:ring-1 focus:ring-primary w-full"
-          placeholder="New folder name"
+          placeholder={t('newFolder.placeholder')}
           disabled={isOperationLoading}
         />
       </TableCell>
@@ -115,7 +118,7 @@ export const NewFolderRow: React.FC<NewFolderRowProps> = ({
                   size="icon"
                   className="h-6 w-6 text-green-500 hover:text-green-400"
                   onClick={handleCreateFolder}
-                  aria-label="Create folder"
+                  aria-label={t('newFolder.createFolder')}
                   disabled={isOperationLoading || !newFolderName.trim()}
                 >
                   {isOperationLoading ? (
@@ -125,7 +128,7 @@ export const NewFolderRow: React.FC<NewFolderRowProps> = ({
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top">Create (Enter)</TooltipContent>
+              <TooltipContent side="top">{t('newFolder.createTooltip')}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
           <TooltipProvider delayDuration={100}>
@@ -136,13 +139,13 @@ export const NewFolderRow: React.FC<NewFolderRowProps> = ({
                   size="icon"
                   className="h-6 w-6 text-muted-foreground hover:text-foreground"
                   onClick={cancelCreatingFolder}
-                  aria-label="Cancel create folder"
+                  aria-label={t('newFolder.cancelCreate')}
                   disabled={isOperationLoading}
                 >
                   <XIcon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top">Cancel (Esc)</TooltipContent>
+              <TooltipContent side="top">{t('newFolder.cancelTooltip')}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>

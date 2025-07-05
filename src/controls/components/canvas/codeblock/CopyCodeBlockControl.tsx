@@ -6,6 +6,7 @@ import { ClipboardIcon, CheckIcon } from "lucide-react";
 // import { toast } from "sonner"; // Removed, feedback will be handled by event listener or globally
 import { emitter } from "@/lib/litechat/event-emitter"; // Added
 import { canvasEvent } from "@/types/litechat/events/canvas.events"; // Added
+import { useTranslation } from "react-i18next";
 
 interface CopyCodeBlockControlProps {
   interactionId?: string; // Added: ID of the interaction, if available
@@ -22,11 +23,23 @@ export const CopyCodeBlockControl: React.FC<CopyCodeBlockControlProps> = ({
   codeToCopy,
   disabled,
 }) => {
+  const { t } = useTranslation('canvas');
   const [isCopied, setIsCopied] = useState(false); // Local state for immediate UI feedback
 
   const handleCopy = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
+      e.preventDefault();
+      
+      // Mark as codeblock button interaction to prevent scroll interference
+      const viewport = document.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+      if (viewport) {
+        (viewport as any)._isCodeblockButtonInteraction = true;
+        setTimeout(() => {
+          (viewport as any)._isCodeblockButtonInteraction = false;
+        }, 100);
+      }
+      
       if (disabled || !codeToCopy) return;
 
       emitter.emit(canvasEvent.copyCodeBlockRequest, {
@@ -46,14 +59,15 @@ export const CopyCodeBlockControl: React.FC<CopyCodeBlockControlProps> = ({
 
   return (
     <ActionTooltipButton
-      tooltipText="Copy Code"
+      tooltipText={t('actions.copyCode', 'Copy Code')}
       onClick={handleCopy}
-      aria-label="Copy code block"
+      aria-label={t('actions.copyCodeAriaLabel', 'Copy code block')}
       disabled={disabled || !codeToCopy}
       icon={
         isCopied ? <CheckIcon className="text-green-500" /> : <ClipboardIcon />
       }
       className="h-6 w-6 text-muted-foreground hover:text-foreground"
+      tabIndex={-1}
     />
   );
 };

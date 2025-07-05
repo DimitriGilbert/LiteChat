@@ -3,16 +3,16 @@
 import React from "react";
 import LCAddIcon from "@/components/LiteChat/common/icons/LCAdd";
 import { ActionCards } from "./ActionCards";
+import { useTranslation } from "react-i18next";
 
 export const EmptyStateReady: React.FC = () => {
+  const { t } = useTranslation('welcome');
   return (
     <div className="flex h-full flex-col items-center justify-center text-center p-4">
       <LCAddIcon className="h-16 w-16 text-muted-foreground mb-4" />
-      <h2 className="text-xl font-semibold mb-2">Start Chatting</h2>
+      <h2 className="text-xl font-semibold mb-2">{t('startChatting.title')}</h2>
       <p className="text-muted-foreground max-w-md mb-8">
-        Select an existing conversation or project from the sidebar, or click
-        the '+' button to start a new chat. You can also explore these setup
-        options:
+        {t('startChatting.description')}
       </p>
 
       <ActionCards />

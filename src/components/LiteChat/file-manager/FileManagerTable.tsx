@@ -12,6 +12,7 @@ import {
 import type { VfsNode } from "@/types/litechat/vfs";
 import { NewFolderRow } from "./NewFolderRow";
 import { FileManagerRow } from "./FileManagerRow";
+import { useTranslation } from "react-i18next";
 
 interface FileManagerTableProps {
   entries: VfsNode[];
@@ -73,12 +74,13 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
   handleGitPush,
   handleGitStatus,
 }) => {
+  const { t } = useTranslation("vfs");
   const memoizedEntries = useMemo(() => entries, [entries]);
 
   if (isOperationLoading && entries.length === 0 && !creatingFolder) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
-        Loading...
+        {t("table.loading")}
       </div>
     );
   }
@@ -92,10 +94,10 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
           <TableRow className="hover:bg-card">
             <TableHead className="w-[40px] px-2"></TableHead>
             <TableHead className="w-[40px] px-2"></TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead className="w-[100px] text-right">Size</TableHead>
-            <TableHead className="w-[150px] text-right">Modified</TableHead>
-            <TableHead className="w-[100px] text-right pr-4">Actions</TableHead>
+            <TableHead>{t("table.name")}</TableHead>
+            <TableHead className="w-[100px] text-right">{t("table.size")}</TableHead>
+            <TableHead className="w-[150px] text-right">{t("table.modified")}</TableHead>
+            <TableHead className="w-[100px] text-right pr-4">{t("table.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -148,7 +150,7 @@ export const FileManagerTable: React.FC<FileManagerTableProps> = ({
                 colSpan={6}
                 className="h-24 text-center text-muted-foreground"
               >
-                Folder is empty
+                {t("table.folderIsEmpty")}
               </TableCell>
             </TableRow>
           )}

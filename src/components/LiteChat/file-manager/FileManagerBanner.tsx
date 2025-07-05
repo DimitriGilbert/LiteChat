@@ -2,6 +2,7 @@
 import React from "react";
 import { FolderIcon, UsersIcon } from "lucide-react";
 import type { SidebarItemType } from "@/types/litechat/chat"
+import { useTranslation } from "react-i18next";
 
 interface FileManagerBannerProps {
   vfsKey: string | null;
@@ -12,13 +13,14 @@ export const FileManagerBanner: React.FC<FileManagerBannerProps> = ({
   vfsKey,
   selectedItemType,
 }) => {
+  const { t } = useTranslation('vfs');
+
   if (vfsKey === "orphan") {
     return (
       <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
         <UsersIcon className="h-4 w-4" />
         <span>
-          <b>Shared VFS:</b> All chats <i>not</i> in a project share this
-          filesystem.
+          {t('fileManagerBanner.sharedVfs')}
         </span>
       </div>
     );
@@ -28,8 +30,7 @@ export const FileManagerBanner: React.FC<FileManagerBannerProps> = ({
       <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
         <UsersIcon className="h-4 w-4" />
         <span>
-          <b>Project-shared VFS:</b> All chats in this project share this
-          filesystem.
+          {t('fileManagerBanner.projectSharedVfs')}
         </span>
       </div>
     );
@@ -38,7 +39,7 @@ export const FileManagerBanner: React.FC<FileManagerBannerProps> = ({
       <div className="flex items-center gap-2 text-xs text-blue-300 bg-blue-900/40 px-2 py-1 rounded mb-1">
         <FolderIcon className="h-4 w-4" />
         <span>
-          <b>Project VFS:</b> Filesystem for this project and all its chats.
+          {t('fileManagerBanner.projectVfs')}
         </span>
       </div>
     );

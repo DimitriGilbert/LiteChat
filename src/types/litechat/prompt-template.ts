@@ -25,6 +25,7 @@ export interface PromptTemplate {
     jsonSchema: object;
   };
   followUps?: string[]; // New field: references to other prompt IDs
+  isShortcut?: boolean; // New field: for shortcut functionality (defaults to false)
   isPublic: boolean;
   createdAt: Date;
   updatedAt: Date;

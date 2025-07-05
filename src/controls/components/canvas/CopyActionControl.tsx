@@ -6,6 +6,7 @@ import { ClipboardIcon, CheckIcon } from "lucide-react";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { canvasEvent } from "@/types/litechat/events/canvas.events";
+import { useTranslation } from "react-i18next";
 
 interface CopyActionControlProps {
   interactionId: string;
@@ -18,13 +19,14 @@ export const CopyActionControl: React.FC<CopyActionControlProps> = ({
   contentToCopy,
   disabled,
 }) => {
+  const { t } = useTranslation('canvas');
   const [isCopied] = useState(false);
 
   const handleCopy = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation();
       if (disabled || !contentToCopy) {
-        toast.info("No content to copy or action disabled.");
+        toast.info(t('actions.noContent', 'No content to copy or action disabled.'));
         return;
       }
 
@@ -40,14 +42,14 @@ export const CopyActionControl: React.FC<CopyActionControlProps> = ({
 
       // Actual copy logic is now moved to an event handler.
     },
-    [interactionId, contentToCopy, disabled]
+    [interactionId, contentToCopy, disabled, t]
   );
 
   return (
     <ActionTooltipButton
-      tooltipText="Copy"
+      tooltipText={t('actions.copy', 'Copy')}
       onClick={handleCopy}
-      aria-label="Copy content"
+      aria-label={t('actions.copyAriaLabel', 'Copy content')}
       disabled={disabled || !contentToCopy}
       icon={
         isCopied ? <CheckIcon className="text-green-500" /> : <ClipboardIcon />

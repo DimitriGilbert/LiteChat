@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/litechat/file-manager-utils";
 import type { VfsNode } from "@/types/litechat/vfs";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
+import { useTranslation } from "react-i18next";
 
 interface FileManagerRowProps {
   entry: VfsNode;
@@ -79,6 +80,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
   handleGitPush,
   handleGitStatus,
 }) => {
+  const { t } = useTranslation('vfs');
   const isDirectory = entry.type === "folder";
 
   const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
@@ -140,7 +142,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
           onCheckedChange={(checked) =>
             handleCheckboxChange(!!checked, entry.id)
           }
-          aria-label={`Select ${entry.name}`}
+          aria-label={t('fileList.selectFile', { name: entry.name })}
           className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
           disabled={isOperationLoading || isDirectory} // Keep disabled for folders
         />
@@ -198,12 +200,12 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
           {isEditingThis ? (
             <>
               <ActionTooltipButton
-                tooltipText="Save (Enter)"
+                tooltipText={t('fileList.saveName')}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleRename();
                 }}
-                aria-label="Save name"
+                aria-label={t('fileList.saveName')}
                 disabled={isOperationLoading || !newName.trim()}
                 icon={
                   isOperationLoading ? (
@@ -215,12 +217,12 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
                 className="h-6 w-6 text-green-500 hover:text-green-400"
               />
               <ActionTooltipButton
-                tooltipText="Cancel (Esc)"
+                tooltipText={t('fileList.cancelEdit')}
                 onClick={(e) => {
                   e.stopPropagation();
                   cancelEditing();
                 }}
-                aria-label="Cancel edit"
+                aria-label={t('fileList.cancelEdit')}
                 disabled={isOperationLoading}
                 icon={<XIcon />}
                 className="h-6 w-6 text-muted-foreground hover:text-foreground"
@@ -229,38 +231,38 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
           ) : (
             <>
               <ActionTooltipButton
-                tooltipText="Rename"
+                tooltipText={t('fileList.rename')}
                 onClick={(e) => {
                   e.stopPropagation();
                   startEditing(entry);
                 }}
-                aria-label="Rename"
+                aria-label={t('fileList.rename')}
                 disabled={isOperationLoading || creatingFolder}
                 icon={<EditIcon />}
                 className="h-6 w-6 text-muted-foreground hover:text-foreground"
               />
               <ActionTooltipButton
                 tooltipText={
-                  isDirectory ? "Download folder (.zip)" : "Download file"
+                  isDirectory ? t('fileList.downloadFolder') : t('fileList.downloadFile')
                 }
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDownload(entry);
                 }}
                 aria-label={
-                  isDirectory ? "Download folder as ZIP" : "Download file"
+                  isDirectory ? t('fileList.downloadFolderZip') : t('fileList.downloadFile')
                 }
                 disabled={isOperationLoading}
                 icon={<DownloadIcon />}
                 className="h-6 w-6 text-muted-foreground hover:text-foreground"
               />
               <ActionTooltipButton
-                tooltipText="Delete"
+                tooltipText={t('fileList.delete')}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDelete(entry);
                 }}
-                aria-label={`Delete ${isDirectory ? "folder" : "file"}`}
+                aria-label={t('fileList.deleteItem', { type: isDirectory ? t('fileList.folder') : t('fileList.file') })}
                 disabled={isOperationLoading}
                 icon={<Trash2Icon />}
                 className="h-6 w-6 text-destructive hover:text-destructive/80"
@@ -286,7 +288,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             onSelect={() => handleNavigate(entry)}
             disabled={isEditingThis || isOperationLoading}
           >
-            Open Folder
+            {t('fileList.contextMenu.openFolder')}
           </ContextMenuItem>
           <ContextMenuSeparator />
           {isGitRepo ? (
@@ -296,28 +298,28 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
                 disabled={isOperationLoading}
               >
                 <GitMergeIcon className="mr-2 h-4 w-4" />
-                Git Pull
+                {t('fileList.contextMenu.gitPull')}
               </ContextMenuItem>
               <ContextMenuItem
                 onSelect={() => handleGitCommit(entry.path)}
                 disabled={isOperationLoading}
               >
                 <GitCommitIcon className="mr-2 h-4 w-4" />
-                Git Commit...
+                {t('fileList.contextMenu.gitCommit')}
               </ContextMenuItem>
               <ContextMenuItem
                 onSelect={() => handleGitPush(entry.path)}
                 disabled={isOperationLoading}
               >
                 <GitPullRequestIcon className="mr-2 h-4 w-4" />
-                Git Push
+                {t('fileList.contextMenu.gitPush')}
               </ContextMenuItem>
               <ContextMenuItem
                 onSelect={() => handleGitStatus(entry.path)}
                 disabled={isOperationLoading}
               >
                 <InfoIcon className="mr-2 h-4 w-4" />
-                Git Status
+                {t('fileList.contextMenu.gitStatus')}
               </ContextMenuItem>
             </>
           ) : (
@@ -326,7 +328,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
               disabled={isOperationLoading}
             >
               <GitBranchIcon className="mr-2 h-4 w-4" />
-              Initialize Git Repository
+              {t('fileList.contextMenu.initializeGitRepo')}
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
@@ -335,14 +337,14 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             disabled={isOperationLoading}
           >
             <EditIcon className="mr-2 h-4 w-4" />
-            Rename
+            {t('fileList.contextMenu.rename')}
           </ContextMenuItem>
           <ContextMenuItem
             onSelect={() => handleDownload(entry)}
             disabled={isOperationLoading}
           >
             <DownloadIcon className="mr-2 h-4 w-4" />
-            Download as ZIP
+            {t('fileList.contextMenu.downloadAsZip')}
           </ContextMenuItem>
           <ContextMenuItem
             className="text-red-600 focus:text-red-600 focus:bg-red-100 dark:focus:bg-red-900/20"
@@ -350,7 +352,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             disabled={isOperationLoading}
           >
             <Trash2Icon className="mr-2 h-4 w-4" />
-            Delete Folder
+            {t('fileList.contextMenu.deleteFolder')}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -372,21 +374,21 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             onSelect={() => handleCheckboxChange(!isChecked, entry.id)}
             disabled={isOperationLoading}
           >
-            {isChecked ? "Deselect" : "Select"} File
+            {isChecked ? t('fileList.contextMenu.deselectFile') : t('fileList.contextMenu.selectFile')}
           </ContextMenuItem>
           <ContextMenuItem
             onSelect={() => startEditing(entry)}
             disabled={isOperationLoading}
           >
             <EditIcon className="mr-2 h-4 w-4" />
-            Rename
+            {t('fileList.contextMenu.rename')}
           </ContextMenuItem>
           <ContextMenuItem
             onSelect={() => handleDownload(entry)}
             disabled={isOperationLoading}
           >
             <DownloadIcon className="mr-2 h-4 w-4" />
-            Download File
+            {t('fileList.contextMenu.downloadFile')}
           </ContextMenuItem>
           <ContextMenuItem
             className="text-red-600 focus:text-red-600 focus:bg-red-100 dark:focus:bg-red-900/20"
@@ -394,7 +396,7 @@ export const FileManagerRow: React.FC<FileManagerRowProps> = ({
             disabled={isOperationLoading}
           >
             <Trash2Icon className="mr-2 h-4 w-4" />
-            Delete File
+            {t('fileList.contextMenu.deleteFile')}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

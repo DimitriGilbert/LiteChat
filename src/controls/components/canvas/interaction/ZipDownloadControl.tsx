@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import JSZip from "jszip";
 import { useMarkdownParser, UniversalBlockData } from "@/lib/litechat/useMarkdownParser";
 import type { CanvasControlRenderContext } from "@/types/litechat/canvas/control";
+import { useTranslation } from "react-i18next";
 
 interface ZipDownloadControlProps {
   context: CanvasControlRenderContext;
@@ -13,6 +14,7 @@ interface ZipDownloadControlProps {
 export const ZipDownloadControl: React.FC<ZipDownloadControlProps> = ({
   context,
 }) => {
+  const { t } = useTranslation('canvas');
   // Parse the response content to extract code blocks
   const parsedContent = useMarkdownParser(context.responseContent || "");
   
@@ -38,7 +40,7 @@ export const ZipDownloadControl: React.FC<ZipDownloadControlProps> = ({
 
   const handleZipDownload = useCallback(async () => {
     if (codeBlocksWithFilepaths.length === 0) {
-      toast.info("No code blocks with filepaths found to download");
+      toast.info(t('actions.noCodeBlocksToDownload', 'No code blocks with filepaths found to download'));
       return;
     }
 
@@ -111,12 +113,12 @@ export const ZipDownloadControl: React.FC<ZipDownloadControlProps> = ({
       // Clean up
       URL.revokeObjectURL(url);
       
-      toast.success(`Downloaded ${codeBlocksWithFilepaths.length} code files as ZIP`);
+      toast.success(t('actions.downloadZip', `Downloaded {{count}} code files as ZIP`, { count: codeBlocksWithFilepaths.length }));
     } catch (error) {
       console.error('ZIP download failed:', error);
-      toast.error('Failed to create ZIP file');
+      toast.error(t('actions.zipDownloadFailed', 'Failed to create ZIP file'));
     }
-  }, [codeBlocksWithFilepaths, context.interactionId]);
+  }, [codeBlocksWithFilepaths, context.interactionId, t]);
 
   // Don't render if there are no code blocks with filepaths
   if (codeBlocksWithFilepaths.length === 0) {
@@ -125,9 +127,9 @@ export const ZipDownloadControl: React.FC<ZipDownloadControlProps> = ({
 
   return (
     <ActionTooltipButton
-      tooltipText={`Download ${codeBlocksWithFilepaths.length} code files as ZIP`}
+      tooltipText={t('actions.downloadZip', `Download {{count}} code files as ZIP`, { count: codeBlocksWithFilepaths.length })}
       onClick={handleZipDownload}
-      aria-label="Download code blocks as ZIP file"
+      aria-label={t('actions.downloadZipAriaLabel', 'Download code blocks as ZIP file')}
       icon={<ArchiveIcon />}
       iconClassName="h-4 w-4"
       className="h-6 w-6 text-muted-foreground hover:text-foreground"

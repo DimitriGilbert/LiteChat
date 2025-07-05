@@ -11,6 +11,7 @@ import type {
   ModPromptControl,
   ModChatControl,
   ModalProvider,
+  ModControlRule,
 } from "@/types/litechat/modding";
 import type { ChatControl as CoreChatControlFromTypes } from "@/types/litechat/chat";
 import type { PromptControl as CorePromptControlFromTypes } from "@/types/litechat/prompt";
@@ -85,6 +86,19 @@ export function createModApi(mod: DbMod): LiteChatModApi {
         emitter.emit(blockRendererEvent.unregisterBlockRendererRequest, {
           id: renderer.id,
         });
+      unsubscribers.push(u);
+      return u;
+    },
+    registerRule: (rule: ModControlRule) => {
+      // Control rules are registered in memory only, not saved to database
+      emitter.emit(controlRegistryEvent.registerControlRuleRequest, {
+        rule,
+      });
+      const u = () => {
+        emitter.emit(controlRegistryEvent.unregisterControlRuleRequest, {
+          id: rule.id,
+        });
+      };
       unsubscribers.push(u);
       return u;
     },
@@ -180,7 +194,18 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       toast[t](`[Mod: ${modName}] ${m}`);
     },
     log: (l, ...a) => {
-      console[l](`[Mod: ${modName}]`, ...a);
+      // Use safe console access instead of dynamic property access
+      if (l === 'log') {
+        console.log(`[Mod: ${modName}]`, ...a);
+      } else if (l === 'error') {
+        console.error(`[Mod: ${modName}]`, ...a);
+      } else if (l === 'warn') {
+        console.warn(`[Mod: ${modName}]`, ...a);
+      } else if (l === 'info') {
+        console.info(`[Mod: ${modName}]`, ...a);
+      } else {
+        console.log(`[Mod: ${modName}]`, ...a);
+      }
     },
     registerModalProvider: (modalId: string, provider: ModalProvider) => {
       emitter.emit(controlRegistryEvent.registerModalProviderRequest, {

@@ -2,6 +2,7 @@
 
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import React, { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FileTextIcon,
   ImageIcon,
@@ -34,6 +35,7 @@ interface FilePreviewRendererProps {
   fileMeta: AttachedFileMetadata;
   onRemove?: (attachmentId: string) => void;
   isReadOnly?: boolean;
+  compact?: boolean;
 }
 
 const MAX_TEXT_PREVIEW_SIZE = 1024 * 5;
@@ -89,14 +91,15 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   fileMeta,
   onRemove,
   isReadOnly = false,
+  compact = false,
 }) => {
+  const { t } = useTranslation('common');
   const [previewContentUrl, setPreviewContentUrl] = useState<string | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
   const [isAddingToVfs, setIsAddingToVfs] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isFolded, setIsFolded] = useState(true);
 
   const mimeType = fileMeta.type || "application/octet-stream";
   const isText = isLikelyTextFile(fileMeta.name, mimeType);
@@ -104,6 +107,8 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   const isAudio = mimeType.startsWith("audio/");
   const isVideo = mimeType.startsWith("video/");
   const isVfsSource = fileMeta.source === "vfs";
+  
+  const [isFolded, setIsFolded] = useState(false);
 
   // Effect to handle preview generation for DIRECT uploads
   useEffect(() => {
@@ -114,7 +119,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     if (fileMeta.source === "direct" && !isText && fileMeta.contentBase64) {
       objectUrl = base64ToBlobUrl(fileMeta.contentBase64, mimeType);
       if (!objectUrl) {
-        setError("Failed to decode file content for preview.");
+        setError(t('filePreview.decodeError'));
       }
       setPreviewContentUrl(objectUrl);
     } else {
@@ -129,7 +134,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       fileMeta.contentText.length > MAX_TEXT_PREVIEW_SIZE
     ) {
       setError(
-        `Text file too large for preview (${(fileMeta.size / 1024).toFixed(1)} KB).`,
+        t('filePreview.tooLargeForPreview', { size: (fileMeta.size / 1024).toFixed(1) })
       );
     } else if (
       fileMeta.source === "direct" &&
@@ -137,7 +142,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       fileMeta.contentText === undefined
     ) {
       // This should ideally not happen if registerFileControl is correct
-      setError("Text content missing from metadata.");
+      setError(t('filePreview.missingContent'));
     }
 
     // Cleanup function for blob URLs
@@ -156,17 +161,18 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     fileMeta.contentText,
     mimeType,
     isText,
+    t
   ]);
 
   const handleAddToVfs = async () => {
     if (fileMeta.source === "vfs") {
-      toast.info("File is already in VFS.");
+      toast.info(t('filePreview.alreadyInVfs'));
       return;
     }
     const fileToAdd = metadataToFile(fileMeta);
 
     if (!fileToAdd) {
-      toast.error("Cannot add to VFS: Failed to reconstruct file data.");
+      toast.error(t('filePreview.reconstructError'));
       return;
     }
 
@@ -174,10 +180,10 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     try {
       const targetPath = "/";
       await VfsOps.uploadFilesOp([fileToAdd], targetPath);
-      toast.success(`"${fileMeta.name}" added to VFS root.`);
+      toast.success(t('filePreview.addSuccess', { name: fileMeta.name }));
     } catch (err) {
       console.error("Failed to add file to VFS:", err);
-      toast.error(`Failed to add "${fileMeta.name}" to VFS.`);
+      toast.error(t('filePreview.addFailed', { name: fileMeta.name }));
     } finally {
       setIsAddingToVfs(false);
     }
@@ -192,7 +198,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
         blob = new Blob([content], { type: mimeType });
       } else {
         const file = metadataToFile(fileMeta);
-        if (!file) throw new Error("Could not reconstruct file data.");
+        if (!file) throw new Error(t('filePreview.reconstructDownloadError'));
         blob = file;
       }
 
@@ -207,7 +213,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     } catch (err) {
       console.error("Failed to download file:", err);
       toast.error(
-        `Download failed: ${err instanceof Error ? err.message : String(err)}`,
+        t('filePreview.downloadFailed', { error: err instanceof Error ? err.message : String(err) })
       );
     } finally {
       setIsDownloading(false);
@@ -230,7 +236,7 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
     if (isVfsSource) {
       return (
         <p className="p-2 text-xs text-muted-foreground italic">
-          VFS file attached. Content will be loaded when sent.
+          {t('filePreview.vfsAttached')}
         </p>
       );
     }
@@ -259,7 +265,11 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
         <img
           src={previewContentUrl}
           alt={fileMeta.name}
-          className="max-w-full max-h-64 object-contain rounded"
+          className={compact 
+            ? "w-full h-24 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity" 
+            : "max-w-full max-h-64 object-contain rounded"
+          }
+          onClick={compact ? () => setIsFolded(false) : undefined}
         />
       );
     } else if (isAudio && previewContentUrl) {
@@ -299,16 +309,27 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   }, [isVfsSource, isText, isImage, isAudio, isVideo, fileMeta.size]);
 
   return (
-    <div className="border rounded-md overflow-hidden bg-card shadow-sm my-1">
-      <div className="flex items-center justify-between p-2 border-b bg-muted/30">
+    <div className={cn(
+      "border rounded-md overflow-hidden bg-card shadow-sm",
+      compact ? "h-fit" : "my-1"
+    )}>
+      <div className={cn(
+        "flex items-center justify-between bg-muted/30",
+        compact ? "p-1.5 text-xs" : "p-2 border-b"
+      )}>
         <div className="flex items-center gap-2 min-w-0">
-          {renderIcon()}
-          <span className="text-sm font-medium truncate" title={fileMeta.name}>
-            {fileMeta.name}
+          {!compact && renderIcon()}
+          <span className={cn(
+            "font-medium truncate",
+            compact ? "text-xs" : "text-sm"
+          )} title={fileMeta.name}>
+            {compact ? (fileMeta.name.length > 20 ? `${fileMeta.name.substring(0, 17)}...` : fileMeta.name) : fileMeta.name}
           </span>
-          <span className="text-xs text-muted-foreground flex-shrink-0">
-            ({formatBytes(fileMeta.size)})
-          </span>
+          {!compact && (
+            <span className="text-xs text-muted-foreground flex-shrink-0">
+              ({formatBytes(fileMeta.size)})
+            </span>
+          )}
           {/* Show VFS path tooltip only if source is VFS */}
           {isVfsSource && fileMeta.path && (
             <TooltipProvider delayDuration={100}>
@@ -327,27 +348,29 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {/* Download Button */}
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                  aria-label="Download file"
-                >
-                  {isDownloading ? (
-                    <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <DownloadIcon className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download File</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {!compact && (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    aria-label="Download file"
+                  >
+                    {isDownloading ? (
+                      <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <DownloadIcon className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Download File</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {/* Fold/Unfold Button */}
           <TooltipProvider delayDuration={100}>
             <Tooltip>
@@ -355,11 +378,14 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  className={cn(
+                    "text-muted-foreground hover:text-foreground",
+                    compact ? "h-5 w-5" : "h-6 w-6"
+                  )}
                   onClick={toggleFold}
                   aria-label={isFolded ? "Unfold preview" : "Fold preview"}
                 >
-                  <ChevronsUpDownIcon className="h-3.5 w-3.5" />
+                  <ChevronsUpDownIcon className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top">
@@ -414,12 +440,22 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
       </div>
       {/* Conditionally render preview or folded summary */}
       {!isFolded ? (
-        <div className={cn("p-2 max-h-80 overflow-y-auto")}>
+        <div className={cn(
+          compact ? "p-1" : "p-2",
+          compact ? "h-40" : "max-h-80 overflow-y-auto"
+        )}>
           {renderPreview()}
+        </div>
+      ) : compact && isImage ? (
+        <div className="h-12 flex items-center justify-center bg-muted/30">
+          {renderIcon()}
         </div>
       ) : (
         <div
-          className="p-2 text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20"
+          className={cn(
+            "text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/20",
+            compact ? "p-1.5" : "p-2"
+          )}
           onClick={toggleFold}
         >
           {foldedSummary}

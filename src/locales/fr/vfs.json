@@ -1,0 +1,103 @@
+{
+  "fileManager": {
+    "foldersCannotBeAttached": "Les dossiers ne peuvent pas être attachés à l'invite.",
+    "warningDeleteFolder": "ATTENTION: Cela supprimera tout le contenu à l'intérieur",
+    "pullingDefaultBranch": "Récupération de la branche par défaut (authentification non encore implémentée)...",
+    "pushingDefaultBranch": "Envoi de la branche par défaut (authentification non encore implémentée)...",
+    "repositoryUrlEmpty": "L'URL du dépôt ne peut pas être vide.",
+    "deleteConfirmation": "Supprimer {{type}} \"{{name}}\"?",
+    "commitMessageEmpty": "Le message de commit ne peut pas être vide.",
+    "initializingFilesystem": "Initialisation du système de fichiers : {{key}}",
+    "loadingFilesystem": "Chargement du système de fichiers...",
+    "errorLoadingFilesystem": "Erreur lors du chargement du système de fichiers : {{error}}",
+    "errorPrefix": "Erreur : ",
+    "retry": "Réessayer",
+    "toolbar": {
+      "goToRootDir": "Aller au répertoire racine",
+      "goUpOneLevel": "Monter d'un niveau",
+      "refreshCurrentDir": "Actualiser le répertoire actuel",
+      "createNewFolder": "Créer un nouveau dossier",
+      "folder": "Dossier",
+      "uploadFiles": "Importer des fichiers",
+      "files": "Fichiers",
+      "uploadFolder": "Importer un dossier",
+      "uploadAndExtractZip": "Importer et extraire le ZIP",
+      "zip": "ZIP",
+      "cloneRepository": "Cloner le dépôt",
+      "gitOperations": "Opérations Git",
+      "downloadAll": "Tout télécharger"
+    },
+    "table": {
+      "loading": "Chargement...",
+      "name": "Nom",
+      "size": "Taille",
+      "modified": "Modifié",
+      "actions": "Actions",
+      "folderIsEmpty": "Le dossier est vide"
+    },
+    "fileList": {
+      "selectFile": "Sélectionner {{name}}",
+      "gitRepository": "Dépôt Git",
+      "folder": "Dossier",
+      "file": "Fichier",
+      "saveName": "Enregistrer le nom",
+      "cancelEdit": "Annuler la modification",
+      "moreActions": "Plus d'actions",
+      "download": "Télécharger",
+      "downloadFile": "Télécharger le fichier",
+      "downloadFolder": "Télécharger le dossier (.zip)",
+      "downloadFolderZip": "Télécharger le dossier en ZIP",
+      "rename": "Renommer",
+      "delete": "Supprimer",
+      "deleteItem": "Supprimer {{type}}",
+      "initializeGitRepo": "Initialiser le dépôt Git",
+      "pull": "Pull",
+      "commit": "Commit",
+      "push": "Push",
+      "status": "Statut",
+      "filePreview": "Aperçu du fichier",
+      "contextMenu": {
+        "openFolder": "Ouvrir le Dossier",
+        "gitPull": "Git Pull",
+        "gitCommit": "Git Commit...",
+        "gitPush": "Git Push",
+        "gitStatus": "Git Status",
+        "initializeGitRepo": "Initialiser Dépôt Git",
+        "rename": "Renommer",
+        "downloadAsZip": "Télécharger en ZIP",
+        "deleteFolder": "Supprimer le Dossier",
+        "selectFile": "Sélectionner le Fichier",
+        "deselectFile": "Désélectionner le Fichier",
+        "downloadFile": "Télécharger le Fichier",
+        "deleteFile": "Supprimer le Fichier"
+      }
+    }
+  },
+  "fileManagerBanner": {
+    "sharedVfs": "<b>VFS Partagé:</b> Tous les chats <i>non</i> dans un projet partagent ce système de fichiers.",
+    "projectSharedVfs": "<b>VFS Partagé de Projet:</b> Tous les chats de ce projet partagent ce système de fichiers.",
+    "projectVfs": "<b>VFS de Projet:</b> Système de fichiers pour ce projet et tous ses chats."
+  },
+  "newFolder": {
+    "placeholder": "Nom du nouveau dossier",
+    "createFolder": "Créer le dossier",
+    "cancelCreate": "Annuler la création du dossier",
+    "createTooltip": "Créer (Entrée)",
+    "cancelTooltip": "Annuler (Échap)"
+  },
+  "modal": {
+    "title": "Système de Fichiers Virtuel",
+    "description": "Gérez les fichiers associés au contexte actuel. Sélectionnez des fichiers pour les joindre à votre prochain prompt.",
+    "noFilesSelected": "Aucun fichier sélectionné dans le VFS à joindre.",
+    "filesAttached": "{{count}} fichier(s) du VFS joint(s) au prochain prompt.",
+    "noValidFilesSelected": "Aucun fichier valide n'a été sélectionné pour être joint.",
+    "attachSelected": "Joindre la Sélection ({{count}})"
+  },
+  "triggerButton": {
+    "toggleVfs": "Basculer le système de fichiers virtuel",
+    "virtualFilesystem": "Système de fichiers virtuel",
+    "attachVfsFiles": "Attacher {{count}} fichier(s) VFS sélectionné(s)",
+    "attachButtonText": "Attacher ({{count}})",
+    "attachSelectedTooltip": "Attacher les fichiers VFS sélectionnés au prompt"
+  }
+}

@@ -1,6 +1,7 @@
 // src/components/LiteChat/settings/assistant/SettingsAssistantPrompt.tsx
 // FULL FILE
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ function FieldMetaMessages({ field }: { field: AnyFieldApi }) {
 }
 
 export const SettingsAssistantPrompt: React.FC = () => {
+  const { t } = useTranslation('assistantSettings');
   const { globalSystemPrompt, setGlobalSystemPrompt } = useSettingsStore(
     useShallow((state) => ({
       globalSystemPrompt: state.globalSystemPrompt,
@@ -48,9 +50,9 @@ export const SettingsAssistantPrompt: React.FC = () => {
     onSubmit: async ({ value }) => {
       try {
         setGlobalSystemPrompt(value.globalSystemPrompt);
-        toast.success("Global system prompt updated!");
+        toast.success(t('prompt.updateSuccess'));
       } catch (error) {
-        toast.error("Failed to update prompt. Please try again.");
+        toast.error(t('prompt.updateError'));
         console.error("Error submitting assistant prompt form:", error);
       }
     },
@@ -80,14 +82,14 @@ export const SettingsAssistantPrompt: React.FC = () => {
                 htmlFor={field.name}
                 className="text-sm mb-1 block"
               >
-                Global System Prompt
+                {t('prompt.title')}
               </Label>
               <p className="text-xs text-muted-foreground mb-2">
-                Default instructions for the assistant. Can be overridden per-project.
+                {t('prompt.description')}
               </p>
               <Textarea
                 id={field.name}
-                placeholder="Enter default system instructions for the assistant..."
+                placeholder={t('prompt.placeholder')}
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
@@ -108,7 +110,7 @@ export const SettingsAssistantPrompt: React.FC = () => {
               size="sm"
               disabled={!canSubmit || isSubmitting || isValidating || !isValid}
             >
-              {isSubmitting ? "Saving..." : isValidating ? "Validating..." : "Save Prompt"}
+              {isSubmitting ? t('common.saving') : isValidating ? t('common.validating') : t('prompt.saveButton')}
             </Button>
           )}
         />

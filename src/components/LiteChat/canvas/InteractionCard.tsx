@@ -17,6 +17,7 @@ import { CardHeader } from "@/components/LiteChat/canvas/interaction/CardHeader"
 import { AssistantResponse } from "@/components/LiteChat/canvas/interaction/AssistantResponse";
 import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { WorkflowStatusDisplay } from './interaction/WorkflowStatusDisplay';
+import { useTranslation } from "react-i18next";
 
 interface InteractionCardProps {
   interaction: Interaction;
@@ -33,6 +34,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
   ({ interaction, className, renderSlot, showPrompt = true }) => {
     const [isResponseFolded, setIsResponseFolded] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
+    const { t } = useTranslation('canvas');
 
     const handleExpand = useCallback(() => {
       setIsResponseFolded(false);
@@ -61,11 +63,11 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
 
     const timeAgo = interaction.endedAt
       ? formatDistanceToNow(new Date(interaction.endedAt), { addSuffix: true })
-      : "Processing...";
+      : t('processing');
 
     const displayModelName = useMemo(() => {
       const modelIdFromMeta = interaction.metadata?.modelId;
-      if (!modelIdFromMeta) return "Unknown Model";
+      if (!modelIdFromMeta) return t('unknownModel');
 
       const { providerId, modelId: specificModelId } =
         splitModelId(modelIdFromMeta);
@@ -84,6 +86,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
       interaction.metadata?.modelId,
       dbProviderConfigs,
       getAllAvailableModelDefsForProvider,
+      t,
     ]);
 
     const isComplete = interaction.status === "COMPLETED";
@@ -123,6 +126,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
         return (
             <div
                 ref={cardRef}
+                data-interaction-id={interaction.id}
                 className={cn(
                     "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm",
                     "overflow-wrap-anywhere",
@@ -152,6 +156,7 @@ export const InteractionCard: React.FC<InteractionCardProps> = React.memo(
     return (
       <div
         ref={cardRef}
+        data-interaction-id={interaction.id}
         className={cn(
           "group/card relative rounded-lg border bg-card p-3 md:p-4 shadow-sm transition-colors hover:bg-muted/50",
           "overflow-wrap-anywhere",

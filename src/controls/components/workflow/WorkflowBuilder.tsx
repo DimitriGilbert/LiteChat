@@ -2,12 +2,18 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import type { WorkflowControlModule } from '@/controls/modules/WorkflowControlModule';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Workflow, Plus, Save, GitFork } from 'lucide-react';
+import { Workflow, Plus, Save, GitFork, Edit } from 'lucide-react';
 import { ActionTooltipButton } from '@/components/LiteChat/common/ActionTooltipButton';
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card';
+import { Badge } from '@/components/ui/badge';
 import type { WorkflowStep, WorkflowTemplate } from '@/types/litechat/workflow';
 import { WorkflowStepCard } from './WorkflowStepCard';
 import { WorkflowList } from './WorkflowList';
@@ -17,11 +23,30 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFormedible } from '@/hooks/use-formedible';
 import { useInteractionStore } from '@/store/interaction.store';
+import { useControlRegistryStore } from '@/store/control.store';
 import { TabbedLayout } from '@/components/LiteChat/common/TabbedLayout';
 import { PersistenceService } from '@/services/persistence.service';
 import { toast } from 'sonner';
 import { nanoid } from 'nanoid';
 import { useForm } from '@tanstack/react-form';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 
 interface WorkflowBuilderProps {
     module: WorkflowControlModule;
@@ -397,11 +422,13 @@ const StepsForm = React.forwardRef<
         promptTemplates: any[];
         agentTasks: any[];
         models: any[];
+        tools: Array<{ name: string; description?: string }>;
         module: any;
         currentWorkflow: WorkflowTemplate;
     }
->(({ initialSteps, promptTemplates, agentTasks, models, module, currentWorkflow }, ref) => {
+>(({ initialSteps, promptTemplates, agentTasks, models, tools, module, currentWorkflow }, ref) => {
     const [steps, setSteps] = useState<WorkflowStep[]>(initialSteps);
+    const [activeStepId, setActiveStepId] = useState<string | null>(null);
 
     // Expose getData and reset methods via ref
     React.useImperativeHandle(ref, () => ({
@@ -419,6 +446,24 @@ const StepsForm = React.forwardRef<
             mountedRef.current = true;
         }
     }, []);
+
+    // Drag and drop sensors - configured for modal usage
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8, // Require 8px movement before drag starts
+            },
+        }),
+        useSensor(TouchSensor, {
+            activationConstraint: {
+                delay: 200,
+                tolerance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     const handleAddStep = useCallback(() => {
         const newStep: WorkflowStep = {
@@ -443,24 +488,102 @@ const StepsForm = React.forwardRef<
         setSteps(prev => prev.filter((_, i) => i !== index));
     }, []);
 
+    // Step reordering handlers
+    const handleMoveStep = useCallback((fromIndex: number, toIndex: number) => {
+        setSteps(prev => arrayMove(prev, fromIndex, toIndex));
+    }, []);
+
+    const handleMoveToTop = useCallback((index: number) => {
+        if (index > 0) {
+            handleMoveStep(index, 0);
+        }
+    }, [handleMoveStep]);
+
+    const handleMoveUp = useCallback((index: number) => {
+        if (index > 0) {
+            handleMoveStep(index, index - 1);
+        }
+    }, [handleMoveStep]);
+
+    const handleMoveDown = useCallback((index: number) => {
+        if (index < steps.length - 1) {
+            handleMoveStep(index, index + 1);
+        }
+    }, [handleMoveStep, steps.length]);
+
+    // Drag handlers
+    const handleDragStart = useCallback((event: DragStartEvent) => {
+        // console.log('🐛 [WorkflowBuilder] DragStart:', {
+        //     activeId: event.active.id,
+        //     event
+        // });
+        setActiveStepId(event.active.id as string);
+    }, []);
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
+        
+        if (over && active.id !== over.id) {
+            const activeIndex = steps.findIndex(step => step.id === active.id);
+            const overIndex = steps.findIndex(step => step.id === over.id);
+            
+            if (activeIndex !== -1 && overIndex !== -1) {
+                handleMoveStep(activeIndex, overIndex);
+            }
+        }
+        setActiveStepId(null);
+    }, [steps, handleMoveStep]);
+
+    const handleDragCancel = useCallback(() => {
+        // console.log('🐛 [WorkflowBuilder] DragCancel');
+        setActiveStepId(null);
+    }, []);
+
+    const stepIds = useMemo(() => steps.map(step => step.id), [steps]);
+
+        // console.log('🐛 [WorkflowBuilder] Component render:', {
+        //     stepsCount: steps.length,
+        //     activeStepId,
+        //     stepIds,
+        //     sensors: sensors.length
+        // });
+
     return (
-        <div className="h-full flex flex-col">
-            <ScrollArea className="flex-1 border rounded-md p-3">
+        <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+                modifiers={[]}
+            >
+            <div className="h-full flex flex-col border rounded-md p-3">
                 <div className="space-y-4">
-                    {steps.map((step, index) => (
-                        <WorkflowStepCard
-                            key={step.id}
-                            step={step}
-                            onChange={(updatedStep) => handleStepChange(index, updatedStep)}
-                            onDelete={() => handleStepDelete(index)}
-                            promptTemplates={promptTemplates}
-                            agentTasks={agentTasks}
-                            models={models}
-                            module={module}
-                            workflow={currentWorkflow}
-                            stepIndex={index}
-                        />
-                    ))}
+                    <SortableContext
+                        items={stepIds}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        {steps.map((step, index) => (
+                            <WorkflowStepCard
+                                key={step.id}
+                                step={step}
+                                onChange={(updatedStep: WorkflowStep) => handleStepChange(index, updatedStep)}
+                                onDelete={() => handleStepDelete(index)}
+                                onMoveToTop={() => handleMoveToTop(index)}
+                                onMoveUp={() => handleMoveUp(index)}
+                                onMoveDown={() => handleMoveDown(index)}
+                                promptTemplates={promptTemplates}
+                                agentTasks={agentTasks}
+                                models={models}
+                                tools={tools}
+                                module={module}
+                                workflow={currentWorkflow}
+                                stepIndex={index}
+                                isFirst={index === 0}
+                                isLast={index === steps.length - 1}
+                            />
+                        ))}
+                    </SortableContext>
                     {steps.length === 0 && (
                         <div className="text-center text-muted-foreground py-8">
                             No subsequent steps. Add one to create a sequence.
@@ -470,8 +593,27 @@ const StepsForm = React.forwardRef<
                         <Plus className="h-4 w-4 mr-2" /> Add Step
                     </Button>
                 </div>
-            </ScrollArea>
-        </div>
+            </div>
+            <DragOverlay dropAnimation={null}>
+                {activeStepId ? (
+                    <WorkflowStepCard
+                        step={steps.find(s => s.id === activeStepId)!}
+                        onChange={() => {}}
+                        onDelete={() => {}}
+                        promptTemplates={promptTemplates}
+                        agentTasks={agentTasks}
+                        models={models}
+                        tools={tools}
+                        module={module}
+                        workflow={currentWorkflow}
+                        stepIndex={steps.findIndex(s => s.id === activeStepId)}
+                        isFirst={false}
+                        isLast={false}
+                        isDragDisabled={true}
+                    />
+                ) : null}
+            </DragOverlay>
+        </DndContext>
     );
 });
 
@@ -524,9 +666,6 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
         reset: (steps: WorkflowStep[]) => void;
     } | null>(null);
     
-    // Keep track of when we've initialized forms to avoid unnecessary resets
-    // const [, setFormsInitialized] = useState(false);
-    
     // Cache for visualizer data - only updated when switching to visualizer tab
     const [visualizerData, setVisualizerData] = useState<{
         workflow: WorkflowTemplate;
@@ -541,6 +680,12 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     const promptTemplates = module.getPromptTemplates();
     const agentTasks = module.getAgentTasks();
     const models = module.getModels();
+    // Get available tools from control registry
+    const controlRegistry = useControlRegistryStore();
+    const tools = Object.keys(controlRegistry.tools).map(toolName => ({
+        name: toolName,
+        description: controlRegistry.tools[toolName]?.definition?.description
+    }));
 
     // Function to gather all form data when needed
     const gatherFormData = useCallback(async (): Promise<{
@@ -608,23 +753,28 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     };
 
     const handleEditWorkflow = (existingWorkflow: WorkflowTemplate) => {
+        // Set editing mode and load existing workflow data
+        setIsEditingExisting(true);
+        setCurrentWorkflow(existingWorkflow);
+        
         const newMetadata = { 
             name: existingWorkflow.name, 
             description: existingWorkflow.description 
         };
+        
         const newTrigger = {
-            triggerType: (existingWorkflow.triggerType as TriggerType) || 'custom',
+            triggerType: existingWorkflow.triggerType || 'custom' as TriggerType,
             customPrompt: existingWorkflow.triggerPrompt || '',
             selectedTemplateId: existingWorkflow.triggerRef || '',
             templateVariables: existingWorkflow.templateVariables || {},
         };
+        
         const newSteps = existingWorkflow.steps || [];
         
-        setCurrentWorkflow(existingWorkflow);
         setInitialMetadata(newMetadata);
         setInitialTrigger(newTrigger);
         setInitialSteps(newSteps);
-        setIsEditingExisting(true);
+        
         setActiveTab('builder');
         setVisualizerData(null);
         
@@ -634,6 +784,8 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
             triggerFormRef.current?.reset(newTrigger);
             stepsFormRef.current?.reset(newSteps);
         }, 100);
+        
+        setOpen(true);
     };
 
     const handleSaveWorkflow = async () => {
@@ -888,15 +1040,16 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                                         value: 'builder',
                                         label: 'Builder',
                                         content: (
-                                            <StepsForm
-                                                ref={stepsFormRef}
-                                                initialSteps={initialSteps}
-                                                promptTemplates={promptTemplates}
-                                                agentTasks={agentTasks}
-                                                models={models}
-                                                module={module}
-                                                currentWorkflow={currentWorkflow}
-                                            />
+                                                                        <StepsForm 
+                                ref={stepsFormRef}
+                                initialSteps={initialSteps}
+                                promptTemplates={promptTemplates}
+                                agentTasks={agentTasks}
+                                models={models}
+                                tools={tools}
+                                module={module}
+                                currentWorkflow={currentWorkflow}
+                            />
                                         ),
                                     },
                                     {
@@ -976,19 +1129,145 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
         },
     ];
 
+    const shortcutWorkflows = module.getShortcutWorkflows();
+    const [searchTerm, setSearchTerm] = useState("");
+    
+    // Filter workflows based on search term
+    const filteredWorkflows = shortcutWorkflows.filter(workflow =>
+        workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        workflow.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const checkIfWorkflowNeedsInput = useCallback((workflow: WorkflowTemplate): boolean => {
+        // Check if trigger needs input
+        if (workflow.triggerType === 'custom' && !workflow.triggerPrompt) {
+            return true; // Custom trigger without prompt
+        }
+        
+        if (workflow.triggerType === 'template' && workflow.triggerRef) {
+            // Check if template has variables that need values
+            const template = module.getPromptTemplates().find(t => t.id === workflow.triggerRef);
+            if (template && template.variables && template.variables.length > 0) {
+                // Check if templateVariables has all required values
+                const hasAllValues = template.variables.every((variable: any) => {
+                    const value = workflow.templateVariables?.[variable.name];
+                    return value !== undefined && value !== null && value !== '';
+                });
+                if (!hasAllValues) return true;
+            }
+        }
+        
+        // Workflow is ready to run
+        return false;
+    }, [module]);
+
+    const handleRunShortcutWorkflow = useCallback((workflow: WorkflowTemplate) => {
+        const needsInput = checkIfWorkflowNeedsInput(workflow);
+        
+        if (needsInput) {
+            // Open builder for configuration - it already has a run button
+            handleEditWorkflow(workflow);
+        } else {
+            // Run directly with sensible defaults
+            const defaultPrompt = workflow.triggerPrompt || "Run workflow";
+            module.startWorkflow(workflow, defaultPrompt);
+            toast.success(`Workflow "${workflow.name}" started!`);
+        }
+    }, [checkIfWorkflowNeedsInput, module, handleEditWorkflow]);
+
     return (
         <>
-            <ActionTooltipButton
-                tooltipText="Open Workflow Builder"
-                onClick={() => setOpen(true)}
-                aria-label="Open Workflow Builder"
-                disabled={isStreaming}
-                icon={<Workflow />}
-                className="h-5 w-5 md:h-6 md:w-6"
-            />
+            {shortcutWorkflows.length > 0 ? (
+                <HoverCard>
+                    <HoverCardTrigger asChild>
+                        <ActionTooltipButton
+                            tooltipText="Open Workflow Builder"
+                            onClick={() => setOpen(true)}
+                            aria-label="Open Workflow Builder"
+                            disabled={isStreaming}
+                            icon={<Workflow />}
+                            className="h-5 w-5 md:h-6 md:w-6"
+                        />
+                    </HoverCardTrigger>
+                    <HoverCardContent className="w-80 p-0" align="start">
+                        <div className="p-3 border-b">
+                            <h4 className="font-semibold text-sm mb-2">Quick Workflows</h4>
+                            <Input
+                                placeholder="Search workflows..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="h-8"
+                            />
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                            <div className="p-2 space-y-1">
+                                {filteredWorkflows.length === 0 ? (
+                                    <div className="text-center text-muted-foreground py-4 text-sm">
+                                        {searchTerm ? "No workflows match your search" : "No shortcut workflows available"}
+                                    </div>
+                                ) : (
+                                    filteredWorkflows.map((workflow) => {
+                                        const needsInput = checkIfWorkflowNeedsInput(workflow);
+                                        
+                                        return (
+                                            <div
+                                                key={workflow.id}
+                                                className="flex items-center gap-2 p-2 rounded hover:bg-accent transition-colors group"
+                                            >
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-6 w-6 p-0 opacity-50 group-hover:opacity-100"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleEditWorkflow(workflow);
+                                                    }}
+                                                >
+                                                    <Edit className="h-3 w-3" />
+                                                </Button>
+                                                
+                                                <div 
+                                                    className="flex-1 min-w-0 cursor-pointer"
+                                                    onClick={() => handleRunShortcutWorkflow(workflow)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium text-sm truncate">{workflow.name}</span>
+                                                        <Badge variant="outline" className="text-xs px-1 py-0">
+                                                            {workflow.steps.length}
+                                                        </Badge>
+                                                        {needsInput && (
+                                                            <Badge variant="secondary" className="text-xs px-1 py-0">
+                                                                Setup
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    {workflow.description && (
+                                                        <div className="text-xs text-muted-foreground truncate mt-0.5">
+                                                            {workflow.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    </HoverCardContent>
+                </HoverCard>
+            ) : (
+                <ActionTooltipButton
+                    tooltipText="Open Workflow Builder"
+                    onClick={() => setOpen(true)}
+                    aria-label="Open Workflow Builder"
+                    disabled={isStreaming}
+                    icon={<Workflow />}
+                    className="h-5 w-5 md:h-6 md:w-6"
+                />
+            )}
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="!w-[95vw] !h-[95vh] !max-w-none flex flex-col p-0">
+                <DialogContent className="!w-[95vw] !h-[95vh] !max-w-none flex flex-col p-0" onPointerDownOutside={(e) => e.preventDefault()}>
                     <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
                         <DialogTitle className="p-2">Workflow Builder</DialogTitle>
                         <DialogDescription>

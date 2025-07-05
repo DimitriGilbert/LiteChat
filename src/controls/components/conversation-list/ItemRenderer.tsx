@@ -28,6 +28,7 @@ import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipB
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { uiEvent } from "@/types/litechat/events/ui.events";
+import { useTranslation } from "react-i18next";
 import {
   Popover,
   PopoverContent,
@@ -41,8 +42,7 @@ interface ConversationItemProps {
   conversationSyncStatus: Record<string, SyncStatus>;
   repoNameMap: Map<string, string>;
   onSelectItem: (id: string, type: SidebarItemType) => void;
-  onDeleteConversation: (id: string, e: React.MouseEvent) => void;
-  onDeleteProject: (id: string, e: React.MouseEvent) => void;
+  onDeleteItem: (item: SidebarItem, e: React.MouseEvent) => void;
   onExportConversation: (
     id: string,
     format: "json" | "md",
@@ -73,8 +73,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     conversationSyncStatus,
     repoNameMap,
     onSelectItem,
-    onDeleteConversation,
-    onDeleteProject,
+    onDeleteItem,
     onExportConversation,
     onExportProject,
     expandedProjects,
@@ -87,6 +86,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
     isSavingEdit,
     originalNameToCompare,
   }) => {
+    const { t } = useTranslation('controls');
     const isSelected = item.id === selectedItemId;
     const isProject = item.itemType === "project";
     // console.log("ConversationItemRenderer", item.itemType);
@@ -161,19 +161,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
 
     const handleDeleteClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (isProject) {
-        if (
-          window.confirm(
-            `Delete project "${
-              (item as Project).name
-            }" and ALL its contents (sub-projects and conversations)? This cannot be undone.`
-          )
-        ) {
-          onDeleteProject(item.id, e);
-        }
-      } else {
-        onDeleteConversation(item.id, e);
-      }
+      onDeleteItem(item, e);
     };
 
     const startLocalEditingWrapper = (e: React.MouseEvent) => {
@@ -206,7 +194,7 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
       if (!trimmedName) {
         // If name is empty, revert to original and cancel (unless it was "New Project")
         if (originalNameToCompare !== "New Project") {
-          toast.error("Name cannot be empty.");
+          toast.error(t('itemRenderer.nameCannotBeEmpty'));
           setLocalEditName(originalNameToCompare); // Revert local state
           // No explicit cancel here, let user correct or press Esc
           localEditInputRef.current?.focus();
@@ -308,25 +296,25 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
           {isGloballyEditingThis ? (
             <>
               <ActionTooltipButton
-                tooltipText="Save (Enter)"
+                tooltipText={t('itemRenderer.saveEnter')}
                 onClick={(e) => {
                   e.stopPropagation();
                   saveLocalEditWrapper();
                 }}
                 disabled={isSavingEdit || !localEditName.trim()}
-                aria-label="Save changes"
+                aria-label={t('itemRenderer.saveChanges')}
                 icon={<SaveIconComponent />}
                 iconClassName={saveIconClassName}
                 className="h-5 w-5 text-green-500 hover:text-green-600"
               />
               <ActionTooltipButton
-                tooltipText="Cancel (Esc)"
+                tooltipText={t('itemRenderer.cancelEsc')}
                 onClick={(e) => {
                   e.stopPropagation();
                   cancelLocalEditWrapper();
                 }}
                 disabled={isSavingEdit}
-                aria-label="Cancel edit"
+                aria-label={t('itemRenderer.cancelEdit')}
                 icon={<XIcon />}
                 className="h-5 w-5 text-muted-foreground hover:text-foreground"
               />
@@ -335,25 +323,25 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
             <>
               {isProject && (
                 <ActionTooltipButton
-                  tooltipText="Project Settings"
+                  tooltipText={t('itemRenderer.projectSettings')}
                   onClick={handleSettingsClick}
-                  aria-label={`Settings for ${displayName}`}
+                  aria-label={t('itemRenderer.settingsFor', { name: displayName })}
                   icon={<CogIcon />}
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                 />
               )}
               <ActionTooltipButton
-                tooltipText="Edit"
+                tooltipText={t('itemRenderer.edit')}
                 onClick={startLocalEditingWrapper}
-                aria-label={`Edit ${displayName}`}
+                aria-label={t('itemRenderer.editItem', { name: displayName })}
                 icon={<Edit2Icon />}
                 className="h-5 w-5 text-muted-foreground hover:text-foreground"
               />
               {isProject ? (
                 <ActionTooltipButton
-                  tooltipText="Export Project (JSON)"
+                  tooltipText={t('itemRenderer.exportProjectJson')}
                   onClick={(e) => onExportProject(item.id, e)}
-                  aria-label={`Export project ${displayName}`}
+                  aria-label={t('itemRenderer.exportProject', { name: displayName })}
                   icon={<FileJsonIcon />}
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
                 />
@@ -361,8 +349,8 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                   <PopoverTrigger asChild>
                     <ActionTooltipButton
-                      tooltipText="Export Conversation"
-                      aria-label={`Export ${displayName}`}
+                      tooltipText={t('itemRenderer.exportConversation')}
+                      aria-label={t('itemRenderer.exportItem', { name: displayName })}
                       icon={<DownloadIcon />}
                       className="h-5 w-5 text-muted-foreground hover:text-foreground"
                     />
@@ -399,11 +387,11 @@ export const ConversationItemRenderer = memo<ConversationItemProps>(
                 </Popover>
               )}
               <ActionTooltipButton
-                tooltipText="Delete"
+                tooltipText={t('itemRenderer.delete', 'Delete')}
                 onClick={handleDeleteClick}
-                aria-label={`Delete ${displayName}`}
+                aria-label={t('itemRenderer.delete', 'Delete')}
                 icon={<Trash2Icon />}
-                className="h-5 w-5 text-destructive hover:text-destructive/80"
+                className="hover:bg-destructive/20 hover:text-destructive"
               />
             </>
           )}

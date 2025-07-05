@@ -29,8 +29,10 @@ import { FileManagerList } from "./FileManagerList";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { vfsEvent } from "@/types/litechat/events/vfs.events";
 import type { ModEventPayloadMap } from "@/types/litechat/modding";
+import { useTranslation } from "react-i18next";
 
 export const FileManager = memo(() => {
+  const { t } = useTranslation("vfs");
   const {
     nodes,
     childrenMap,
@@ -255,10 +257,10 @@ export const FileManager = memo(() => {
           emitter.emit(vfsEvent.deselectFileRequest, { fileId: nodeId });
         }
       } else if (node && node.type === "folder") {
-        toast.info("Folders cannot be attached to the prompt.");
+        toast.info(t("fileManager.foldersCannotBeAttached"));
       }
     },
-    [nodes]
+    [nodes, t]
   );
 
   const startEditing = useCallback(
@@ -365,19 +367,16 @@ export const FileManager = memo(() => {
   const handleDelete = useCallback(
     async (entry: VfsNode) => {
       const confirmation = window.confirm(
-        `Delete ${entry.type} "${entry.name}"?${
-          entry.type === "folder"
-            ? `
-
-WARNING: This will delete all contents inside`
-            : ""
-        }`
+        t("fileManager.deleteConfirmation", { type: entry.type, name: entry.name }) + 
+          (entry.type === "folder"
+            ? `\n\n` + t("fileManager.warningDeleteFolder")
+            : "")
       );
       if (confirmation) {
         await runOperation(vfsEvent.deleteNodesRequest, { ids: [entry.id] });
       }
     },
-    [runOperation]
+    [runOperation, t]
   );
 
   const handleDownload = useCallback(
@@ -459,10 +458,10 @@ WARNING: This will delete all contents inside`
 
   const handleGitPull = useCallback(
     (path: string) => {
-      toast.info("Pulling default branch (auth not implemented yet)...");
+      toast.info(t("fileManager.pullingDefaultBranch"));
       runGitOperation(path, () => VfsOps.gitPullOp(path, "main"));
     },
-    [runGitOperation]
+    [runGitOperation, t]
   );
 
   const handleGitCommit = useCallback((path: string) => {
@@ -473,10 +472,10 @@ WARNING: This will delete all contents inside`
 
   const handleGitPush = useCallback(
     (path: string) => {
-      toast.info("Pushing default branch (auth not implemented yet)...");
+      toast.info(t("fileManager.pushingDefaultBranch"));
       runGitOperation(path, () => VfsOps.gitPushOp(path, "main"));
     },
-    [runGitOperation]
+    [runGitOperation, t]
   );
 
   const handleGitStatus = useCallback(
@@ -494,7 +493,7 @@ WARNING: This will delete all contents inside`
 
   const onSubmitClone = useCallback(async () => {
     if (!cloneRepoUrl.trim()) {
-      toast.error("Repository URL cannot be empty.");
+      toast.error(t("fileManager.repositoryUrlEmpty"));
       return;
     }
     setIsCloning(true);
@@ -527,11 +526,12 @@ WARNING: This will delete all contents inside`
     currentParentId,
     loading,
     fsOperationLoading,
+    t,
   ]);
 
   const onSubmitCommit = useCallback(async () => {
     if (!commitPath || !commitMessage.trim()) {
-      toast.error("Commit message cannot be empty.");
+      toast.error(t("fileManager.commitMessageEmpty"));
       return;
     }
     setIsCommitting(true);
@@ -556,10 +556,10 @@ WARNING: This will delete all contents inside`
         <Loader2 className="h-8 w-8 animate-spin mb-2" />
         <p>
           {initializingKey
-            ? `Initializing filesystem: ${initializingKey}`
-            : "Loading filesystem..."}
+            ? t("fileManager.initializingFilesystem", { key: initializingKey })
+            : t("fileManager.loadingFilesystem")}
         </p>
-        {error && <p className="text-destructive mt-2">Error: {error}</p>}
+        {error && <p className="text-destructive mt-2">{t("fileManager.errorPrefix")}{error}</p>}
       </div>
     );
   }
@@ -567,7 +567,7 @@ WARNING: This will delete all contents inside`
   if (error && !isVfsLoading) {
     return (
       <div className="flex h-full flex-col items-center justify-center bg-card text-destructive p-4">
-        <p>Error loading filesystem: {error}</p>
+        <p>{t("fileManager.errorLoadingFilesystem", { error: error })}</p>
         <Button
           variant="outline"
           size="sm"
@@ -578,7 +578,7 @@ WARNING: This will delete all contents inside`
           }
           className="mt-2"
         >
-          Retry
+          {t("fileManager.retry")}
         </Button>
       </div>
     );
@@ -607,6 +607,7 @@ WARNING: This will delete all contents inside`
         archiveInputRef={archiveInputRef}
         handleFileChange={handleFileChange}
         handleArchiveChange={handleArchiveChange}
+        gitRepoStatus={gitRepoStatus}
       />
       <div className="flex-grow overflow-auto hidden md:block">
         <FileManagerTable

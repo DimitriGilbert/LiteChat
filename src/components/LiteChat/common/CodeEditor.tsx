@@ -4,6 +4,7 @@ import Prism from "prismjs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Save, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // Import Prism languages
 import "prismjs/components/prism-typescript";
@@ -67,11 +68,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   error,
   onSave,
   showSaveButton = false,
-  saveButtonText = "Save",
+  saveButtonText,
   disabled = false,
   minHeight = '200px',
   className = '',
 }) => {
+  const { t } = useTranslation('common');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const highlightCode = useCallback((code: string) => {
@@ -79,10 +81,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       const prismLang = getPrismLanguage(language);
       return Prism.highlight(code, prismLang, language || 'text');
     } catch (error) {
-      console.error('Syntax highlighting error:', error);
+      console.error(t("codeEditor.syntaxHighlightingError"), error);
       return code;
     }
-  }, [language]);
+  }, [language, t]);
 
   const handleSave = useCallback(async () => {
     if (!onSave || disabled || isSubmitting) return;
@@ -140,7 +142,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             className="flex items-center gap-2"
           >
             <Save className="h-4 w-4" />
-            {isSubmitting ? 'Saving...' : saveButtonText}
+            {isSubmitting ? t("codeEditor.saving") : (saveButtonText || t("codeEditor.saveButtonText"))}
           </Button>
         </div>
       )}

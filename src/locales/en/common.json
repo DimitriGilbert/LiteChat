@@ -1,0 +1,130 @@
+{
+  "initializingLiteChat": "Initializing LiteChat...",
+  "liteChatMenu": "LiteChat Menu",
+  "closeMenu": "Close menu",
+  "openMenu": "Open menu",
+  "loadingMenu": "Loading menu...",
+  "pleaseWaitInitialization": "Please wait while the application initializes.",
+  "footerControlsLoading": "Footer controls loading...",
+  "applicationCoreNotReady": "Application core not ready. Please try again.",
+  "failedToStartNewChat": "Failed to start new chat.",
+  "failedToSendMessage": "Failed to send message.",
+  "modalManager": {
+    "noProvider": "No provider for modalId: {{id}}"
+  },
+  "universalBlockRenderer": {
+    "code": "CODE",
+    "renderError": "Render Error"
+  },
+  "codeEditor": {
+    "saveButtonText": "Save",
+    "saving": "Saving...",
+    "syntaxHighlightingError": "Syntax highlighting error:"
+  },
+  "theme": {
+    "toggle": "Toggle theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "app": {
+    "initializationError": "Application failed to initialize. Please refresh the page.",
+    "initializationErrorDetails": "Initialization Error",
+    "initializing": "Initializing...",
+    "noConversationSelected": "No conversation selected",
+    "startNewConversation": "Start a new conversation or select one from the sidebar.",
+    "newConversation": "New Conversation",
+    "createConversationError": "Failed to create conversation",
+    "loadConversationError": "Failed to load conversation",
+    "loadInteractionsError": "Failed to load interactions",
+    "runningWorkflow": "Running workflow...",
+    "workflowAborted": "Workflow aborted",
+    "workflowError": "Workflow execution failed",
+    "workflowCompleted": "Workflow completed",
+    "updateError": "Update failed",
+    "noInteractions": "No interactions yet",
+    "startTyping": "Start typing to begin the conversation.",
+    "genericError": "An unexpected error occurred. Please try again."
+  },
+  "close": "Close",
+  "apiKeyAddedSuccess": "API key added successfully!",
+  "providerAddedSuccess": "Provider added successfully!",
+  "modelEnabledSuccess": "Model enabled successfully!",
+  "modelDisabledSuccess": "Model disabled successfully!",
+  "failedToUpdateModel": "Failed to update model status.",
+  "newChat": "New Chat",
+  "welcomeFirstChat": "Welcome to your first chat!",
+  "failedToStartChat": "Failed to start your first chat.",
+  "submit": "Submit",
+  "cancel": "Cancel",
+  "submitting": "Submitting...",
+  "apiKeyForm": {
+    "keyNameRequired": "Key Name is required.",
+    "providerTypeRequired": "Provider Type is required.",
+    "apiKeyValueRequired": "API Key Value is required.",
+    "providerTypeLabel": "Provider Type",
+    "keyNameLabel": "Key Name",
+    "apiKeyValueLabel": "API Key Value",
+    "selectProviderPlaceholder": "Select Provider Type",
+    "keyNamePlaceholder": "e.g., My OpenAI Key",
+    "keyValuePlaceholder": "Enter your API key",
+    "saving": "Saving...",
+    "updateApiKey": "Update API Key",
+    "saveApiKey": "Save API Key"
+  },
+  "errorBoundary": {
+    "copySuccess": "{label} copied to clipboard!",
+    "copyFailed": "Failed to copy {label}.",
+    "copied": "Copied!",
+    "copyLabel": "Copy {label}",
+    "title": "Oops! Something went wrong.",
+    "description": "LiteChat encountered an unexpected error. Please try refreshing the page. If the problem persists, consider reporting the issue. Copy the details and paste them into the GitHub issue.",
+    "unknownError": "Unknown Error",
+    "refreshButton": "Refresh Page",
+    "detailsLabel": "Details",
+    "aiDebugPromptLabel": "AI Debug Prompt",
+    "reportButton": "Report on GitHub",
+    "reportSuccess": "Error report copied to clipboard. Paste it into the GitHub issue body.",
+    "reportFailed": "Failed to copy error report. Please copy manually."
+  },
+  "filePreview": {
+    "decodeError": "Failed to decode file content for preview.",
+    "tooLargeForPreview": "Text file too large for preview ({size} KB).",
+    "missingContent": "Text content missing from metadata.",
+    "alreadyInVfs": "File is already in VFS.",
+    "reconstructError": "Cannot add to VFS: Failed to reconstruct file data.",
+    "addSuccess": "\"{name}\" added to VFS root.",
+    "addFailed": "Failed to add \"{name}\" to VFS.",
+    "reconstructDownloadError": "Could not reconstruct file data.",
+    "downloadFailed": "Download failed: {error}",
+    "vfsAttached": "VFS file attached. Content will be loaded when sent.",
+    "addToVfsTooltip": "Add to Virtual File System",
+    "downloadTooltip": "Download file"
+  },
+  "loadingStateWrapper": {
+    "loading": "Loading...",
+    "error": "Error: {{error}}",
+    "noItems": "No items found."
+  },
+  "sortableModelItem": {
+    "dragToReorder": "Drag to reorder model {{name}}",
+    "modelInfo": "Model information",
+    "moveToTop": "Move to Top",
+    "moveUp": "Move Up",
+    "moveDown": "Move Down"
+  },
+  "stopButton": {
+    "stop": "Stop",
+    "stopGeneration": "Stop Generation"
+  },
+  "cloneDialog": {
+    "title": "Clone Git Repository",
+    "description": "Enter the repository URL. It will be cloned into a new folder named after the repository within {{path}}.",
+    "clone": "Clone",
+    "url": "URL",
+    "branch": "Branch",
+    "urlPlaceholder": "https://github.com/user/repo.git",
+    "branchPlaceholder": "main (default)",
+    "httpsRecommendation": "Recommendation: Use HTTPS URLs for better browser compatibility and authentication (e.g., https://github.com/user/repo.git)"
+  }
+}

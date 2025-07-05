@@ -1,6 +1,7 @@
 // src/components/LiteChat/common/StopButton.tsx
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { SquareIcon } from "lucide-react";
 import { ActionTooltipButton } from "./ActionTooltipButton";
 
@@ -23,13 +24,15 @@ export const StopButton: React.FC<StopButtonProps> = ({
   className,
   size = "icon",
   variant = "ghost",
-  "aria-label": ariaLabel = "Stop Generation",
+  "aria-label": ariaLabel,
 }) => {
+  const { t } = useTranslation('common');
+  
   return (
     <ActionTooltipButton
-      tooltipText="Stop"
+      tooltipText={t('stopButton.stop')}
       onClick={onStop}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel || t('stopButton.stopGeneration')}
       icon={<SquareIcon />}
       variant={variant}
       size={size}

@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { BookOpenText, Settings } from "lucide-react";
+import { BookOpenText, Settings, Edit } from "lucide-react";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { useShallow } from "zustand/react/shallow";
 import { emitter } from "@/lib/litechat/event-emitter";
@@ -12,6 +17,7 @@ import { toast } from "sonner";
 interface PromptLibraryControlModule {
   compileTemplate: (templateId: string, formData: Record<string, any>) => Promise<{ content: string; selectedTools?: string[]; selectedRules?: string[]; }>;
   applyTemplate: (templateId: string, formData: PromptFormData) => Promise<void>;
+  getShortcutTemplates: () => PromptTemplate[];
 }
 import {
   Dialog,
@@ -293,17 +299,127 @@ export const PromptLibraryControl: React.FC<PromptLibraryControlProps> = ({ modu
     }
   };
 
+  const shortcutTemplates = module.getShortcutTemplates();
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Filter templates based on search term
+  const filteredTemplates = shortcutTemplates.filter(template =>
+    template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    template.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleRunShortcutTemplate = (template: PromptTemplate) => {
+    // Check if template needs configuration (has variables)
+    if (template.variables && template.variables.length > 0) {
+      // Open template configuration
+      handleTemplateSelect(template);
+      setIsModalOpen(true);
+    } else {
+      // Apply template directly
+      module.applyTemplate(template.id, {}).then(() => {
+        toast.success(`Template "${template.name}" applied!`);
+      }).catch((error) => {
+        console.error("Failed to apply template:", error);
+        toast.error("Failed to apply template!");
+      });
+    }
+  };
+
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsModalOpen(true)}
-        className="h-8 w-8 p-0"
-        title="Open Prompt Library"
-      >
-        <BookOpenText className="h-4 w-4" />
-      </Button>
+      {shortcutTemplates.length > 0 ? (
+        <HoverCard>
+          <HoverCardTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsModalOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Open Prompt Library"
+            >
+              <BookOpenText className="h-4 w-4" />
+            </Button>
+          </HoverCardTrigger>
+          <HoverCardContent className="w-80 p-0" align="start">
+            <div className="p-3 border-b">
+              <h4 className="font-semibold text-sm mb-2">Quick Templates</h4>
+              <Input
+                placeholder="Search templates..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8"
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              <div className="p-2 space-y-1">
+                {filteredTemplates.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-4 text-sm">
+                    {searchTerm ? "No templates match your search" : "No shortcut templates available"}
+                  </div>
+                ) : (
+                  filteredTemplates.map((template) => {
+                    const needsConfig = template.variables && template.variables.length > 0;
+                    
+                    return (
+                      <div
+                        key={template.id}
+                        className="flex items-center gap-2 p-2 rounded hover:bg-accent transition-colors group"
+                      >
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0 opacity-50 group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTemplateSelect(template);
+                            setIsModalOpen(true);
+                          }}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        
+                        <div 
+                          className="flex-1 min-w-0 cursor-pointer"
+                          onClick={() => handleRunShortcutTemplate(template)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm truncate">{template.name}</span>
+                            {template.variables && template.variables.length > 0 && (
+                              <Badge variant="outline" className="text-xs px-1 py-0">
+                                {template.variables.length}
+                              </Badge>
+                            )}
+                            {needsConfig && (
+                              <Badge variant="secondary" className="text-xs px-1 py-0">
+                                Setup
+                              </Badge>
+                            )}
+                          </div>
+                          {template.description && (
+                            <div className="text-xs text-muted-foreground truncate mt-0.5">
+                              {template.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsModalOpen(true)}
+          className="h-8 w-8 p-0"
+          title="Open Prompt Library"
+        >
+          <BookOpenText className="h-4 w-4" />
+        </Button>
+      )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="!w-[80vw] !h-[85vh] !max-w-none flex flex-col">

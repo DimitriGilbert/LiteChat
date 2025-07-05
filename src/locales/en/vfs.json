@@ -1,0 +1,103 @@
+{
+  "fileManager": {
+    "foldersCannotBeAttached": "Folders cannot be attached to the prompt.",
+    "warningDeleteFolder": "WARNING: This will delete all contents inside",
+    "pullingDefaultBranch": "Pulling default branch (auth not implemented yet)...",
+    "pushingDefaultBranch": "Pushing default branch (auth not implemented yet)...",
+    "repositoryUrlEmpty": "Repository URL cannot be empty.",
+    "deleteConfirmation": "Delete {{type}} \"{{name}}\"?",
+    "commitMessageEmpty": "Commit message cannot be empty.",
+    "initializingFilesystem": "Initializing filesystem: {{key}}",
+    "loadingFilesystem": "Loading filesystem...",
+    "errorLoadingFilesystem": "Error loading filesystem: {{error}}",
+    "errorPrefix": "Error: ",
+    "retry": "Retry",
+    "toolbar": {
+      "goToRootDir": "Go to root directory",
+      "goUpOneLevel": "Go up one level",
+      "refreshCurrentDir": "Refresh current directory",
+      "createNewFolder": "Create New Folder",
+      "folder": "Folder",
+      "uploadFiles": "Upload Files",
+      "files": "Files",
+      "uploadFolder": "Upload Folder",
+      "uploadAndExtractZip": "Upload & Extract ZIP",
+      "zip": "ZIP",
+      "cloneRepository": "Clone Repository",
+      "gitOperations": "Git Operations",
+      "downloadAll": "Download All"
+    },
+    "table": {
+      "loading": "Loading...",
+      "name": "Name",
+      "size": "Size",
+      "modified": "Modified",
+      "actions": "Actions",
+      "folderIsEmpty": "Folder is empty"
+    },
+    "fileList": {
+      "selectFile": "Select {{name}}",
+      "gitRepository": "Git Repository",
+      "folder": "Folder",
+      "file": "File",
+      "saveName": "Save name",
+      "cancelEdit": "Cancel edit",
+      "moreActions": "More actions",
+      "download": "Download",
+      "downloadFile": "Download file",
+      "downloadFolder": "Download folder (.zip)",
+      "downloadFolderZip": "Download folder as ZIP",
+      "rename": "Rename",
+      "delete": "Delete",
+      "deleteItem": "Delete {{type}}",
+      "initializeGitRepo": "Initialize Git Repo",
+      "pull": "Pull",
+      "commit": "Commit",
+      "push": "Push",
+      "status": "Status",
+      "filePreview": "File Preview",
+      "contextMenu": {
+        "openFolder": "Open Folder",
+        "gitPull": "Git Pull",
+        "gitCommit": "Git Commit...",
+        "gitPush": "Git Push",
+        "gitStatus": "Git Status",
+        "initializeGitRepo": "Initialize Git Repository",
+        "rename": "Rename",
+        "downloadAsZip": "Download as ZIP",
+        "deleteFolder": "Delete Folder",
+        "selectFile": "Select File",
+        "deselectFile": "Deselect File",
+        "downloadFile": "Download File",
+        "deleteFile": "Delete File"
+      }
+    }
+  },
+  "fileManagerBanner": {
+    "sharedVfs": "<b>Shared VFS:</b> All chats <i>not</i> in a project share this filesystem.",
+    "projectSharedVfs": "<b>Project-shared VFS:</b> All chats in this project share this filesystem.",
+    "projectVfs": "<b>Project VFS:</b> Filesystem for this project and all its chats."
+  },
+  "newFolder": {
+    "placeholder": "New folder name",
+    "createFolder": "Create folder",
+    "cancelCreate": "Cancel create folder",
+    "createTooltip": "Create (Enter)",
+    "cancelTooltip": "Cancel (Esc)"
+  },
+  "modal": {
+    "title": "Virtual Filesystem",
+    "description": "Manage files associated with the current context. Select files to attach them to your next prompt.",
+    "noFilesSelected": "No files selected in VFS to attach.",
+    "filesAttached": "Attached {{count}} file(s) from VFS to the next prompt.",
+    "noValidFilesSelected": "No valid files were selected to attach.",
+    "attachSelected": "Attach Selected ({{count}})"
+  },
+  "triggerButton": {
+    "toggleVfs": "Toggle Virtual File System",
+    "virtualFilesystem": "Virtual Filesystem",
+    "attachVfsFiles": "Attach {{count}} selected VFS file(s)",
+    "attachButtonText": "Attach ({{count}})",
+    "attachSelectedTooltip": "Attach selected VFS files to prompt"
+  }
+}

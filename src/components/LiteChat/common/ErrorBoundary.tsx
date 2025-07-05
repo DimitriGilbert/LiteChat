@@ -1,6 +1,7 @@
 // src/components/LiteChat/common/ErrorBoundary.tsx
 // FULL FILE
 import React, { Component, ErrorInfo, ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { CopyIcon, CodeIcon, CheckIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -25,16 +26,17 @@ const CopyButton: React.FC<{
   label: string;
   className?: string;
 }> = ({ textToCopy, label, className }) => {
+  const { t } = useTranslation('common');
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(textToCopy);
       setIsCopied(true);
-      toast.success(`${label} copied to clipboard!`);
+      toast.success(t('errorBoundary.copySuccess', { label }));
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
-      toast.error(`Failed to copy ${label.toLowerCase()}.`);
+      toast.error(t('errorBoundary.copyFailed', { label: label.toLowerCase() }));
       console.error(`Clipboard copy failed for ${label}:`, err);
     }
   };
@@ -46,12 +48,20 @@ const CopyButton: React.FC<{
       ) : (
         <CopyIcon className="mr-2 h-4 w-4" />
       )}
-      {isCopied ? "Copied!" : `Copy ${label}`}
+      {isCopied ? t('errorBoundary.copied') : t('errorBoundary.copyLabel', { label })}
     </Button>
   );
 };
 
-export class ErrorBoundary extends Component<Props, State> {
+// A functional component wrapper to provide the 't' function to the class component
+const withTranslation = (Component: any) => {
+  return (props: any) => {
+    const { t, i18n } = useTranslation('common');
+    return <Component {...props} t={t} i18n={i18n} />;
+  };
+};
+
+class ErrorBoundaryComponent extends Component<Props & { t: any }, State> {
   public state: State = {
     hasError: false,
     error: null,
@@ -69,6 +79,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private getGitHubIssueTitle(): string {
     const { error, errorInfo } = this.state;
+    const { t } = this.props;
     let title = "Crash Report: ";
 
     if (errorInfo?.componentStack) {
@@ -81,7 +92,7 @@ export class ErrorBoundary extends Component<Props, State> {
       }
     }
 
-    title += error?.message.substring(0, 70) ?? "Unknown Error";
+    title += error?.message.substring(0, 70) ?? t('errorBoundary.unknownError');
     if (error && error.message.length > 70) {
       title += "...";
     }
@@ -90,6 +101,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private generateErrorReport(forGithub: boolean = false): string {
     const { error, errorInfo } = this.state;
+    const { t } = this.props;
     const nl = forGithub
       ? `
 `
@@ -105,7 +117,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (error) {
       report += `**Error Message:**${nl}${codeBlock}${nl}${error.message}${nl}${codeBlock}${nl}${nl}`;
     } else {
-      report += `**Error Message:** Unknown Error${nl}${nl}`;
+      report += `**Error Message:** ${t('errorBoundary.unknownError')}${nl}${nl}`;
     }
 
     if (errorInfo?.componentStack) {
@@ -125,11 +137,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private generateAIPrompt(): string {
     const { error, errorInfo } = this.state;
+    const { t } = this.props;
     let prompt = `I encountered an error in a React application (LiteChat v${LITECHAT_VERSION}). Please help me debug it.
 
 Error Message:
 \`\`\`
-${error?.message ?? "Unknown Error"}
+${error?.message ?? t('errorBoundary.unknownError')}
 \`\`\`
 
 Component Stack (if available):
@@ -149,15 +162,14 @@ Based on this information, what are the likely causes and potential solutions? F
 
   private handleReportOnGitHub = async () => {
     const reportBody = this.generateErrorReport(true);
+    const { t } = this.props;
     try {
       await navigator.clipboard.writeText(reportBody);
-      toast.success(
-        "Error report copied to clipboard. Paste it into the GitHub issue body.",
-      );
+      toast.success(t('errorBoundary.reportSuccess'));
       const issueUrl = `${GITHUB_REPO_URL}/issues/new?title=${encodeURIComponent(this.getGitHubIssueTitle())}`;
       window.open(issueUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
-      toast.error("Failed to copy error report. Please copy manually.");
+      toast.error(t('errorBoundary.reportFailed'));
       console.error("Clipboard copy failed for GitHub report:", err);
       // Still open the link even if copy fails
       const issueUrl = `${GITHUB_REPO_URL}/issues/new?title=${encodeURIComponent(this.getGitHubIssueTitle())}`;
@@ -166,6 +178,7 @@ Based on this information, what are the likely causes and potential solutions? F
   };
 
   public render() {
+    const { t } = this.props;
     if (this.state.hasError) {
       return this.props.fallback ? (
         this.props.fallback
@@ -177,33 +190,31 @@ Based on this information, what are the likely causes and potential solutions? F
           <div className="max-w-2xl w-full border border-destructive bg-destructive/10 rounded-lg p-6 text-center shadow-lg">
             <LCErrorIcon className="h-24 w-24 text-destructive mx-auto mb-4" />
             <h1 className="text-2xl font-semibold text-destructive mb-2">
-              Oops! Something went wrong.
+              {t('errorBoundary.title')}
             </h1>
             <p className="text-destructive/90 mb-4">
-              LiteChat encountered an unexpected error. Please try refreshing
-              the page. If the problem persists, consider reporting the issue.
-              Copy the details and paste them into the GitHub issue.
+              {t('errorBoundary.description')}
             </p>
             <pre className="text-left text-xs bg-destructive/10 border border-destructive/30 rounded p-3 max-h-32 overflow-auto mb-4 font-mono text-destructive/80">
-              {this.state.error?.message ?? "Unknown Error"}
+              {this.state.error?.message ?? t('errorBoundary.unknownError')}
             </pre>
             <div className="flex flex-wrap justify-center gap-2">
               <Button
                 variant="destructive"
                 onClick={() => window.location.reload()}
               >
-                Refresh Page
+                {t('errorBoundary.refreshButton')}
               </Button>
               <CopyButton
                 textToCopy={this.generateErrorReport()}
-                label="Details"
+                label={t('errorBoundary.detailsLabel')}
               />
               <CopyButton
                 textToCopy={this.generateAIPrompt()}
-                label="AI Debug Prompt"
+                label={t('errorBoundary.aiDebugPromptLabel')}
               />
               <Button variant="outline" onClick={this.handleReportOnGitHub}>
-                <CodeIcon className="mr-2 h-4 w-4" /> Report on GitHub
+                <CodeIcon className="mr-2 h-4 w-4" /> {t('errorBoundary.reportButton')}
               </Button>
             </div>
           </div>
@@ -214,3 +225,5 @@ Based on this information, what are the likely causes and potential solutions? F
     return this.props.children;
   }
 }
+
+export const ErrorBoundary = withTranslation(ErrorBoundaryComponent);

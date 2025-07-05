@@ -1,0 +1,74 @@
+{
+  "sendMessagePlaceholder": "Send a message...",
+  "promptSubmissionCancelled": "Prompt submission cancelled by middleware.",
+  "failedToSendMessage": "Failed to send message: {{errorMessage}}",
+  "sendMessage": "Send message",
+  "inputAreaPlaceholder": "Type message... (Shift+Enter for new line)",
+  "chatInputAriaLabel": "Chat input",
+  "parameterControl": {
+    "title": "Advanced Parameters",
+    "ariaLabel": "Adjust Advanced Parameters",
+    "temperature": "Temperature",
+    "topP": "Top P",
+    "maxTokens": "Max Tokens",
+    "topK": "Top K",
+    "presencePenalty": "Presence Penalty",
+    "frequencyPenalty": "Frequency Penalty",
+    "placeholder": "Default: {{defaultValue}}",
+    "none": "None",
+    "useDefault": "Use Default ({{defaultValue}})"
+  },
+  "rules": {
+    "autoSelectDisabled": "Auto-rule selection is disabled in settings.",
+    "noPromptForSelect": "No user prompt found to base selection on.",
+    "noRulesForSelect": "No rules available for selection.",
+    "noModelForSelect": "No model selected for auto-rule selection in settings.",
+    "selectingRules": "AI is selecting relevant rules...",
+    "selectionFailed": "AI rule selection failed: {{error}}",
+    "selectionSuccess": "AI selected {{count}} rules.",
+    "noRulesSelected": "The AI did not select any rules."
+  },
+  "rulesControl": {
+    "trigger": {
+      "configureAria": "Configure Rules & Tags for Next Turn",
+      "addAria": "Add Rules & Tags (Opens Settings)",
+      "tooltipActive": "Rules/Tags Active ({{tagsCount}} tags, {{rulesCount}} rules)",
+      "tooltipInactive": "Activate Rules/Tags (Next Turn)",
+      "tooltipAdd": "Add Rules/Tags (Opens Settings)"
+    },
+    "dialog": {
+      "filterTagsPlaceholder": "Filter tags...",
+      "openSettingsTooltip": "Open Rules Settings",
+      "manageButton": "Manage",
+      "noTagsDefined": "No tags defined.",
+      "noTagsMatchFilter": "No tags match filter.",
+      "includes": "Includes: {{ruleNames}}",
+      "filterRulesPlaceholder": "Filter rules...",
+      "autoSelectTooltip": "Auto-select rules based on prompt context",
+      "autoSelectButton": "Auto-Select",
+      "noRulesDefined": "No rules defined.",
+      "noRulesMatchFilter": "No rules match filter.",
+      "ruleType": "Type: {{type}}",
+      "ruleContent": "Content: {{content}}",
+      "tabs": {
+        "activateRules": "Activate Rules",
+        "activateTags": "Activate Tags"
+      }
+    }
+  },
+  "toolSelector": {
+    "title": "Available Tools",
+    "filterPlaceholder": "Filter tools...",
+    "toolsShown": "{{count}} tools shown",
+    "enableAll": "Enable All",
+    "disableAll": "Disable All",
+    "noToolsRegistered": "No tools registered.",
+    "noToolsMatchFilter": "No tools match filter.",
+    "noDescription": "No description provided."
+  },
+  "fileControl": {
+    "attachFilesWithImages": "Attach Files (Text, Images, etc.)",
+    "attachTextFiles": "Attach Text Files",
+    "processingError": "Failed to process file \"{{fileName}}\": {{error}}"
+  }
+}

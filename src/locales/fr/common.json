@@ -1,0 +1,130 @@
+{
+  "initializingLiteChat": "Initialisation de LiteChat...",
+  "liteChatMenu": "Menu LiteChat",
+  "closeMenu": "Fermer le menu",
+  "openMenu": "Ouvrir le menu",
+  "loadingMenu": "Chargement du menu...",
+  "pleaseWaitInitialization": "Veuillez patienter pendant l'initialisation de l'application.",
+  "footerControlsLoading": "Chargement des contrôles de pied de page...",
+  "applicationCoreNotReady": "Noyau de l'application non prêt. Veuillez réessayer.",
+  "failedToStartNewChat": "Échec du démarrage d'une nouvelle conversation.",
+  "failedToSendMessage": "Échec de l'envoi du message.",
+  "modalManager": {
+    "noProvider": "Aucun fournisseur pour modalId : {{id}}"
+  },
+  "universalBlockRenderer": {
+    "code": "CODE",
+    "renderError": "Erreur de rendu"
+  },
+  "codeEditor": {
+    "saveButtonText": "Enregistrer",
+    "saving": "Enregistrement...",
+    "syntaxHighlightingError": "Erreur de coloration syntaxique :"
+  },
+  "theme": {
+    "toggle": "Changer de thème",
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système"
+  },
+  "app": {
+    "initializationError": "L'application n'a pas pu s'initialiser. Veuillez rafraîchir la page.",
+    "initializationErrorDetails": "Erreur d'initialisation",
+    "initializing": "Initialisation...",
+    "noConversationSelected": "Aucune conversation sélectionnée",
+    "startNewConversation": "Commencez une nouvelle conversation ou sélectionnez-en une dans la barre latérale.",
+    "newConversation": "Nouvelle conversation",
+    "createConversationError": "Échec de la création de la conversation",
+    "loadConversationError": "Échec du chargement de la conversation",
+    "loadInteractionsError": "Échec du chargement des interactions",
+    "runningWorkflow": "Exécution du workflow...",
+    "workflowAborted": "Workflow annulé",
+    "workflowError": "L'exécution du workflow a échoué",
+    "workflowCompleted": "Workflow terminé",
+    "updateError": "La mise à jour a échoué",
+    "noInteractions": "Aucune interaction pour le moment",
+    "startTyping": "Commencez à taper pour démarrer la conversation.",
+    "genericError": "Une erreur inattendue est survenue. Veuillez réessayer."
+  },
+  "close": "Fermer",
+  "apiKeyAddedSuccess": "Clé API ajoutée avec succès !",
+  "providerAddedSuccess": "Fournisseur ajouté avec succès !",
+  "modelEnabledSuccess": "Modèle activé avec succès !",
+  "modelDisabledSuccess": "Modèle désactivé avec succès !",
+  "failedToUpdateModel": "Échec de la mise à jour du statut du modèle.",
+  "newChat": "Nouvelle conversation",
+  "welcomeFirstChat": "Bienvenue dans votre première conversation !",
+  "failedToStartChat": "Échec du démarrage de votre première conversation.",
+  "submit": "Valider",
+  "cancel": "Annuler",
+  "submitting": "Envoi en cours...",
+  "apiKeyForm": {
+    "keyNameRequired": "Le nom de la clé est requis.",
+    "providerTypeRequired": "Le type de fournisseur est requis.",
+    "apiKeyValueRequired": "La valeur de la clé API est requise.",
+    "providerTypeLabel": "Type de fournisseur",
+    "keyNameLabel": "Nom de la clé",
+    "apiKeyValueLabel": "Valeur de la clé API",
+    "selectProviderPlaceholder": "Sélectionner un type de fournisseur",
+    "keyNamePlaceholder": "ex: Ma clé OpenAI",
+    "keyValuePlaceholder": "Entrez votre clé API",
+    "saving": "Enregistrement...",
+    "updateApiKey": "Mettre à jour la clé API",
+    "saveApiKey": "Enregistrer la clé API"
+  },
+  "errorBoundary": {
+    "copySuccess": "{label} copié dans le presse-papiers !",
+    "copyFailed": "Échec de la copie de {label}.",
+    "copied": "Copié !",
+    "copyLabel": "Copier {label}",
+    "title": "Oups ! Quelque chose s'est mal passé.",
+    "description": "LiteChat a rencontré une erreur inattendue. Veuillez essayer de rafraîchir la page. Si le problème persiste, envisagez de signaler le problème. Copiez les détails et collez-les dans le ticket GitHub.",
+    "unknownError": "Erreur inconnue",
+    "refreshButton": "Rafraîchir la page",
+    "detailsLabel": "Détails",
+    "aiDebugPromptLabel": "Prompt de débogage IA",
+    "reportButton": "Signaler sur GitHub",
+    "reportSuccess": "Rapport d'erreur copié dans le presse-papiers. Collez-le dans le corps du ticket GitHub.",
+    "reportFailed": "Échec de la copie du rapport d'erreur. Veuillez copier manuellement."
+  },
+  "filePreview": {
+    "decodeError": "Échec du décodage du contenu du fichier pour l'aperçu.",
+    "tooLargeForPreview": "Fichier texte trop volumineux pour l'aperçu ({size} KB).",
+    "missingContent": "Contenu texte manquant dans les métadonnées.",
+    "alreadyInVfs": "Le fichier est déjà dans le VFS.",
+    "reconstructError": "Impossible d'ajouter au VFS : Échec de la reconstruction des données du fichier.",
+    "addSuccess": "\"{name}\" ajouté à la racine VFS.",
+    "addFailed": "Échec de l'ajout de \"{name}\" au VFS.",
+    "reconstructDownloadError": "Impossible de reconstruire les données du fichier.",
+    "downloadFailed": "Échec du téléchargement : {error}",
+    "vfsAttached": "Fichier VFS attaché. Le contenu sera chargé lors de l'envoi.",
+    "addToVfsTooltip": "Ajouter au système de fichiers virtuel",
+    "downloadTooltip": "Télécharger le fichier"
+  },
+  "loadingStateWrapper": {
+    "loading": "Chargement...",
+    "error": "Erreur : {{error}}",
+    "noItems": "Aucun élément trouvé."
+  },
+  "sortableModelItem": {
+    "dragToReorder": "Faire glisser pour réorganiser le modèle {{name}}",
+    "modelInfo": "Informations sur le modèle",
+    "moveToTop": "Déplacer en haut",
+    "moveUp": "Déplacer vers le haut",
+    "moveDown": "Déplacer vers le bas"
+  },
+  "stopButton": {
+    "stop": "Arrêter",
+    "stopGeneration": "Arrêter la génération"
+  },
+  "cloneDialog": {
+    "title": "Cloner le dépôt Git",
+    "description": "Entrez l'URL du dépôt. Il sera cloné dans un nouveau dossier nommé d'après le dépôt dans {{path}}.",
+    "clone": "Cloner",
+    "url": "URL",
+    "branch": "Branche",
+    "urlPlaceholder": "https://github.com/utilisateur/depot.git",
+    "branchPlaceholder": "main (par défaut)",
+    "httpsRecommendation": "Recommandation : Utilisez des URL HTTPS pour une meilleure compatibilité du navigateur et authentification (ex : https://github.com/utilisateur/depot.git)"
+  }
+}

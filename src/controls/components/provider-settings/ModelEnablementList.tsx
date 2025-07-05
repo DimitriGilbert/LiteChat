@@ -10,9 +10,17 @@ import type { OpenRouterModel } from "@/types/litechat/provider";
 import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ModelFilterControls } from "@/controls/components/common/ModelFilterControls";
+import { useTranslation } from "react-i18next";
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 type EnabledFilterStatus = "all" | "enabled" | "disabled";
+type SortField = "name" | "price_input" | "price_output" | "context_length" | "created";
+type SortDirection = "asc" | "desc";
+
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
 
 interface ModelEnablementListProps {
   providerId: string;
@@ -28,7 +36,7 @@ interface ModelEnablementListProps {
 const parsePrice = (priceStr: string | null | undefined): number | null => {
   if (!priceStr) return null;
   const priceNum = parseFloat(priceStr);
-  return isNaN(priceNum) ? null : priceNum / 1_000_000;
+  return isNaN(priceNum) ? null : priceNum;
 };
 
 export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
@@ -41,6 +49,8 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   listHeightClass = "h-[26rem]",
   onModelClick,
 }) => {
+  const { t } = useTranslation('settings');
+
   const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(
     null
   );
@@ -86,6 +96,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   const [maxInputPrice, setMaxInputPrice] = useState<string>("");
   const [minOutputPrice, setMinOutputPrice] = useState<string>("");
   const [maxOutputPrice, setMaxOutputPrice] = useState<string>("");
+  const [sort, setSort] = useState<SortState>({ field: "name", direction: "asc" });
 
   const filteredModels = useMemo(() => {
     let models = [...allAvailableModels];
@@ -163,7 +174,43 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
         return match;
       });
     }
-    return models;
+
+    // Apply sorting
+    const sorted = [...models].sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (sort.field) {
+        case "name":
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case "price_input":
+          aValue = parsePrice(a.pricing?.prompt) || 0;
+          bValue = parsePrice(b.pricing?.prompt) || 0;
+          break;
+        case "price_output":
+          aValue = parsePrice(a.pricing?.completion) || 0;
+          bValue = parsePrice(b.pricing?.completion) || 0;
+          break;
+        case "context_length":
+          aValue = a.context_length || 0;
+          bValue = b.context_length || 0;
+          break;
+        case "created":
+          aValue = a.created || 0;
+          bValue = b.created || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue === bValue) return 0;
+      
+      const comparison = aValue < bValue ? -1 : 1;
+      return sort.direction === "asc" ? comparison : -comparison;
+    });
+
+    return sorted;
   }, [
     allAvailableModels,
     searchQuery,
@@ -174,6 +221,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
     maxInputPrice,
     minOutputPrice,
     maxOutputPrice,
+    sort,
   ]);
 
   const rowVirtualizer = useVirtualizer({
@@ -198,6 +246,10 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
     setMaxOutputPrice(maxOut);
   }, []);
 
+  const handleSortChange = useCallback((newSort: SortState) => {
+    setSort(newSort);
+  }, []);
+
   const activeFilterCount = useMemo(() => (
     (enabledFilter !== "all" ? 1 : 0) +
     Object.values(capabilityFilters).filter(Boolean).length +
@@ -217,7 +269,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
   if (allAvailableModels.length === 0) {
     return (
       <p className="text-sm text-muted-foreground italic pt-2">
-        No models available for this provider. Try fetching models.
+        {t('modelEnablement.noModelsAvailable', 'No models available for this provider. Try fetching models.')}
       </p>
     );
   }
@@ -230,7 +282,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter models by name..."
+            placeholder={t('modelEnablement.searchPlaceholder', 'Filter models by name...')}
             className="pl-8 h-9 w-full text-xs"
             type="text"
             disabled={disabled}
@@ -246,9 +298,12 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           currentMinOutputPrice={minOutputPrice}
           currentMaxOutputPrice={maxOutputPrice}
           onPriceFilterChange={handlePriceFilterChange}
+          currentSort={sort}
+          onSortChange={handleSortChange}
           showStatusFilter={true}
           showCapabilityFilters={true}
           showPriceFilters={true}
+          showSortControls={true}
           disabled={disabled}
           totalActiveFilters={activeFilterCount}
         />
@@ -270,7 +325,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
           >
             {filteredModels.length === 0 && !isLoading ? (
               <p className="text-sm text-muted-foreground text-center py-4 absolute inset-0 flex items-center justify-center">
-                No models match the current filters.
+                {t('modelEnablement.noModelsMatchFilters', 'No models match the current filters.')}
               </p>
             ) : (
               rowVirtualizer.getVirtualItems().map((virtualRow) => {
@@ -338,7 +393,7 @@ export const ModelEnablementList: React.FC<ModelEnablementListProps> = ({
         )}
         {!viewportElement && !isLoading && (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            Initializing list...
+            {t('modelEnablement.initializingList', 'Initializing list...')}
           </div>
         )}
       </ScrollArea>

@@ -29,7 +29,9 @@ import type {
 } from "@/types/litechat/control";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { vfsEvent, VfsEventPayloads } from "@/types/litechat/events/vfs.events";
+import { uiEvent } from "@/types/litechat/events/ui.events";
 import { useVfsStore } from "./vfs.store";
+import { BulkSyncService } from "@/services/bulk-sync.service";
 
 export type SidebarItem =
   | (Conversation & { itemType: "conversation" })
@@ -71,6 +73,7 @@ interface ConversationActions {
   ) => Promise<void>;
   exportProject: (projectId: string) => Promise<void>;
   exportAllConversations: () => Promise<void>;
+  clearAllConversations: (force?: boolean) => Promise<void>;
   loadSyncRepos: () => Promise<void>;
   addSyncRepo: (
     repoData: Omit<SyncRepo, "id" | "createdAt" | "updatedAt">
@@ -517,31 +520,50 @@ export const useConversationStore = create(
     },
 
     selectItem: async (id, type) => {
-      const currentSelId = get().selectedItemId;
-      const currentSelType = get().selectedItemType;
+      const oldItemId = get().selectedItemId;
+      const oldItemType = get().selectedItemType;
 
-      if (currentSelId === id && currentSelType === type) {
+      if (oldItemId === id && oldItemType === type) {
+        console.log(
+          `[ConversationStore] Item ${id} (${type}) is already selected. Skipping.`
+        );
         return;
       }
-
+      set({ selectedItemId: id, selectedItemType: type });
       console.log(
-        `ConversationStore: Selecting item. ID: ${id}, Type: ${type}. Previous: ${currentSelId} (${currentSelType})`
+        `[ConversationStore] Selecting item. ID: ${id}, Type: ${type}. Previous: ${oldItemId} (${oldItemType})`
       );
 
-      // Update interaction store first if needed
-      const conversationIdForInteractions = type === "conversation" ? id : null;
-      if (conversationIdForInteractions) {
-        emitter.emit(interactionEvent.setCurrentConversationIdRequest, {
-          id: conversationIdForInteractions,
-        });
-        // Ensure interactions are loaded for the selected conversation
-        emitter.emit(interactionEvent.loadInteractionsRequest, {
-          conversationId: conversationIdForInteractions,
-        });
+      emitter.emit(interactionEvent.currentConversationIdChanged, {
+        conversationId: type === "conversation" ? id : null,
+      });
+      emitter.emit(uiEvent.contextChanged, {
+        selectedItemId: id,
+        selectedItemType: type,
+      });
+      
+      // Auto-select project's VFS
+      if (type === "project" && id) {
+        emitter.emit(vfsEvent.initializeVFSRequest, { vfsKey: id });
       }
 
-      // Then update local state
-      set({ selectedItemId: id, selectedItemType: type });
+      // Update interaction store first if needed
+      if (type === "conversation") {
+        emitter.emit(interactionEvent.setCurrentConversationIdRequest, {
+          id: id,
+        });
+        if (id) {
+          // Ensure interactions are loaded for the selected conversation
+          emitter.emit(interactionEvent.loadInteractionsRequest, {
+            conversationId: id,
+          });
+        }
+      }
+
+      // Auto-load project settings
+      if (type === "project") {
+        // Implementation of auto-load project settings
+      }
 
       // Finally notify about the selection change
       emitter.emit(conversationEvent.selectedItemChanged, {
@@ -565,6 +587,59 @@ export const useConversationStore = create(
     },
     exportAllConversations: async () => {
       await ImportExportService.exportAllConversations();
+    },
+
+    clearAllConversations: async (_force?: boolean) => {
+      set({ isLoading: true, error: null });
+      try {
+        // Also delete any associated files in VFS for synced conversations
+        const { syncRepos, conversations } = get();
+        if (conversations.some(c => c.syncRepoId)) {
+          const syncVfs = await get()._ensureSyncVfsReady();
+          for (const convo of conversations) {
+            if (convo.syncRepoId) {
+              const repo = syncRepos.find((r) => r.id === convo.syncRepoId);
+              if (repo) {
+                const conversationDir = normalizePath(
+                  `${SYNC_REPO_BASE_DIR}/${repo.id}/${convo.id}`,
+                );
+                try {
+                  // Check if directory exists before trying to delete
+                  try {
+                    await VfsOps.stat(conversationDir, { fsInstance: syncVfs });
+                    await VfsOps.rmdirRecursive(conversationDir, { fsInstance: syncVfs });
+                    console.log(`[ConversationStore] Deleted VFS directory: ${conversationDir}`);
+                  } catch (statError) {
+                    // Directory doesn't exist, which is fine.
+                  }
+                } catch (e) {
+                  console.warn(`[ConversationStore] Could not delete VFS dir ${conversationDir}`, e);
+                }
+              }
+            }
+          }
+        }
+
+        await PersistenceService.clearTable('conversations');
+        await PersistenceService.clearTable('interactions');
+
+        set({
+          conversations: [],
+          selectedItemId: null,
+          selectedItemType: null,
+          conversationSyncStatus: {},
+          isLoading: false,
+        });
+
+        emitter.emit(conversationEvent.conversationsCleared, undefined);
+        // The UI component will show the toast and reload the page
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('[ConversationStore] Failed to clear conversations:', error);
+        set({ isLoading: false, error: errorMessage });
+        // Re-throw so the UI can catch it and show a toast
+        throw error;
+      }
     },
 
     loadSyncRepos: async () => {
@@ -871,7 +946,6 @@ export const useConversationStore = create(
     },
 
     syncAllConversations: async () => {
-      const { BulkSyncService } = await import("@/services/bulk-sync.service");
       await BulkSyncService.syncAll({
         syncRepos: false,
         syncConversations: true,
@@ -881,12 +955,10 @@ export const useConversationStore = create(
     },
 
     syncPendingConversations: async () => {
-      const { BulkSyncService } = await import("@/services/bulk-sync.service");
       await BulkSyncService.syncPendingConversations();
     },
 
     initializeAllRepositories: async () => {
-      const { BulkSyncService } = await import("@/services/bulk-sync.service");
       await BulkSyncService.initializeAllRepositories();
     },
 

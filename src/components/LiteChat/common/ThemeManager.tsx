@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useSettingsStore } from "@/store/settings.store";
 import { useShallow } from "zustand/react/shallow";
 import type { CustomThemeColors } from "@/store/settings.store";
+import { THEME_OPTIONS } from "@/types/litechat/common";
 
 // Helper to convert camelCase to kebab-case for CSS variables
 const camelToKebab = (str: string) =>
@@ -63,7 +64,7 @@ export const ThemeManager: React.FC = () => {
 
     // --- Reset Custom Styles ---
     // Remove all theme classes first
-    body.classList.remove("light", "dark", "TijuLight", "TijuDark", "custom");
+    body.classList.remove(...THEME_OPTIONS);
     // Remove all known theme CSS variables from :root inline styles
     ALL_THEME_COLOR_KEYS.forEach((key) => {
       root.style.removeProperty(`--${camelToKebab(key)}`);

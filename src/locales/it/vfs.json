@@ -1,0 +1,103 @@
+{
+  "fileManager": {
+    "foldersCannotBeAttached": "Le cartelle non possono essere allegate al prompt.",
+    "warningDeleteFolder": "ATTENZIONE: Questo eliminerà tutti i contenuti all'interno",
+    "pullingDefaultBranch": "Pulling del branch predefinito (autenticazione non ancora implementata)...",
+    "pushingDefaultBranch": "Pushing del branch predefinito (autenticazione non ancora implementata)...",
+    "repositoryUrlEmpty": "L'URL del repository non può essere vuoto.",
+    "deleteConfirmation": "Eliminare {{type}} \"{{name}}\"?",
+    "commitMessageEmpty": "Il messaggio di commit non può essere vuoto.",
+    "initializingFilesystem": "Inizializzazione filesystem: {{key}}",
+    "loadingFilesystem": "Caricamento filesystem...",
+    "errorLoadingFilesystem": "Errore durante il caricamento del filesystem: {{error}}",
+    "errorPrefix": "Errore: ",
+    "retry": "Riprova",
+    "toolbar": {
+      "goToRootDir": "Vai alla directory radice",
+      "goUpOneLevel": "Vai su di un livello",
+      "refreshCurrentDir": "Aggiorna directory corrente",
+      "createNewFolder": "Crea Nuova Cartella",
+      "folder": "Cartella",
+      "uploadFiles": "Carica File",
+      "files": "File",
+      "uploadFolder": "Carica Cartella",
+      "uploadAndExtractZip": "Carica & Estrai ZIP",
+      "zip": "ZIP",
+      "cloneRepository": "Clona Repository",
+      "gitOperations": "Operazioni Git",
+      "downloadAll": "Scarica Tutto"
+    },
+    "table": {
+      "loading": "Caricamento...",
+      "name": "Nome",
+      "size": "Dimensione",
+      "modified": "Modificato",
+      "actions": "Azioni",
+      "folderIsEmpty": "La cartella è vuota"
+    },
+    "fileList": {
+      "selectFile": "Seleziona {{name}}",
+      "gitRepository": "Repository Git",
+      "folder": "Cartella",
+      "file": "File",
+      "saveName": "Salva nome",
+      "cancelEdit": "Annulla modifica",
+      "moreActions": "Altre azioni",
+      "download": "Scarica",
+      "downloadFile": "Scarica file",
+      "downloadFolder": "Scarica cartella (.zip)",
+      "downloadFolderZip": "Scarica cartella come ZIP",
+      "rename": "Rinomina",
+      "delete": "Elimina",
+      "deleteItem": "Elimina {{type}}",
+      "initializeGitRepo": "Inizializza Repo Git",
+      "pull": "Pull",
+      "commit": "Commit",
+      "push": "Push",
+      "status": "Stato",
+      "filePreview": "Anteprima File",
+      "contextMenu": {
+        "openFolder": "Apri Cartella",
+        "gitPull": "Git Pull",
+        "gitCommit": "Git Commit...",
+        "gitPush": "Git Push",
+        "gitStatus": "Git Status",
+        "initializeGitRepo": "Inizializza Repository Git",
+        "rename": "Rinomina",
+        "downloadAsZip": "Scarica come ZIP",
+        "deleteFolder": "Elimina Cartella",
+        "selectFile": "Seleziona File",
+        "deselectFile": "Deseleziona File",
+        "downloadFile": "Scarica File",
+        "deleteFile": "Elimina File"
+      }
+    }
+  },
+  "fileManagerBanner": {
+    "sharedVfs": "<b>VFS Condiviso:</b> Tutti i chat <i>non</i> in un progetto condividono questo filesystem.",
+    "projectSharedVfs": "<b>VFS Condiviso del Progetto:</b> Tutti i chat in questo progetto condividono questo filesystem.",
+    "projectVfs": "<b>VFS del Progetto:</b> Filesystem per questo progetto e tutti i suoi chat."
+  },
+  "newFolder": {
+    "placeholder": "Nome nuova cartella",
+    "createFolder": "Crea cartella",
+    "cancelCreate": "Annulla creazione cartella",
+    "createTooltip": "Crea (Invio)",
+    "cancelTooltip": "Annulla (Esc)"
+  },
+  "modal": {
+    "title": "Filesystem Virtuale",
+    "description": "Gestisci i file associati al contesto corrente. Seleziona i file da allegare al tuo prossimo prompt.",
+    "noFilesSelected": "Nessun file selezionato in VFS da allegare.",
+    "filesAttached": "{{count}} file(s) da VFS allegati al prossimo prompt.",
+    "noValidFilesSelected": "Nessun file valido è stato selezionato da allegare.",
+    "attachSelected": "Allega Selezionati ({{count}})"
+  },
+  "triggerButton": {
+    "toggleVfs": "Attiva/Disattiva Filesystem Virtuale",
+    "virtualFilesystem": "Filesystem Virtuale",
+    "attachVfsFiles": "Allega {{count}} file(s) VFS selezionati",
+    "attachButtonText": "Allega ({{count}})",
+    "attachSelectedTooltip": "Allega i file VFS selezionati al prompt"
+  }
+}

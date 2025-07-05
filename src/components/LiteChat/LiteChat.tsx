@@ -41,6 +41,7 @@ import { settingsEvent } from "@/types/litechat/events/settings.events";
 import { projectEvent } from "@/types/litechat/events/project.events";
 import type { LiteChatModApi } from "@/types/litechat/modding";
 import { WorkflowService } from "@/services/workflow.service";
+import { useTranslation } from "react-i18next";
 
 let initializedControlModules: ControlModule[] = [];
 let appInitializationPromise: Promise<ControlModule[]> | null = null;
@@ -55,6 +56,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const inputAreaRef = useRef<InputAreaRef>(null);
   const coreModApiRef = useRef<LiteChatModApi | null>(null);
+  const { t } = useTranslation('common');
 
   const {
     selectedItemId,
@@ -336,7 +338,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
 
   const handlePromptSubmit = useCallback(async (turnData: PromptTurnObject) => {
     if (!coreModApiRef.current) {
-      toast.error("Application core not ready. Please try again.");
+      toast.error(t('applicationCoreNotReady'));
       return;
     }
 
@@ -367,7 +369,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
           "[LiteChat] App: Failed to create new conversation",
           error
         );
-        toast.error("Failed to start new chat.");
+        toast.error(t('failedToStartNewChat'));
         return;
       }
     }
@@ -384,9 +386,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
       await ConversationService.submitPrompt(finalTurnData);
     } catch (error) {
       console.error("[LiteChat] App: Error submitting prompt:", error);
-      toast.error("Failed to send message.");
+      toast.error(t('failedToSendMessage'));
     }
-  }, []);
+  }, [t]);
 
   const currentConversationIdForCanvas =
     selectedItemType === "conversation" ? selectedItemId : null;
@@ -397,7 +399,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="text-lg text-muted-foreground">
-            Initializing LiteChat...
+            {t('initializingLiteChat')}
           </p>
         </div>
       </div>
@@ -464,11 +466,11 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
             ></div>
             <div className="relative w-4/5 max-w-sm bg-card border-r border-border h-full flex flex-col animate-slideInFromLeft shadow-2xl">
               <div className="sticky top-0 z-[var(--z-sticky)] flex justify-between items-center p-4 border-b border-border bg-card">
-                <h2 className="font-semibold text-card-foreground">LiteChat Menu</h2>
+                <h2 className="font-semibold text-card-foreground">{t('liteChatMenu')}</h2>
                 <button
                   onClick={toggleMobileSidebar}
                   className="p-2 rounded-md hover:bg-muted text-card-foreground touch-manipulation"
-                  aria-label="Close menu"
+                  aria-label={t('closeMenu')}
                   style={{ minHeight: '44px', minWidth: '44px' }}
                 >
                   <X className="h-5 w-5" />
@@ -484,9 +486,9 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
                   />
                 ) : (
                   <div className="p-4 text-center text-muted-foreground">
-                    <p className="text-sm">Loading menu...</p>
+                    <p className="text-sm">{t('loadingMenu')}</p>
                     <p className="text-xs mt-2">
-                      Please wait while the application initializes.
+                      {t('pleaseWaitInitialization')}
                     </p>
                   </div>
                 )}
@@ -501,7 +503,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
                   />
                 ) : (
                   <div className="text-center text-muted-foreground text-xs">
-                    Footer controls loading...
+                    {t('footerControlsLoading')}
                   </div>
                 )}
               </div>
@@ -517,7 +519,7 @@ export const LiteChat: React.FC<LiteChatProps> = ({ controls = [] }) => {
                 isMobileSidebarOpen && "bg-muted"
               )}
               onClick={toggleMobileSidebar}
-              aria-label={isMobileSidebarOpen ? "Close menu" : "Open menu"}
+              aria-label={t(isMobileSidebarOpen ? 'closeMenu' : 'openMenu')}
               style={{ minHeight: '44px', minWidth: '44px' }}
             >
               {isMobileSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}

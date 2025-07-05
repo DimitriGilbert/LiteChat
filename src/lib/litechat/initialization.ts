@@ -25,6 +25,7 @@ import { projectEvent } from "@/types/litechat/events/project.events";
 import { InteractionService } from "@/services/interaction.service";
 import { BundledConfigService } from "@/services/bundled-config.service";
 import { StartupSyncService } from "@/services/startup-sync.service";
+import i18next from "i18next";
 
 interface CoreStores {
   requestLoadSettings: () => void;
@@ -177,6 +178,20 @@ export async function initializeControlModules(
     "[Init] Control Modules: Instantiation & Dependency Resolution START"
   );
   const moduleInstances = moduleConstructors.map((Ctor) => new Ctor());
+
+  // After module instantiation, register translations
+  for (const Module of moduleConstructors) {
+    if (Module.translations) {
+      const language = i18next.language;
+      if (Module.translations[language]) {
+        const namespaces = Module.translations[language];
+        for (const [ns, resources] of Object.entries(namespaces)) {
+          i18next.addResourceBundle(language, ns, resources, true, true);
+        }
+      }
+    }
+  }
+
   const sortedModules = resolveDependencyOrder(moduleInstances);
 
   if (!sortedModules) {

@@ -1,6 +1,12 @@
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { FilterIcon, BrainCircuitIcon, SearchIcon, WrenchIcon, ImageIcon, CheckIcon, BanIcon, DollarSignIcon } from "lucide-react";
+import { FilterIcon, BrainCircuitIcon, SearchIcon, WrenchIcon, ImageIcon, CheckIcon, BanIcon, DollarSignIcon, ArrowUpDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -9,9 +15,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { cn } from "@/lib/utils";
 import { DbProviderConfig } from "@/types/litechat/provider";
+import { useTranslation } from "react-i18next";
 
 type CapabilityFilter = "reasoning" | "webSearch" | "tools" | "multimodal";
 type EnabledFilterStatus = "all" | "enabled" | "disabled";
+
+type SortField = "name" | "price_input" | "price_output" | "context_length" | "created";
+type SortDirection = "asc" | "desc";
+
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
 
 interface ModelFilterControlsProps {
   // State from parent
@@ -23,9 +38,11 @@ interface ModelFilterControlsProps {
   currentMinOutputPrice?: string; // Optional, for price filter
   currentMaxOutputPrice?: string; // Optional, for price filter
   allProviders?: DbProviderConfig[]; // Optional, for provider filter
+  currentSort?: SortState; // Optional, for sorting
 
   // Callbacks to update parent state
   onCapabilityFilterChange: (filters: Record<CapabilityFilter, boolean>) => void;
+  onSortChange?: (sort: SortState) => void;
   onProviderFilterChange?: (selectedProviderIds: Set<string>) => void;
   onEnabledFilterChange?: (status: EnabledFilterStatus) => void;
   onPriceFilterChange?: (minIn: string, maxIn: string, minOut: string, maxOut: string) => void;
@@ -35,6 +52,7 @@ interface ModelFilterControlsProps {
   showProviderFilter?: boolean;
   showStatusFilter?: boolean;
   showPriceFilters?: boolean;
+  showSortControls?: boolean;
 
   disabled?: boolean;
   totalActiveFilters: number; // Calculated by parent
@@ -53,13 +71,17 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
   currentMaxOutputPrice,
   onPriceFilterChange,
   allProviders,
+  currentSort,
+  onSortChange,
   showCapabilityFilters = true,
   showProviderFilter = false,
   showStatusFilter = false,
   showPriceFilters = false,
+  showSortControls = false,
   disabled = false,
   totalActiveFilters,
 }) => {
+  const { t } = useTranslation('controls');
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
 
   const toggleCapabilityFilter = useCallback((filter: CapabilityFilter) => {
@@ -91,23 +113,72 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
 
 
   return (
-    <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 px-3 relative"
-          disabled={disabled}
-        >
-          <FilterIcon className="h-4 w-4 mr-1" />
-          Filters
-          {totalActiveFilters > 0 && (
-            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
-              {totalActiveFilters}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+    <div className="flex items-center gap-2">
+      {showSortControls && currentSort && onSortChange && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 px-3"
+              disabled={disabled}
+            >
+              <ArrowUpDown className="h-4 w-4 mr-1" />
+              {t('modelFilter.sort', 'Sort')}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => onSortChange({ field: "name", direction: "asc" })}>
+              {t('modelFilter.nameAsc', 'Name (A-Z)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "name", direction: "desc" })}>
+              {t('modelFilter.nameDesc', 'Name (Z-A)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "price_input", direction: "asc" })}>
+              {t('modelFilter.inputPriceAsc', 'Input Price (Low-High)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "price_input", direction: "desc" })}>
+              {t('modelFilter.inputPriceDesc', 'Input Price (High-Low)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "price_output", direction: "asc" })}>
+              {t('modelFilter.outputPriceAsc', 'Output Price (Low-High)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "price_output", direction: "desc" })}>
+              {t('modelFilter.outputPriceDesc', 'Output Price (High-Low)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "context_length", direction: "desc" })}>
+              {t('modelFilter.contextLengthDesc', 'Context Length (High-Low)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "context_length", direction: "asc" })}>
+              {t('modelFilter.contextLengthAsc', 'Context Length (Low-High)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "created", direction: "desc" })}>
+              {t('modelFilter.releaseDateDesc', 'Release Date (Newest)')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSortChange({ field: "created", direction: "asc" })}>
+              {t('modelFilter.releaseDateAsc', 'Release Date (Oldest)')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      
+      <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 px-3 relative"
+            disabled={disabled}
+          >
+            <FilterIcon className="h-4 w-4 mr-1" />
+            {t('modelFilter.filters', 'Filters')}
+            {totalActiveFilters > 0 && (
+              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
+                {totalActiveFilters}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
       <PopoverContent
         className="p-4 space-y-4 w-72 bg-popover shadow-lg relative"
         style={{ zIndex: 9999, pointerEvents: 'auto' }}
@@ -119,28 +190,28 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
       >
         {showStatusFilter && currentEnabledFilter !== undefined && onEnabledFilterChange && (
           <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-            <Label className="text-xs font-semibold">Status</Label>
+            <Label className="text-xs font-semibold">{t('modelFilter.status', 'Status')}</Label>
             <div className="flex gap-1">
               <Button
                 variant={currentEnabledFilter === "all" ? "secondary" : "outline"}
                 size="sm"
                 onClick={(e) => { e.stopPropagation(); onEnabledFilterChange("all"); }}
               >
-                All
+                {t('modelFilter.all', 'All')}
               </Button>
               <Button
                 variant={currentEnabledFilter === "enabled" ? "secondary" : "outline"}
                 size="sm"
                 onClick={(e) => { e.stopPropagation(); onEnabledFilterChange("enabled"); }}
               >
-                <CheckIcon className="h-3 w-3 mr-1" /> Enabled
+                <CheckIcon className="h-3 w-3 mr-1" /> {t('modelFilter.enabled', 'Enabled')}
               </Button>
               <Button
                 variant={currentEnabledFilter === "disabled" ? "secondary" : "outline"}
                 size="sm"
                 onClick={(e) => { e.stopPropagation(); onEnabledFilterChange("disabled"); }}
               >
-                <BanIcon className="h-3 w-3 mr-1" /> Disabled
+                <BanIcon className="h-3 w-3 mr-1" /> {t('modelFilter.disabled', 'Disabled')}
               </Button>
             </div>
           </div>
@@ -149,7 +220,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         {showProviderFilter && currentSelectedProviders && allProviders && onProviderFilterChange && (
           <div onClick={(e) => e.stopPropagation()}>
             <Label className="text-xs px-2 font-semibold block mb-1">
-              Providers
+              {t('modelFilter.providers', 'Providers')}
             </Label>
             <ScrollArea className="h-32 border rounded-md p-1">
               {allProviders.map((provider: DbProviderConfig) => (
@@ -178,10 +249,10 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
 
         {showCapabilityFilters && (
           <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-            <Label className="text-xs font-semibold">Capabilities</Label>
+            <Label className="text-xs font-semibold">{t('modelFilter.capabilities', 'Capabilities')}</Label>
             <div className="flex flex-wrap gap-1">
               <ActionTooltipButton
-                tooltipText="Reasoning"
+                tooltipText={t('modelFilter.reasoning', 'Reasoning')}
                 aria-label="Reasoning"
                 icon={<BrainCircuitIcon />}
                 onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("reasoning"); }}
@@ -189,7 +260,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 className={cn(currentCapabilityFilters.reasoning && "text-primary")}
               />
               <ActionTooltipButton
-                tooltipText="Web Search"
+                tooltipText={t('modelFilter.webSearch', 'Web Search')}
                 aria-label="Web Search"
                 icon={<SearchIcon />}
                 onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("webSearch"); }}
@@ -197,7 +268,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 className={cn(currentCapabilityFilters.webSearch && "text-primary")}
               />
               <ActionTooltipButton
-                tooltipText="Tools"
+                tooltipText={t('modelFilter.tools', 'Tools')}
                 aria-label="Tools"
                 icon={<WrenchIcon />}
                 onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("tools"); }}
@@ -205,7 +276,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 className={cn(currentCapabilityFilters.tools && "text-primary")}
               />
               <ActionTooltipButton
-                tooltipText="Multimodal"
+                tooltipText={t('modelFilter.multimodal', 'Multimodal')}
                 aria-label="Multimodal"
                 icon={<ImageIcon />}
                 onClick={(e) => { e.stopPropagation(); toggleCapabilityFilter("multimodal"); }}
@@ -219,14 +290,14 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         {showPriceFilters && currentMinInputPrice !== undefined && onPriceFilterChange && (
           <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
             <Label className="text-xs font-semibold flex items-center gap-1">
-              <DollarSignIcon className="h-3 w-3" /> Price Range ($ / 1M Tokens)
+              <DollarSignIcon className="h-3 w-3" /> {t('modelFilter.priceRange', 'Price Range ($ / 1M Tokens)')}
             </Label>
             <div className="grid grid-cols-2 gap-2">
               <Input
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Min Input"
+                placeholder={t('modelFilter.minInput', 'Min Input')}
                 value={currentMinInputPrice}
                 onChange={(e) => { e.stopPropagation(); handlePriceInputChange('minInput', e.target.value); }}
                 className="h-8 text-xs"
@@ -235,7 +306,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Max Input"
+                placeholder={t('modelFilter.maxInput', 'Max Input')}
                 value={currentMaxInputPrice}
                 onChange={(e) => { e.stopPropagation(); handlePriceInputChange('maxInput', e.target.value); }}
                 className="h-8 text-xs"
@@ -244,7 +315,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Min Output"
+                placeholder={t('modelFilter.minOutput', 'Min Output')}
                 value={currentMinOutputPrice}
                 onChange={(e) => { e.stopPropagation(); handlePriceInputChange('minOutput', e.target.value); }}
                 className="h-8 text-xs"
@@ -253,7 +324,7 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Max Output"
+                placeholder={t('modelFilter.maxOutput', 'Max Output')}
                 value={currentMaxOutputPrice}
                 onChange={(e) => { e.stopPropagation(); handlePriceInputChange('maxOutput', e.target.value); }}
                 className="h-8 text-xs"
@@ -263,5 +334,6 @@ export const ModelFilterControls: React.FC<ModelFilterControlsProps> = ({
         )}
       </PopoverContent>
     </Popover>
+    </div>
   );
-}; 
+};

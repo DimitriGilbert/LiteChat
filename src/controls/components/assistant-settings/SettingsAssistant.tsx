@@ -1,8 +1,8 @@
 // src/controls/components/assistant-settings/SettingsAssistant.tsx
 // FULL FILE
 import React, { useMemo } from "react";
-// import { useSettingsStore } from "@/store/settings.store";
-// import { useShallow } from "zustand/react/shallow";
+import { useSettingsStore } from "@/store/settings.store";
+import { useShallow } from "zustand/react/shallow";
 // import { Separator } from "@/components/ui/separator";
 // import { Button } from "@/components/ui/button";
 // import { RotateCcwIcon } from "lucide-react";
@@ -18,69 +18,68 @@ import { SettingsAssistantPrompts } from "./SettingsAssistantPrompts";
 import { SettingsAssistantAgent } from "./SettingsAssistantAgent";
 import { SettingsAssistantMcp } from "./SettingsAssistantMcp";
 import { SettingsAssistantForkCompact } from "./SettingsAssistantForkCompact";
+import { useTranslation } from "react-i18next";
 
 const SettingsAssistantComponent: React.FC = () => {
-  // const { resetAssistantSettings } = useSettingsStore(
-  //   useShallow((state) => ({
-  //     resetAssistantSettings: state.resetAssistantSettings,
-  //   }))
-  // );
+  const { t } = useTranslation('assistantSettings');
 
-  // const handleResetClick = () => {
-  //   if (
-  //     window.confirm(
-  //       "Are you sure you want to reset all Assistant settings (Prompt, Parameters, Tools, Auto-Title) to their defaults?"
-  //     )
-  //   ) {
-  //     resetAssistantSettings();
-  //   }
-  // };
+  const { enableAdvancedSettings } = useSettingsStore(
+    useShallow((state) => ({
+      enableAdvancedSettings: state.enableAdvancedSettings,
+    }))
+  );
 
-  const tabs: TabDefinition[] = useMemo(
-    () => [
+  const tabs: TabDefinition[] = useMemo(() => {
+    const allTabs: TabDefinition[] = [
       {
         value: "prompt",
-        label: "System Prompt",
+        label: t('assistantTabs.systemPrompt'),
         content: <SettingsAssistantPrompt />,
       },
       {
-        value: "parameters",
-        label: "Parameters",
-        content: <SettingsAssistantParameters />,
-      },
-      {
-        value: "tools",
-        label: "Tools",
-        content: <SettingsAssistantTools />,
-      },
-      {
-        value: "mcp",
-        label: "MCP",
-        content: <SettingsAssistantMcp />,
-      },
-      {
-        value: "titles",
-        label: "Auto-Titles",
-        content: <SettingsAssistantTitles />,
-      },
-      {
-        value: "fork-compact",
-        label: "Fork Compact",
-        content: <SettingsAssistantForkCompact />,
-      },
-      {
-        value: "prompts",
-        label: "Prompts",
+        value: "library",
+        label: t('assistantTabs.library'),
         content: <SettingsAssistantPrompts />,
       },
       {
         value: "agents",
-        label: "Agents",
+        label: t('assistantTabs.agents'),
         content: <SettingsAssistantAgent />,
       },
-    ],
-    []
-  );
+      {
+        value: "titles",
+        label: t('assistantTabs.autoTitles'),
+        content: <SettingsAssistantTitles />,
+      },
+      {
+        value: "tools",
+        label: t('assistantTabs.tools'),
+        content: <SettingsAssistantTools />,
+      },
+    ];
+
+    // Add advanced tabs only when advanced settings is enabled
+    if (enableAdvancedSettings) {
+      allTabs.push({
+          value: "mcp",
+          label: t('assistantTabs.mcp'),
+          content: <SettingsAssistantMcp />,
+        },
+        {
+          value: "parameters",
+          label: t('assistantTabs.parameters'),
+          content: <SettingsAssistantParameters />,
+        },
+        {
+          value: "fork-compact",
+          label: t('assistantTabs.forkCompact'),
+          content: <SettingsAssistantForkCompact />,
+        }
+      );
+    }
+
+    return allTabs;
+  }, [enableAdvancedSettings, t]);
 
   return (
     <div className="space-y-4 p-1 h-full flex flex-col">

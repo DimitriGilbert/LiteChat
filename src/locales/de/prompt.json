@@ -1,0 +1,83 @@
+{
+  "sendMessagePlaceholder": "Nachricht senden...",
+  "promptSubmissionCancelled": "Prompt-Einreichung durch Middleware abgebrochen.",
+  "failedToSendMessage": "Nachricht konnte nicht gesendet werden: {{errorMessage}}",
+  "sendMessage": "Nachricht senden",
+  "inputAreaPlaceholder": "Nachricht eingeben... (Umschalt+Eingabetaste für neue Zeile)",
+  "chatInputAriaLabel": "Chat-Eingabe",
+  "parameterControl": {
+    "title": "Erweiterte Parameter",
+    "ariaLabel": "Erweiterte Parameter anpassen",
+    "temperature": "Temperatur",
+    "topP": "Top P",
+    "maxTokens": "Max Token",
+    "topK": "Top K",
+    "presencePenalty": "Presence Penalty",
+    "frequencyPenalty": "Frequency Penalty",
+    "placeholder": "Standard: {{defaultValue}}",
+    "none": "Keine",
+    "useDefault": "Standard verwenden ({{defaultValue}})"
+  },
+  "rules": {
+    "autoSelectDisabled": "Automatische Regelauswahl ist in den Einstellungen deaktiviert.",
+    "noPromptForSelect": "Kein Benutzer-Prompt gefunden, auf dem die Auswahl basieren kann.",
+    "noRulesForSelect": "Keine Regeln zur Auswahl verfügbar.",
+    "noModelForSelect": "Kein Modell für die automatische Regelauswahl in den Einstellungen ausgewählt.",
+    "selectingRules": "AI wählt relevante Regeln aus...",
+    "selectionFailed": "AI-Regelauswahl fehlgeschlagen: {{error}}",
+    "selectionSuccess": "AI hat {{count}} Regeln ausgewählt.",
+    "noRulesSelected": "Die AI hat keine Regeln ausgewählt."
+  },
+  "rulesControl": {
+    "trigger": {
+      "configureAria": "Regeln & Tags für nächsten Zug konfigurieren",
+      "addAria": "Regeln & Tags hinzufügen (Einstellungen öffnen)",
+      "tooltipActive": "Regeln/Tags aktiv ({{tagsCount}} Tags, {{rulesCount}} Regeln)",
+      "tooltipInactive": "Regeln/Tags aktivieren (nächster Zug)",
+      "tooltipAdd": "Regeln/Tags hinzufügen (Einstellungen öffnen)"
+    },
+    "dialog": {
+      "filterTagsPlaceholder": "Tags filtern...",
+      "openSettingsTooltip": "Regel-Einstellungen öffnen",
+      "manageButton": "Verwalten",
+      "noTagsDefined": "Keine Tags definiert.",
+      "noTagsMatchFilter": "Keine Tags stimmen mit dem Filter überein.",
+      "includes": "Beinhaltet: {{ruleNames}}",
+      "filterRulesPlaceholder": "Regeln filtern...",
+      "autoSelectTooltip": "Regeln automatisch basierend auf dem Prompt-Kontext auswählen",
+      "autoSelectButton": "Automatische Auswahl",
+      "noRulesDefined": "Keine Regeln definiert.",
+      "noRulesMatchFilter": "Keine Regeln stimmen mit dem Filter überein.",
+      "ruleType": "Typ: {{type}}",
+      "ruleContent": "Inhalt: {{content}}",
+      "tabs": {
+        "activateRules": "Regeln aktivieren",
+        "activateTags": "Tags aktivieren"
+      }
+    }
+  },
+  "toolSelector": {
+    "title": "Tool-Auswahl",
+    "filterPlaceholder": "Tools filtern...",
+    "allToolsFilter": "Alle Tools",
+    "enabledToolsFilter": "Aktivierte Tools",
+    "disabledToolsFilter": "Deaktivierte Tools",
+    "mcpToolsFilter": "MCP-Tools",
+    "systemToolsFilter": "System-Tools",
+    "refreshButton": "Tools aktualisieren",
+    "applyButton": "Anwenden",
+    "loadingTools": "Tools werden geladen...",
+    "noToolsAvailable": "Keine Tools verfügbar",
+    "noToolsMatchFilter": "Keine Tools entsprechen dem Filter '{{filter}}'",
+    "mcpServer": "MCP-Server",
+    "toolDescription": "Beschreibung: {{description}}",
+    "noDescription": "Keine Beschreibung verfügbar",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert"
+  },
+  "fileControl": {
+    "attachFiles": "Dateien anhängen",
+    "attachFilesTooltip": "Dateien an Prompt anhängen",
+    "filesAttached": "{{count}} Datei(en) angehängt"
+  }
+}

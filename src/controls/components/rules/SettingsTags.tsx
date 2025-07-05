@@ -9,12 +9,14 @@ import { TagRuleLinker } from "./TagRuleLinker";
 import type { DbTag, DbRule } from "@/types/litechat/rules";
 import { Separator } from "@/components/ui/separator";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
+import { useTranslation } from "react-i18next";
 
 interface SettingsTagsProps {
   module: RulesControlModule;
 }
 
 export const SettingsTags: React.FC<SettingsTagsProps> = ({ module }) => {
+  const { t } = useTranslation('controls');
   const [, setLastUpdated] = useState(Date.now());
 
   const tags = module.getAllTags();
@@ -127,11 +129,10 @@ export const SettingsTags: React.FC<SettingsTagsProps> = ({ module }) => {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-card-foreground">
-          Manage Tags
+          {t('tagsSettings.manageTitle')}
         </h3>
         <p className="text-sm text-muted-foreground">
-          Create tags to group related rules. You can activate tags before
-          sending a prompt to apply their associated rules.
+          {t('tagsSettings.manageDescription')}
         </p>
       </div>
 
@@ -142,7 +143,7 @@ export const SettingsTags: React.FC<SettingsTagsProps> = ({ module }) => {
           className="w-full"
           disabled={isLoading}
         >
-          <PlusIcon className="h-4 w-4 mr-1" /> Add New Tag
+          <PlusIcon className="h-4 w-4 mr-1" /> {t('tagsSettings.addNew')}
         </Button>
       )}
 
@@ -169,7 +170,7 @@ export const SettingsTags: React.FC<SettingsTagsProps> = ({ module }) => {
       <Separator />
 
       <div className="pt-4">
-        <h4 className="text-md font-medium mb-2">Existing Tags</h4>
+        <h4 className="text-md font-medium mb-2">{t('tagsSettings.existing')}</h4>
         <TagsList
           tags={tags}
           rulesByTagId={rulesByTagId}

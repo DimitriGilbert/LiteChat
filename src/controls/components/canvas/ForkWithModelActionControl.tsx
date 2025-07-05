@@ -6,6 +6,7 @@ import { canvasEvent } from "@/types/litechat/events/canvas.events";
 import { toast } from "sonner";
 import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector";
 import type { ForkWithModelActionControlModule } from "@/controls/modules/canvas/ForkWithModelActionControlModule";
+import { useTranslation } from "react-i18next";
 
 interface ForkWithModelActionControlProps {
   module: ForkWithModelActionControlModule;
@@ -16,6 +17,7 @@ interface ForkWithModelActionControlProps {
 export const ForkWithModelActionControl: React.FC<
   ForkWithModelActionControlProps
 > = ({ module, interactionId, disabled }) => {
+  const { t } = useTranslation('canvas');
   const [showSelector, setShowSelector] = useState(false);
   const [, forceUpdate] = useState({});
 
@@ -45,7 +47,7 @@ export const ForkWithModelActionControl: React.FC<
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled) {
-      toast.info("Fork is currently disabled.");
+      toast.info(t('actions.forkDisabled', 'Fork is currently disabled.'));
       return;
     }
     setShowSelector(!showSelector);
@@ -66,9 +68,9 @@ export const ForkWithModelActionControl: React.FC<
 
   return (
     <ActionTooltipButton
-      tooltipText="Fork with"
+      tooltipText={t('actions.forkWith', 'Fork with')}
       onClick={handleClick}
-      aria-label="Fork Conversation with Model Selection"
+      aria-label={t('actions.forkWithModelAriaLabel', 'Fork Conversation with Model Selection')}
       disabled={disabled}
       icon={
         <div className="relative">

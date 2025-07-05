@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { canvasEvent } from "@/types/litechat/events/canvas.events";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 // Re-export InlineCodeEditor for backward compatibility
 export { InlineCodeEditor } from "@/components/LiteChat/common/CodeEditor";
@@ -30,27 +31,39 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
   disabled,
   onEditModeChange,
 }) => {
+  const { t } = useTranslation('canvas');
   const [isEditing, setIsEditing] = useState(false);
 
   const handleStartEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
+    
+    // Mark as codeblock button interaction to prevent scroll interference
+    const viewport = document.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+    if (viewport) {
+      (viewport as any)._isCodeblockButtonInteraction = true;
+      setTimeout(() => {
+        (viewport as any)._isCodeblockButtonInteraction = false;
+      }, 100);
+    }
+    
     if (disabled || !originalContent || !interactionId || !codeBlockId) {
-      toast.info("Code editing is currently disabled.");
+      toast.info(t('actions.codeEditingDisabled', 'Code editing is currently disabled.'));
       return;
     }
     
     setIsEditing(true);
     onEditModeChange?.(true);
-  }, [disabled, originalContent, interactionId, codeBlockId, onEditModeChange]);
+  }, [disabled, originalContent, interactionId, codeBlockId, onEditModeChange, t]);
 
   const handleSave = useCallback(() => {
     if (!interactionId || !codeBlockId) {
-      toast.error("Missing interaction or code block ID");
+      toast.error(t('actions.missingIdError', 'Missing interaction or code block ID'));
       return;
     }
 
     if (editedContent.trim() === "") {
-      toast.error("Code cannot be empty");
+      toast.error(t('actions.codeCannotBeEmpty', 'Code cannot be empty'));
       return;
     }
 
@@ -66,8 +79,8 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
 
     setIsEditing(false);
     onEditModeChange?.(false);
-    toast.success("Code block edited successfully");
-  }, [interactionId, codeBlockId, language, filepath, originalContent, editedContent, onEditModeChange]);
+    toast.success(t('actions.codeEditedSuccessfully', 'Code block edited successfully'));
+  }, [interactionId, codeBlockId, language, filepath, originalContent, editedContent, onEditModeChange, t]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
@@ -93,7 +106,7 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
           className="h-6 px-2 text-xs"
         >
           <SaveIcon className="h-3 w-3 mr-1" />
-          Save
+          {t('actions.save', 'Save')}
         </Button>
         <Button
           size="sm"
@@ -102,7 +115,7 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
           className="h-6 px-2 text-xs"
         >
           <XIcon className="h-3 w-3 mr-1" />
-          Cancel
+          {t('actions.cancel', 'Cancel')}
         </Button>
       </div>
     );
@@ -111,13 +124,14 @@ export const EditCodeBlockControl: React.FC<EditCodeBlockControlProps> = ({
   // If not editing, return the edit button
   return (
     <ActionTooltipButton
-      tooltipText="Edit Code"
+      tooltipText={t('actions.editCode', 'Edit Code')}
       onClick={handleStartEdit}
-      aria-label="Edit code block"
+      aria-label={t('actions.editCodeAriaLabel', 'Edit code block')}
       disabled={disabled || !originalContent || !interactionId || !codeBlockId}
       icon={<NotebookPenIcon />}
       iconClassName="h-3.5 w-3.5"
       className="h-6 w-6 text-muted-foreground hover:text-foreground"
+      tabIndex={-1}
     />
   );
 };

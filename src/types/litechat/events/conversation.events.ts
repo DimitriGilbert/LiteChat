@@ -10,6 +10,7 @@ export const conversationEvent = {
   conversationAdded: "conversation.added",
   conversationUpdated: "conversation.updated",
   conversationDeleted: "conversation.deleted",
+  conversationsCleared: "conversation.conversations.cleared",
   conversationSyncStatusChanged: "conversation.sync.status.changed",
   syncReposLoaded: "conversation.sync.repos.loaded",
   syncRepoChanged: "conversation.sync.repo.changed",
@@ -53,6 +54,7 @@ export interface ConversationEventPayloads {
     updates: Partial<Conversation>;
   };
   [conversationEvent.conversationDeleted]: { conversationId: string };
+  [conversationEvent.conversationsCleared]: undefined;
   [conversationEvent.conversationSyncStatusChanged]: {
     conversationId: string;
     status: SyncStatus;

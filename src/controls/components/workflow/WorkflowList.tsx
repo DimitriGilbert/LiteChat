@@ -9,6 +9,7 @@ import type { WorkflowControlModule } from '@/controls/modules/WorkflowControlMo
 import { PersistenceService } from '@/services/persistence.service';
 import { toast } from 'sonner';
 import { nanoid } from 'nanoid';
+import { WorkflowShortcutToggle } from './WorkflowShortcutToggle';
 
 interface WorkflowListProps {
     module: WorkflowControlModule;
@@ -83,12 +84,41 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
         }
     };
 
+    const checkIfWorkflowNeedsInput = (workflow: WorkflowTemplate): boolean => {
+        // Check if trigger needs input
+        if (workflow.triggerType === 'custom' && !workflow.triggerPrompt) {
+            return true; // Custom trigger without prompt
+        }
+        
+        if (workflow.triggerType === 'template' && workflow.triggerRef) {
+            // Check if template has variables that need values
+            const template = module.getPromptTemplates().find(t => t.id === workflow.triggerRef);
+            if (template && template.variables && template.variables.length > 0) {
+                // Check if templateVariables has all required values
+                const hasAllValues = template.variables.every(variable => {
+                    const value = workflow.templateVariables?.[variable.name];
+                    return value !== undefined && value !== null && value !== '';
+                });
+                if (!hasAllValues) return true;
+            }
+        }
+        
+        // Workflow is ready to run
+        return false;
+    };
+
     const handleRunWorkflow = (workflow: WorkflowTemplate) => {
-        // For running directly from list, we'll use a simple prompt for now
-        const initialPrompt = prompt(`Enter initial message for workflow "${workflow.name}":`);
-        if (initialPrompt) {
-            module.startWorkflow(workflow, initialPrompt);
+        const needsInput = checkIfWorkflowNeedsInput(workflow);
+        
+        if (needsInput) {
+            // Open builder for configuration - it already has a run button
+            onEditWorkflow(workflow);
+        } else {
+            // Run directly with sensible defaults
+            const defaultPrompt = workflow.triggerPrompt || "Run workflow";
+            module.startWorkflow(workflow, defaultPrompt);
             onWorkflowRun?.(); // Close dialog after starting workflow
+            toast.success(`Workflow "${workflow.name}" started!`);
         }
     };
 
@@ -162,6 +192,17 @@ export const WorkflowList: React.FC<WorkflowListProps> = ({
                                             Steps: {workflow.steps.map(s => s.name).join(', ')}
                                         </div>
                                     )}
+                                    
+                                    <div className="mt-2">
+                                        <WorkflowShortcutToggle 
+                                            workflow={workflow}
+                                            onToggle={() => {
+                                                // Refresh workflows to update UI
+                                                loadWorkflows();
+                                                onWorkflowsChanged?.();
+                                            }}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center gap-1 mt-4 pt-2 border-t">

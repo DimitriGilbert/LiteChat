@@ -21,6 +21,8 @@ export const workflowEvent = {
   resumeRequest: "workflow.resume.request",
   // Fired by the UI to cancel a running workflow
   cancelRequest: "workflow.cancel.request",
+  // Fired by the UI to update a workflow template
+  updateWorkflowRequest: "workflow.update.request",
 
   // --- State Changes ---
   // Fired by the WorkflowService when a workflow officially starts
@@ -35,6 +37,8 @@ export const workflowEvent = {
   completed: "workflow.completed",
   // Fired by the WorkflowService if any unrecoverable error occurs
   error: "workflow.error",
+  // Fired when a workflow template is updated
+  workflowUpdated: "workflow.updated",
 
   // --- Internal Events for Better Integration ---
   // Fired before a step starts (for UI preparation)
@@ -60,6 +64,8 @@ export const WORKFLOW_EVENT_PRIORITIES: Record<string, WorkflowEventPriority> = 
   [workflowEvent.flowUpdated]: 'low',
   [workflowEvent.runNextStepRequest]: 'normal',
   [workflowEvent.resumeRequest]: 'high',
+  [workflowEvent.updateWorkflowRequest]: 'normal',
+  [workflowEvent.workflowUpdated]: 'low',
 };
 
 export interface WorkflowEventPayloads {
@@ -82,6 +88,11 @@ export interface WorkflowEventPayloads {
   [workflowEvent.cancelRequest]: {
     runId: string;
     reason?: string;
+    metadata?: WorkflowEventMetadata;
+  };
+  [workflowEvent.updateWorkflowRequest]: {
+    id: string;
+    updates: Partial<WorkflowTemplate>;
     metadata?: WorkflowEventMetadata;
   };
   [workflowEvent.started]: {
@@ -117,6 +128,11 @@ export interface WorkflowEventPayloads {
     runId: string;
     error: string;
     context?: Record<string, any>;
+    metadata?: WorkflowEventMetadata;
+  };
+  [workflowEvent.workflowUpdated]: {
+    id: string;
+    updates: Partial<WorkflowTemplate>;
     metadata?: WorkflowEventMetadata;
   };
   [workflowEvent.stepStarting]: {

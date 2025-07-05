@@ -13,6 +13,7 @@ import type { PromptTurnObject, PromptObject } from "@/types/litechat/prompt";
 import { ModMiddlewareHook } from "@/types/litechat/middleware.types";
 import type { Interaction } from "@/types/litechat/interaction";
 
+import { nanoid } from "nanoid";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 
@@ -190,7 +191,6 @@ export class RacePromptControlModule implements ControlModule {
 
       if (combineEnabled) {
         // COMBINE MODE: Manually create main interaction, then start children
-        const { nanoid } = await import("nanoid");
         
         // --- Manually create the main placeholder interaction ---
         const mainInteractionId = nanoid();
@@ -327,7 +327,6 @@ export class RacePromptControlModule implements ControlModule {
       } else {
         // NON-COMBINE MODE: Create original interaction as main, then additional race children
         
-        const { nanoid } = await import("nanoid");
         const mainInteractionId = nanoid();
         
         // Create main interaction with original model
@@ -550,7 +549,7 @@ ${raceResponses}`;
       };
 
       // Create combine turn data - Use targetUserInteractionId to let existing handler work
-      const { nanoid } = await import("nanoid");
+
       const combineTurnData: PromptTurnObject = {
         id: nanoid(),
         content: `[Internal combine generation for race interaction ${mainInteractionId}]`,

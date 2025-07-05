@@ -644,6 +644,7 @@ export const useProviderStore = create(
         return {
           id: m.id,
           name: m.name,
+          created: null, // Unknown creation date for default models
           context_length: 4096, // Default placeholder
           architecture: {
             modality,
@@ -653,6 +654,7 @@ export const useProviderStore = create(
           pricing: { prompt: "0", completion: "0" }, // Default placeholder
           top_provider: { context_length: 4096 }, // Default placeholder
           supported_parameters: DEFAULT_SUPPORTED_PARAMS[config.type] ?? [],
+          homepageUrl: null,
         };
       });
     },
@@ -679,6 +681,8 @@ export const useProviderStore = create(
               output_modalities: modelDef.architecture?.output_modalities,
               pricing: modelDef.pricing,
               description: modelDef.description,
+              created: modelDef.created,
+              homepageUrl: modelDef.homepageUrl,
             },
           });
         });

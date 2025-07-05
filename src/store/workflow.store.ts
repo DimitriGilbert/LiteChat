@@ -49,7 +49,7 @@ export const useWorkflowStore = create(
     },
 
     _handleStepCompleted: (runId, stepId, output) => {
-      get()._updateRun(runId, "RUNNING", (run: WorkflowRun) => {
+      get()._updateRun(runId, "running", (run: WorkflowRun) => {
         // console.log(`[WorkflowStore] Step completed: ${stepId}, incrementing currentStepIndex from ${run.currentStepIndex} to ${run.currentStepIndex + 1}`);
         run.stepOutputs[stepId] = output;
         run.currentStepIndex += 1;
@@ -57,17 +57,17 @@ export const useWorkflowStore = create(
     },
 
     _handleWorkflowPaused: (payload) => {
-      get()._updateRun(payload.runId, "PAUSED");
+      get()._updateRun(payload.runId, "paused");
       set({ pausePayload: payload });
     },
 
     _handleWorkflowResumed: (runId) => {
-      get()._updateRun(runId, "RUNNING");
+      get()._updateRun(runId, "running");
       set({ pausePayload: null });
     },
 
     _handleWorkflowCompleted: (runId) => {
-      get()._updateRun(runId, "COMPLETED", (run: WorkflowRun) => {
+      get()._updateRun(runId, "completed", (run: WorkflowRun) => {
         run.completedAt = new Date().toISOString();
       });
       // Optionally clear after a delay
@@ -75,7 +75,7 @@ export const useWorkflowStore = create(
     },
 
     _handleWorkflowError: (runId, error) => {
-      get()._updateRun(runId, "ERROR", (run: WorkflowRun) => {
+      get()._updateRun(runId, "error", (run: WorkflowRun) => {
         run.error = error;
         run.completedAt = new Date().toISOString();
       });

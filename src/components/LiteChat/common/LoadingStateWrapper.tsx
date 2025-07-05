@@ -1,5 +1,6 @@
 // src/components/LiteChat/common/LoadingStateWrapper.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,19 +19,28 @@ interface LoadingStateWrapperProps {
   emptyClassName?: string;
 }
 
-const DefaultLoading: React.FC = () => (
-  <div className="flex items-center justify-center p-4 text-muted-foreground">
-    <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading...
-  </div>
-);
+const DefaultLoading: React.FC = () => {
+  const { t } = useTranslation('common');
+  return (
+    <div className="flex items-center justify-center p-4 text-muted-foreground">
+      <Loader2 className="h-5 w-5 animate-spin mr-2" /> {t('loadingStateWrapper.loading')}
+    </div>
+  );
+};
 
-const DefaultError: React.FC<{ error: string }> = ({ error }) => (
-  <div className="p-4 text-destructive text-center">Error: {error}</div>
-);
+const DefaultError: React.FC<{ error: string }> = ({ error }) => {
+  const { t } = useTranslation('common');
+  return (
+    <div className="p-4 text-destructive text-center">{t('loadingStateWrapper.error', { error })}</div>
+  );
+};
 
-const DefaultEmpty: React.FC = () => (
-  <div className="p-4 text-muted-foreground text-center">No items found.</div>
-);
+const DefaultEmpty: React.FC = () => {
+  const { t } = useTranslation('common');
+  return (
+    <div className="p-4 text-muted-foreground text-center">{t('loadingStateWrapper.noItems')}</div>
+  );
+};
 
 export const LoadingStateWrapper: React.FC<LoadingStateWrapperProps> = ({
   isLoading,

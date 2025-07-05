@@ -21,6 +21,8 @@ export interface CanvasControlRenderContext {
   toolResult?: ToolResultPart;
   // This type should reflect the element the control is associated with
   canvasContextType?: "interaction" | "codeblock" | "global" | "tool-call-step";
+  // Scroll viewport for ToC and other controls that need to scroll
+  scrollViewport?: HTMLElement | null;
 }
 
 export interface CanvasControl {

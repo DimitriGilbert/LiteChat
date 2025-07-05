@@ -53,7 +53,7 @@ export class JSONFlowParser implements FlowParser {
       // Validate nodes
       for (let i = 0; i < parsed.nodes.length; i++) {
         const node = parsed.nodes[i];
-        const nodeError = this.validateNode(node, i);
+        const nodeError = this.validateNode(node, i, parsed.nodes);
         if (nodeError) {
           return { success: false, error: nodeError };
         }
@@ -88,67 +88,40 @@ export class JSONFlowParser implements FlowParser {
     return JSON.stringify(flowData, null, 2);
   }
 
-  private validateNode(node: any, index: number): string | null {
+  private validateNode(node: any, index: number, allNodes: any[]): string | null {
     if (!node.id) {
       return `Node ${index}: Missing required field: id`;
     }
-
     if (typeof node.id !== 'string') {
       return `Node ${index}: Field 'id' must be a string`;
     }
-
     if (!node.type) {
       return `Node ${index}: Missing required field: type`;
     }
-
-    const validTypes = ['trigger', 'prompt', 'agent-task', 'transform', 'human-in-the-loop', 'custom', 'input', 'output', 'default', 'group'];
-    if (!validTypes.includes(node.type)) {
-      return `Node ${index}: Invalid type '${node.type}'. Must be one of: ${validTypes.join(', ')}`;
-    }
-
     if (!node.label) {
       return `Node ${index}: Missing required field: label`;
     }
-
-    if (!node.position || typeof node.position !== 'object') {
-      return `Node ${index}: Missing or invalid field: position (must be object)`;
-    }
-
-    if (typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
-      return `Node ${index}: Position must have numeric x and y coordinates`;
-    }
-
-    if (node.status) {
-      const validStatuses: StepStatus[] = ['pending', 'running', 'success', 'error'];
-      if (!validStatuses.includes(node.status)) {
-        return `Node ${index}: Invalid status '${node.status}'. Must be one of: ${validStatuses.join(', ')}`;
+    // Allow label to be HTML (including <img> and <svg>), not just plain text. Do not restrict or escape label content. // TRUSTED CONTENT
+    // Position is optional - if not provided, auto-layout will handle it
+    if (node.position && typeof node.position === 'object') {
+      if (typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
+        return `Node ${index}: Invalid position - must have x and y as numbers`;
       }
     }
-
-    // Validate styling options
+    // Check for duplicate IDs
+    const idCount = allNodes.filter(n => n.id === node.id).length;
+    if (idCount > 1) {
+      return `Node ${index}: Duplicate ID '${node.id}' - IDs must be unique`;
+    }
+    // Allow any type for custom nodes; do not warn or restrict
+    // Allow any style keys for node.style, just require object type
     if (node.style && typeof node.style !== 'object') {
       return `Node ${index}: Style must be an object`;
     }
-
-    if (node.style) {
-      const validStyleKeys = [
-        'background', 'backgroundColor', 'color', 'border', 'borderColor', 'borderWidth', 'borderRadius',
-        'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
-        'padding', 'margin', 'fontSize', 'fontWeight', 'opacity', 'boxShadow'
-      ];
-      
-      for (const key in node.style) {
-        if (!validStyleKeys.includes(key)) {
-          return `Node ${index}: Invalid style property '${key}'. Valid properties: ${validStyleKeys.join(', ')}`;
-        }
-      }
-    }
-
     // Validate className
     if (node.className && typeof node.className !== 'string') {
       return `Node ${index}: className must be a string`;
     }
-
     return null;
   }
 
@@ -156,60 +129,32 @@ export class JSONFlowParser implements FlowParser {
     if (!edge.id) {
       return `Edge ${index}: Missing required field: id`;
     }
-
     if (!edge.source) {
       return `Edge ${index}: Missing required field: source`;
     }
-
     if (!edge.target) {
       return `Edge ${index}: Missing required field: target`;
     }
-
     if (!nodeIds.has(edge.source)) {
       return `Edge ${index}: Source node '${edge.source}' does not exist`;
     }
-
     if (!nodeIds.has(edge.target)) {
       return `Edge ${index}: Target node '${edge.target}' does not exist`;
     }
-
-    // Validate edge type
-    if (edge.type) {
-      const validEdgeTypes = ['default', 'straight', 'step', 'smoothstep', 'bezier', 'custom'];
-      if (!validEdgeTypes.includes(edge.type)) {
-        return `Edge ${index}: Invalid type '${edge.type}'. Must be one of: ${validEdgeTypes.join(', ')}`;
-      }
-    }
-
-    // Validate styling options
+    // Allow any edge type; do not restrict
+    // Allow any style keys for edge.style, just require object type
     if (edge.style && typeof edge.style !== 'object') {
       return `Edge ${index}: Style must be an object`;
     }
-
-    if (edge.style) {
-      const validStyleKeys = [
-        'stroke', 'strokeWidth', 'strokeDasharray', 'strokeOpacity',
-        'fill', 'color', 'opacity'
-      ];
-      
-      for (const key in edge.style) {
-        if (!validStyleKeys.includes(key)) {
-          return `Edge ${index}: Invalid style property '${key}'. Valid properties: ${validStyleKeys.join(', ')}`;
-        }
-      }
-    }
-
-    // Validate markers
+    // Validate markers as before
     if (edge.markerEnd) {
       const markerError = this.validateMarker(edge.markerEnd, `Edge ${index} markerEnd`);
       if (markerError) return markerError;
     }
-
     if (edge.markerStart) {
       const markerError = this.validateMarker(edge.markerStart, `Edge ${index} markerStart`);
       if (markerError) return markerError;
     }
-
     return null;
   }
 
@@ -253,19 +198,23 @@ export function autoLayoutNodes(nodes: FlowNode[]): FlowNode[] {
   const VERTICAL_SPACING = 150;
 
   return nodes.map((node, index) => {
-    if (node.position.x === 0 && node.position.y === 0 && index > 0) {
-      // Auto-position nodes that don't have explicit positions
+    // If position is missing, or x/y are not numbers, auto-layout
+    if (
+      !node.position ||
+      typeof node.position.x !== 'number' ||
+      typeof node.position.y !== 'number'
+    ) {
       const row = Math.floor(index / 3);
       const col = index % 3;
-      
       return {
         ...node,
         position: {
           x: col * HORIZONTAL_SPACING,
-          y: row * VERTICAL_SPACING
-        }
+          y: row * VERTICAL_SPACING,
+        },
       };
     }
+    // Otherwise, use the provided position
     return node;
   });
 }

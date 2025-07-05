@@ -5,6 +5,8 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { SettingsProviders } from "@/controls/components/provider-settings/SettingsProviders";
 import { providerEvent } from "@/types/litechat/events/provider.events";
+import i18next from 'i18next';
+import type { ControlModuleConstructor } from '@/types/litechat/control';
 
 export class ProviderSettingsModule implements ControlModule {
   readonly id = "core-provider-settings";
@@ -47,7 +49,7 @@ export class ProviderSettingsModule implements ControlModule {
     this.modApiRef = modApi;
     modApi.registerSettingsTab({
       id: "providers",
-      title: "Providers & Models",
+      title: i18next.t("controls:settings.tabs.providers"),
       order: 20,
       component: () =>
         // SettingsProviders will fetch its own data from the store.
@@ -66,3 +68,16 @@ export class ProviderSettingsModule implements ControlModule {
     this.modApiRef = null;
   }
 }
+
+(ProviderSettingsModule as ControlModuleConstructor).translations = {
+  en: {
+    controls: {
+      "settings.tabs.providers": "Providers & Models"
+    }
+  },
+  fr: {
+    controls: {
+      "settings.tabs.providers": "Fournisseurs et Modèles"
+    }
+  }
+};

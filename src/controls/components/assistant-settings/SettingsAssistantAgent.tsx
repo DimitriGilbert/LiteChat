@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { useShallow } from "zustand/react/shallow";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Edit, Plus } from "lucide-react";
 import type { PromptTemplate } from "@/types/litechat/prompt-template";
@@ -12,6 +13,7 @@ import { TemplateFormBase, BaseTemplateFormData } from "./common/TemplateFormBas
 import { TemplateList } from "./common/TemplateList";
 
 export const SettingsAssistantAgent: React.FC = () => {
+  const { t } = useTranslation('assistantSettings');
   const [activeTab, setActiveTab] = useState("agents");
   const [editingAgent, setEditingAgent] = useState<PromptTemplate | undefined>();
   const [managingAgent, setManagingAgent] = useState<PromptTemplate | undefined>();
@@ -48,16 +50,20 @@ export const SettingsAssistantAgent: React.FC = () => {
       ...data,
       type: "agent",
       isPublic: false,
+      isShortcut: data.isShortcut || false,
     });
   };
 
   const handleUpdateAgent = async (data: BaseTemplateFormData) => {
     if (!editingAgent) return;
-    await updatePromptTemplate(editingAgent.id, data);
+    await updatePromptTemplate(editingAgent.id, {
+      ...data,
+      isShortcut: data.isShortcut || false,
+    });
   };
 
   const handleDeleteAgent = async (id: string) => {
-    if (confirm("Are you sure you want to delete this agent and all its tasks?")) {
+    if (confirm(t('agent.deleteConfirm'))) {
       // First delete all tasks for this agent
       const tasks = getTasksForAgent(id);
       for (const task of tasks) {
@@ -75,6 +81,7 @@ export const SettingsAssistantAgent: React.FC = () => {
       type: "task",
       parentId: managingAgent.id,
       isPublic: false,
+      isShortcut: data.isShortcut || false,
     });
   };
 
@@ -83,11 +90,12 @@ export const SettingsAssistantAgent: React.FC = () => {
     await updatePromptTemplate(editingTask.id, {
       ...data,
       parentId: managingAgent.id,
+      isShortcut: data.isShortcut || false,
     });
   };
 
   const handleDeleteTask = async (id: string) => {
-    if (confirm("Are you sure you want to delete this task?")) {
+    if (confirm(t('task.deleteConfirm'))) {
       await deletePromptTemplate(id);
     }
   };
@@ -133,7 +141,7 @@ export const SettingsAssistantAgent: React.FC = () => {
   const tabs: TabDefinition[] = [
     {
       value: "agents",
-      label: "Agents",
+      label: t('agent.title'),
       content: (
         <TemplateList
           templates={agents}
@@ -146,10 +154,10 @@ export const SettingsAssistantAgent: React.FC = () => {
               variant="ghost"
               size="sm"
               onClick={() => handleManageTasks(agent)}
-              title="Manage Tasks"
+              title={t('agent.manageTasks')}
             >
               <Edit className="h-4 w-4" />
-              Tasks
+              {t('agent.tasks')}
             </Button>
           )}
         />
@@ -157,7 +165,7 @@ export const SettingsAssistantAgent: React.FC = () => {
     },
     {
       value: "new-agent",
-      label: "New Agent",
+      label: t('agent.new'),
       content: (
         <TemplateFormBase
           key="new-agent-form"
@@ -175,7 +183,7 @@ export const SettingsAssistantAgent: React.FC = () => {
   if (editingAgent) {
     tabs.push({
       value: "edit-agent",
-      label: `Edit: ${editingAgent.name}`,
+      label: t('agent.edit', { name: editingAgent.name }),
       content: (
         <TemplateFormBase
           key={`edit-agent-form-${editingAgent.id}`}
@@ -193,7 +201,7 @@ export const SettingsAssistantAgent: React.FC = () => {
               className="flex items-center gap-2"
             >
               <Edit className="h-4 w-4" />
-              Tasks ({getTasksForAgent(editingAgent.id).length})
+{t('agent.tasks')} ({getTasksForAgent(editingAgent.id).length})
             </Button>
           }
         />
@@ -205,24 +213,24 @@ export const SettingsAssistantAgent: React.FC = () => {
   if (managingAgent) {
     tabs.push({
       value: "manage-tasks",
-      label: `Tasks: ${managingAgent.name}`,
+      label: t('task.manage', { agentName: managingAgent.name }),
       content: (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleBackToAgents}>
-              ← Back to Agents
+              ← {t('common.backToAgents')}
             </Button>
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-medium">Tasks for {managingAgent.name}</h3>
+              <h3 className="font-medium">{t('task.forAgent', { agentName: managingAgent.name })}</h3>
               <p className="text-sm text-muted-foreground">
-                Manage tasks for this agent
+                {t('task.description')}
               </p>
             </div>
             <Button onClick={handleNewTask}>
               <Plus className="h-4 w-4 mr-2" />
-              New Task
+              {t('task.new')}
             </Button>
           </div>
           <TemplateList
@@ -230,7 +238,7 @@ export const SettingsAssistantAgent: React.FC = () => {
             onEdit={handleEditTask}
             onDelete={handleDeleteTask}
             type="task"
-            emptyMessage="No Tasks Yet"
+            emptyMessage={t('templateList.noTasks')}
           />
         </div>
       ),
@@ -241,12 +249,12 @@ export const SettingsAssistantAgent: React.FC = () => {
   if (managingAgent && activeTab === "new-task") {
     tabs.push({
       value: "new-task",
-      label: "New Task",
+      label: t('task.new'),
       content: (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleBackToTasks}>
-              ← Back to Tasks
+              ← {t('common.backToTasks')}
             </Button>
           </div>
           <TemplateFormBase
@@ -267,12 +275,12 @@ export const SettingsAssistantAgent: React.FC = () => {
   if (editingTask && managingAgent) {
     tabs.push({
       value: "edit-task",
-      label: `Edit: ${editingTask.name}`,
+      label: t('task.edit', { name: editingTask.name }),
       content: (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleBackToTasks}>
-              ← Back to Tasks
+              ← {t('common.backToTasks')}
             </Button>
           </div>
           <TemplateFormBase

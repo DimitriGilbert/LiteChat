@@ -1,0 +1,592 @@
+#!/bin/bash
+
+# LiteChat Build & Release Script
+# Usage: bin/builder [--release <name>] [--no-publish]
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+LANGUAGES=()
+DEFAULT_LANG=""
+BUILD_DIR="build"
+RELEASE_DIR="release"
+DIST_DIR="dist"
+
+# Parse command line arguments
+RELEASE_NAME=""
+NO_PUBLISH=false
+DOCKER_REPO=""
+SKIP_BUILD=false
+SKIP_DOCKER=false
+SKIP_GITHUB=false
+BUILD_DOCKER=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --release)
+      RELEASE_NAME="$2"
+      shift 2
+      ;;
+    --no-publish)
+      NO_PUBLISH=true
+      shift
+      ;;
+    --docker-repo)
+      DOCKER_REPO="$2"
+      shift 2
+      ;;
+    --skip-build)
+      SKIP_BUILD=true
+      shift
+      ;;
+    --skip-docker)
+      SKIP_DOCKER=true
+      shift
+      ;;
+    --skip-github)
+      SKIP_GITHUB=true
+      shift
+      ;;
+    --build-docker)
+      BUILD_DOCKER=true
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: $0 [options]"
+      echo ""
+      echo "Options:"
+      echo "  --release <name>     Create a release with the specified name"
+      echo "  --no-publish         Create release files but don't publish to GitHub"
+      echo "  --docker-repo <repo> Docker repository for image (e.g., 'myuser/litechat')"
+      echo "  --skip-build         Skip the application build step"
+      echo "  --skip-docker        Skip Docker image creation"
+      echo "  --skip-github        Skip GitHub release creation"
+      echo "  --build-docker       Force Docker image creation (uses 'litechat' as default repo)"
+      echo "  -h, --help           Show this help message"
+      echo ""
+      echo "Examples:"
+      echo "  $0                                                # Build only"
+      echo "  $0 --release v1.0.0                              # Build and create GitHub release"
+      echo "  $0 --release v1.0.0 --docker-repo myuser/litechat # Build, release, and push Docker image"
+      echo "  $0 --release v1.0.0 --build-docker               # Build, release, and create Docker images with default repo"
+      echo "  $0 --skip-build --build-docker --release v1.0.0  # Skip build, create Docker images from existing build"
+      echo "  $0 --skip-build --skip-github --build-docker     # Only create Docker images"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Use --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
+# Functions
+log_info() {
+  echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+  echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+  echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+  echo -e "${RED}[ERROR]${NC} $1"
+}
+
+detect_languages() {
+  log_info "Detecting available languages..."
+  if [ ! -d "src/locales" ]; then
+    log_warning "'src/locales' directory not found. Skipping multi-language build features."
+    return
+  fi
+
+  # Get subdirectories in src/locales
+  LANGUAGES=($(find src/locales -mindepth 1 -maxdepth 1 -type d -exec basename {} \;))
+  
+  if [ ${#LANGUAGES[@]} -eq 0 ]; then
+    log_warning "No language subdirectories found in 'src/locales'."
+    LANGUAGES=()
+    return
+  fi
+
+  log_info "Detected languages: ${LANGUAGES[*]}"
+
+  # Determine default language (prefer 'en', otherwise first one)
+  if [[ " ${LANGUAGES[*]} " =~ " en " ]]; then
+    DEFAULT_LANG="en"
+  else
+    DEFAULT_LANG="${LANGUAGES[0]}"
+  fi
+  log_info "Default language set to: $DEFAULT_LANG"
+}
+
+cleanup_dirs() {
+  log_info "Cleaning up previous builds..."
+  rm -rf "$BUILD_DIR"
+  if [[ -n "$RELEASE_NAME" ]]; then
+    rm -rf "$RELEASE_DIR"
+  fi
+  
+  if [ ${#LANGUAGES[@]} -gt 0 ]; then
+    for lang in "${LANGUAGES[@]}"; do
+      mkdir -p "$BUILD_DIR/$lang"
+    done
+  fi
+}
+
+create_directories() {
+  log_info "Creating build directories..."
+  mkdir -p "$BUILD_DIR"
+  
+  if [[ -n "$RELEASE_NAME" ]]; then
+    mkdir -p "$RELEASE_DIR"
+  fi
+  
+  if [ ${#LANGUAGES[@]} -gt 0 ]; then
+    for lang in "${LANGUAGES[@]}"; do
+      mkdir -p "$BUILD_DIR/$lang"
+    done
+  fi
+}
+
+build_project() {
+  if [[ "$SKIP_BUILD" == true ]]; then
+    log_info "Skipping application build (--skip-build flag)"
+    return
+  fi
+  
+  if [ ${#LANGUAGES[@]} -eq 0 ]; then
+    # Single build mode
+    log_info "Performing single, language-agnostic build..."
+    rm -rf "$DIST_DIR"
+    npm run build # Build without language env var
+    if [[ ! -d "$DIST_DIR" ]]; then
+      log_error "Build failed - dist directory not found"
+      exit 1
+    fi
+    log_info "Copying build to $BUILD_DIR/"
+    cp -r "$DIST_DIR"/* "$BUILD_DIR/"
+    if [[ -n "$RELEASE_NAME" ]]; then
+      log_info "Creating release zip: $RELEASE_DIR/$RELEASE_NAME.zip"
+      (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" .)
+    fi
+    log_success "Single build completed."
+  else
+    # Multi-language build mode
+    log_info "Performing multi-language builds for: ${LANGUAGES[*]}"
+    
+    # Build default language (en) first and put it at the root
+    log_info "Building default language: $DEFAULT_LANG (will be placed at build root)"
+    rm -rf "$DIST_DIR"
+    export VITE_APP_LANG="$DEFAULT_LANG"
+    export VITE_BASE="/"
+    npm run build
+    if [[ ! -d "$DIST_DIR" ]]; then
+      log_error "Build failed for default language $DEFAULT_LANG - dist directory not found"
+      exit 1
+    fi
+    
+    # Copy default language to build root
+    log_info "Copying default language build ($DEFAULT_LANG) to $BUILD_DIR/ root"
+    cp -r "$DIST_DIR"/* "$BUILD_DIR/"
+    # Also copy to language-specific directory for consistency
+    mkdir -p "$BUILD_DIR/$DEFAULT_LANG"
+    cp -r "$DIST_DIR"/* "$BUILD_DIR/$DEFAULT_LANG/"
+    
+    # Create default release zip
+    if [[ -n "$RELEASE_NAME" ]]; then
+      log_info "Creating default release zip: $RELEASE_DIR/$RELEASE_NAME.zip"
+      (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" .)
+    fi
+    log_success "Default language $DEFAULT_LANG build completed"
+    
+    # Build other languages and put them in subdirectories
+    for lang in "${LANGUAGES[@]}"; do
+      if [[ "$lang" == "$DEFAULT_LANG" ]]; then
+        continue # Skip default language as it's already built
+      fi
+      
+      log_info "Building language: $lang (will be placed in $BUILD_DIR/$lang/)"
+      rm -rf "$DIST_DIR"
+      export VITE_APP_LANG="$lang"
+      export VITE_BASE="/"
+      npm run build
+      if [[ ! -d "$DIST_DIR" ]]; then
+        log_error "Build failed for language $lang - dist directory not found"
+        exit 1
+      fi
+
+      # Copy to language-specific directory
+      log_info "Copying $lang build to $BUILD_DIR/$lang/"
+      cp -r "$DIST_DIR"/* "$BUILD_DIR/$lang/"
+
+      # Create language-specific release zip
+      if [[ -n "$RELEASE_NAME" ]]; then
+        log_info "Creating language-specific release zip: $RELEASE_DIR/$RELEASE_NAME.$lang.zip"
+        (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.$lang.zip" .)
+      fi
+      log_success "Language $lang build completed"
+    done
+  fi
+}
+
+create_language_specific_dockerfile() {
+  local lang="$1"
+  local temp_dockerfile="dockerfile.tmp.$lang"
+  
+  cat > "$temp_dockerfile" << EOF
+FROM lipanski/docker-static-website:latest
+
+# Copy the built application files for specific language
+COPY build/$lang/ .
+
+# Copy httpd.conf for SPA routing and any needed configuration
+COPY docker/httpd.conf .
+
+# The base image already exposes port 3000 and runs the httpd server
+# No additional configuration needed
+EOF
+
+  echo "$temp_dockerfile"
+}
+
+create_docker_image() {
+  if [[ "$SKIP_DOCKER" == true ]]; then
+    log_info "Skipping Docker image creation (--skip-docker flag)"
+    return
+  fi
+  
+  if [[ "$BUILD_DOCKER" != true && -z "$DOCKER_REPO" ]]; then
+    log_info "No Docker repository provided and --build-docker not specified, skipping Docker image creation"
+    return
+  fi
+  
+  # Use default repo if --build-docker is specified but no repo provided
+  if [[ "$BUILD_DOCKER" == true && -z "$DOCKER_REPO" ]]; then
+    DOCKER_REPO="litechat"
+    log_info "Using default Docker repository: $DOCKER_REPO"
+  fi
+  
+  if [[ -z "$RELEASE_NAME" ]]; then
+    log_error "Release name is required for Docker image creation"
+    return 1
+  fi
+  
+  # Check if Docker is available
+  if ! command -v docker &> /dev/null; then
+    log_error "Docker is not installed. Please install Docker to create images."
+    return 1
+  fi
+  
+  # Check if Dockerfile exists
+  if [[ ! -f "dockerfile" ]]; then
+    log_error "Dockerfile not found. Please ensure 'dockerfile' exists in the project root."
+    return 1
+  fi
+  
+  if [ ${#LANGUAGES[@]} -eq 0 ]; then
+    # Single build mode - create one image
+    log_info "Creating Docker image: $DOCKER_REPO:$RELEASE_NAME"
+    
+    # Build the Docker image
+    log_info "Building Docker image..."
+    if ! docker build -t "$DOCKER_REPO:$RELEASE_NAME" -t "$DOCKER_REPO:latest" .; then
+      log_error "Docker build failed"
+      return 1
+    fi
+    
+    log_success "Docker image built successfully: $DOCKER_REPO:$RELEASE_NAME"
+    
+    # Push to Docker registry if not in no-publish mode
+    if [[ "$NO_PUBLISH" == true ]]; then
+      log_warning "Docker image created but not pushed (--no-publish flag used)"
+      return
+    fi
+    
+    log_info "Pushing Docker image to registry..."
+    
+    # Push both tags
+    if docker push "$DOCKER_REPO:$RELEASE_NAME" && docker push "$DOCKER_REPO:latest"; then
+      log_success "Docker image pushed successfully!"
+      log_info "Image available at: $DOCKER_REPO:$RELEASE_NAME"
+      log_info "Latest tag updated: $DOCKER_REPO:latest"
+    else
+      log_error "Failed to push Docker image. Please check your Docker Hub credentials and repository permissions."
+      log_info "You can manually push with: docker push $DOCKER_REPO:$RELEASE_NAME"
+      return 1
+    fi
+  else
+    # Multi-language mode - create images for each language
+    local created_images=()
+    local temp_dockerfiles=()
+    
+    # Create default language image (without language suffix)
+    log_info "Creating default Docker image: $DOCKER_REPO:$RELEASE_NAME"
+    if ! docker build -t "$DOCKER_REPO:$RELEASE_NAME" -t "$DOCKER_REPO:latest" .; then
+      log_error "Docker build failed for default image"
+      return 1
+    fi
+    created_images+=("$DOCKER_REPO:$RELEASE_NAME" "$DOCKER_REPO:latest")
+    log_success "Default Docker image built successfully: $DOCKER_REPO:$RELEASE_NAME"
+    
+    # Create language-specific images
+    for lang in "${LANGUAGES[@]}"; do
+      if [[ "$lang" == "$DEFAULT_LANG" ]]; then
+        continue # Skip default language as it's already built
+      fi
+      
+      log_info "Creating language-specific Docker image: $DOCKER_REPO:$RELEASE_NAME-$lang"
+      
+      # Create temporary Dockerfile for this language
+      local temp_dockerfile=$(create_language_specific_dockerfile "$lang")
+      temp_dockerfiles+=("$temp_dockerfile")
+      
+      # Build language-specific image
+      if ! docker build -f "$temp_dockerfile" -t "$DOCKER_REPO:$RELEASE_NAME-$lang" .; then
+        log_error "Docker build failed for language: $lang"
+        # Clean up temp files before returning
+        for tf in "${temp_dockerfiles[@]}"; do
+          rm -f "$tf"
+        done
+        return 1
+      fi
+      
+      created_images+=("$DOCKER_REPO:$RELEASE_NAME-$lang")
+      log_success "Language-specific Docker image built successfully: $DOCKER_REPO:$RELEASE_NAME-$lang"
+    done
+    
+    # Clean up temporary Dockerfiles
+    for temp_dockerfile in "${temp_dockerfiles[@]}"; do
+      rm -f "$temp_dockerfile"
+    done
+    
+    # Push all images if not in no-publish mode
+    if [[ "$NO_PUBLISH" == true ]]; then
+      log_warning "Docker images created but not pushed (--no-publish flag used)"
+      log_info "Created images: ${created_images[*]}"
+      return
+    fi
+    
+    log_info "Pushing Docker images to registry..."
+    local failed_pushes=()
+    
+    for image in "${created_images[@]}"; do
+      log_info "Pushing $image..."
+      if docker push "$image"; then
+        log_success "Successfully pushed: $image"
+      else
+        log_error "Failed to push: $image"
+        failed_pushes+=("$image")
+      fi
+    done
+    
+    if [ ${#failed_pushes[@]} -eq 0 ]; then
+      log_success "All Docker images pushed successfully!"
+      log_info "Available images: ${created_images[*]}"
+    else
+      log_error "Some pushes failed: ${failed_pushes[*]}"
+      log_info "You can manually retry with: docker push <image_name>"
+      return 1
+    fi
+  fi
+}
+
+create_github_release() {
+  if [[ "$SKIP_GITHUB" == true ]]; then
+    log_info "Skipping GitHub release creation (--skip-github flag)"
+    return
+  fi
+  
+  if [[ -z "$RELEASE_NAME" ]]; then
+    return
+  fi
+  
+  if [[ "$NO_PUBLISH" == true ]]; then
+    log_warning "Release files created but not published to GitHub (--no-publish flag used)"
+    log_info "Release files available in: $RELEASE_DIR/"
+    ls -la "$RELEASE_DIR/"
+    return
+  fi
+  
+  log_info "Creating GitHub release: $RELEASE_NAME"
+  
+  # Check if gh CLI is available
+  if ! command -v gh &> /dev/null; then
+    log_error "GitHub CLI (gh) is not installed. Please install it to create releases."
+    log_info "Release files are available in: $RELEASE_DIR/"
+    exit 1
+  fi
+  
+  # Check if we're in a git repository
+  if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    log_error "Not in a git repository"
+    exit 1
+  fi
+  
+  # Get current branch for release notes
+  CURRENT_BRANCH=$(git branch --show-current)
+  
+  # Prepare release assets
+  RELEASE_ASSETS=()
+  for file in "$RELEASE_DIR"/*.zip; do
+    if [[ -f "$file" ]]; then
+      RELEASE_ASSETS+=("$file")
+    fi
+  done
+  
+  if [[ ${#RELEASE_ASSETS[@]} -eq 0 ]]; then
+    log_error "No release assets found in $RELEASE_DIR/"
+    exit 1
+  fi
+  
+  # Create the release
+  log_info "Creating release with assets: ${RELEASE_ASSETS[*]}"
+  
+  # Generate release notes based on whether languages were built
+  NOTES="Release $RELEASE_NAME built from branch $CURRENT_BRANCH on $(date)"
+  if [ ${#LANGUAGES[@]} -gt 0 ]; then
+      NOTES+="\n\nAvailable builds:\n- $RELEASE_NAME.zip: Default language ($DEFAULT_LANG)"
+      for lang in "${LANGUAGES[@]}"; do
+          NOTES+="\n- $RELEASE_NAME.$lang.zip: $lang version"
+      done
+  else
+      NOTES+="\n\nSingle build asset:\n- $RELEASE_NAME.zip"
+  fi
+
+  gh release create "$RELEASE_NAME" \
+    "${RELEASE_ASSETS[@]}" \
+    --title "$RELEASE_NAME" \
+    --notes-file <(echo -e "$NOTES") \
+    --generate-notes
+  
+  log_success "GitHub release created successfully!"
+  log_info "View the release at: $(gh browse --no-browser -p)/releases/tag/$RELEASE_NAME"
+}
+
+show_summary() {
+  echo ""
+  log_success "Build completed successfully!"
+  echo ""
+  echo "📁 Build Structure:"
+  echo "├── $BUILD_DIR/"
+  if [ ${#LANGUAGES[@]} -gt 0 ]; then
+    echo "│   ├── (root: default language $DEFAULT_LANG)"
+    for lang in "${LANGUAGES[@]}"; do
+      if [[ "$lang" != "$DEFAULT_LANG" ]]; then
+        echo "│   └── $lang/ (language-specific)"
+      fi
+    done
+  else
+    echo "│   └── (single language-agnostic build)"
+  fi
+  
+  if [[ -n "$RELEASE_NAME" ]]; then
+    echo "│"
+    echo "├── $RELEASE_DIR/"
+    echo "│   ├── $RELEASE_NAME.zip"
+    if [ ${#LANGUAGES[@]} -gt 0 ]; then
+      for lang in "${LANGUAGES[@]}"; do
+        echo "│   └── $RELEASE_NAME.$lang.zip"
+      done
+    fi
+  fi
+  echo ""
+  
+  # Show disk usage
+  echo "💾 Build sizes:"
+  du -sh "$BUILD_DIR"/* 2>/dev/null || true
+  
+  if [[ -n "$RELEASE_NAME" ]]; then
+    echo ""
+    echo "📦 Release sizes:"
+    du -sh "$RELEASE_DIR"/* 2>/dev/null || true
+    
+    if [[ -n "$DOCKER_REPO" ]]; then
+      echo ""
+      echo "🐳 Docker images:"
+      # Show all images for this repository
+      docker images "$DOCKER_REPO" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" 2>/dev/null || echo "No Docker images found"
+      
+      if [ ${#LANGUAGES[@]} -gt 0 ]; then
+        echo ""
+        echo "📋 Available image tags:"
+        echo "  • $DOCKER_REPO:$RELEASE_NAME (default: $DEFAULT_LANG)"
+        echo "  • $DOCKER_REPO:latest (always points to default)"
+        for lang in "${LANGUAGES[@]}"; do
+          if [[ "$lang" != "$DEFAULT_LANG" ]]; then
+            echo "  • $DOCKER_REPO:$RELEASE_NAME-$lang ($lang version)"
+          fi
+        done
+      fi
+    fi
+  fi
+}
+
+# Main execution
+main() {
+  echo "🚀 LiteChat Build & Release Script"
+  echo "=================================="
+  
+  if [[ -n "$RELEASE_NAME" ]]; then
+    log_info "Building for release: $RELEASE_NAME"
+    if [[ "$NO_PUBLISH" == true ]]; then
+      log_info "Release will be created locally only (--no-publish)"
+    fi
+    if [[ "$BUILD_DOCKER" == true || -n "$DOCKER_REPO" ]]; then
+      local docker_repo="${DOCKER_REPO:-litechat}"
+      log_info "Docker image will be created: $docker_repo:$RELEASE_NAME"
+    fi
+  else
+    log_info "Building without release"
+  fi
+  
+  # Show what will be skipped
+  if [[ "$SKIP_BUILD" == true ]]; then
+    log_info "Application build will be skipped"
+  fi
+  if [[ "$SKIP_DOCKER" == true ]]; then
+    log_info "Docker image creation will be skipped"
+  fi
+  if [[ "$SKIP_GITHUB" == true ]]; then
+    log_info "GitHub release creation will be skipped"
+  fi
+  
+  echo ""
+  
+  # Ensure we're in the right directory
+  if [[ ! -f "package.json" ]]; then
+    log_error "package.json not found. Please run this script from the project root."
+    exit 1
+  fi
+  
+  # Ensure zip is available
+  if ! command -v zip &> /dev/null; then
+    log_error "zip command is not available. Please install zip."
+    exit 1
+  fi
+  
+  detect_languages
+  cleanup_dirs
+  create_directories
+  build_project
+  create_docker_image
+  create_github_release
+  show_summary
+  
+  log_success "All done! 🎉"
+}
+
+# Run main function
+main "$@" 

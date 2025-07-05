@@ -6,6 +6,7 @@ import { emitter } from "@/lib/litechat/event-emitter"; // Added
 import { interactionEvent } from "@/types/litechat/events/interaction.events"; // Added
 import { ActionTooltipButton } from "@/components/LiteChat/common/ActionTooltipButton";
 import { Star } from "lucide-react"; // Import star icon
+import { useTranslation } from "react-i18next";
 
 interface InteractionRatingProps {
   interactionId: string;
@@ -16,6 +17,7 @@ export const InteractionRating: React.FC<InteractionRatingProps> = ({
   interactionId,
   currentRating,
 }) => {
+  const { t } = useTranslation('canvas');
   // const rateInteraction = useInteractionStore((state) => state.rateInteraction); // Removed
 
   const handleRate = (newRating: number | null) => {
@@ -36,17 +38,17 @@ export const InteractionRating: React.FC<InteractionRatingProps> = ({
       {ratings.map((ratingValue) => {
         // Determine tooltip text based on rating value
         let tooltip = "";
-        if (ratingValue === -5) tooltip = "Terrible";
-        else if (ratingValue === -4) tooltip = "Very Bad";
-        else if (ratingValue === -3) tooltip = "Bad";
-        else if (ratingValue === -2) tooltip = "Poor";
-        else if (ratingValue === -1) tooltip = "Below Average";
-        else if (ratingValue === 0) tooltip = "Neutral";
-        else if (ratingValue === 1) tooltip = "Above Average";
-        else if (ratingValue === 2) tooltip = "Good";
-        else if (ratingValue === 3) tooltip = "Very Good";
-        else if (ratingValue === 4) tooltip = "Excellent";
-        else if (ratingValue === 5) tooltip = "Perfect";
+        if (ratingValue === -5) tooltip = t('actions.ratings.terrible', 'Terrible');
+        else if (ratingValue === -4) tooltip = t('actions.ratings.veryBad', 'Very Bad');
+        else if (ratingValue === -3) tooltip = t('actions.ratings.bad', 'Bad');
+        else if (ratingValue === -2) tooltip = t('actions.ratings.poor', 'Poor');
+        else if (ratingValue === -1) tooltip = t('actions.ratings.belowAverage', 'Below Average');
+        else if (ratingValue === 0) tooltip = t('actions.ratings.neutral', 'Neutral');
+        else if (ratingValue === 1) tooltip = t('actions.ratings.aboveAverage', 'Above Average');
+        else if (ratingValue === 2) tooltip = t('actions.ratings.good', 'Good');
+        else if (ratingValue === 3) tooltip = t('actions.ratings.veryGood', 'Very Good');
+        else if (ratingValue === 4) tooltip = t('actions.ratings.excellent', 'Excellent');
+        else if (ratingValue === 5) tooltip = t('actions.ratings.perfect', 'Perfect');
 
         // Determine star color based on rating value
         let colorClass = "text-muted-foreground";
@@ -86,7 +88,7 @@ export const InteractionRating: React.FC<InteractionRatingProps> = ({
             key={ratingValue}
             tooltipText={tooltip}
             onClick={() => handleRate(ratingValue)}
-            aria-label={`Rate response as ${tooltip}`}
+            aria-label={t('actions.ratings.ariaLabel', 'Rate response as {{rating}}', { rating: tooltip })}
             icon={
               <Star
                 className={cn(

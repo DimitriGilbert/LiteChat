@@ -31,3 +31,4 @@ src.*.d
 .update_scripts/*
 todo.*.md
 public/versions/
+**/*.bak

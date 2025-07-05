@@ -6,6 +6,7 @@ import type {
   ResolvedRuleContent,
 } from "@/types/litechat/prompt";
 import { InteractionService } from "./interaction.service";
+import { PromptCompilationService } from "./prompt-compilation.service";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useProjectStore } from "@/store/project.store";
 import { usePromptStateStore } from "@/store/prompt.store";
@@ -34,9 +35,6 @@ export const ConversationService = {
   async submitPrompt(turnData: PromptTurnObject): Promise<void> {
     console.log("[ConversationService] submitPrompt called", turnData);
     const interactionStoreState = useInteractionStore.getState();
-    const projectStoreState = useProjectStore.getState();
-    const promptState = usePromptStateStore.getState();
-    const conversationStoreState = useConversationStore.getState();
     const settingsStoreState = useSettingsStore.getState();
 
     const conversationId = interactionStoreState.currentConversationId;
@@ -48,11 +46,6 @@ export const ConversationService = {
       return;
     }
 
-    const currentConversation =
-      conversationStoreState.getConversationById(conversationId);
-    const currentProjectId = currentConversation?.projectId ?? null;
-    const effectiveSettings =
-      projectStoreState.getEffectiveProjectSettings(currentProjectId);
 
     const isFirstInteraction =
       interactionStoreState.interactions.filter(
@@ -64,146 +57,11 @@ export const ConversationService = {
       turnData.metadata?.autoTitleEnabledForTurn === true &&
       settingsStoreState.autoTitleModelId;
 
-    // Correctly build history for the AI
-    const activeInteractionsOnSpine = interactionStoreState.interactions
-      .filter(i => i.parentId === null && i.status === "COMPLETED")
-      .sort((a, b) => a.index - b.index);
-
-    const turnsForHistoryBuilder: Interaction[] = activeInteractionsOnSpine.map(activeInteraction => {
-      if (activeInteraction.type === "message.assistant_regen" && activeInteraction.metadata?.regeneratedFromId) {
-        const originalInteraction = interactionStoreState.interactions.find(
-          orig => orig.id === activeInteraction.metadata!.regeneratedFromId
-        );
-        // Ensure the original interaction was a user_assistant type and had a prompt.
-        if (originalInteraction && originalInteraction.prompt && originalInteraction.type === "message.user_assistant") {
-          // Create a synthetic interaction for history: original prompt + regen's response & active status
-          return {
-            ...activeInteraction, // Includes regen's ID, response, status, parentId (null), index, etc.
-            prompt: originalInteraction.prompt, // Crucially, take the prompt from the original
-            type: "message.user_assistant", // Present it as a standard turn for buildHistoryMessages
-          } as Interaction;
-        }
-      }
-      // If it's already a user_assistant type with a prompt, or a regen whose original prompt couldn't be mapped cleanly,
-      // return it as is, but ensure it has a prompt if it's user_assistant type.
-      if (activeInteraction.type === "message.user_assistant" && activeInteraction.prompt) {
-        return activeInteraction;
-      }
-      // Return null for types that don't fit the user_assistant structure for buildHistoryMessages or are incomplete
-      return null;
-    }).filter(Boolean) as Interaction[]; // Filter out any nulls
-
-    const historyMessages: CoreMessage[] =
-      buildHistoryMessages(turnsForHistoryBuilder);
-
-    let userContent = turnData.content;
-    const userMessageContentParts: (TextPart | ImagePart)[] = [];
-
-    const effectiveRulesContent: ResolvedRuleContent[] =
-      turnData.metadata?.effectiveRulesContent ?? [];
-
-    const systemRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "system")
-      .map((r) => r.content);
-    const beforeRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "before")
-      .map((r) => r.content);
-    const afterRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "after")
-      .map((r) => r.content);
-
-    if (beforeRulesContent.length > 0) {
-      userContent = `${beforeRulesContent.join(`
-`)}
-
-${userContent}`;
-    }
-    if (afterRulesContent.length > 0) {
-      userContent = `${userContent}
-
-    ${afterRulesContent.join(`
-`)}`;
-    }
-
-    if (userContent) {
-      userMessageContentParts.push({ type: "text", text: userContent });
-    }
-
-    const attachedFilesMeta = turnData.metadata?.attachedFiles ?? [];
-    if (attachedFilesMeta.length > 0) {
-      const fileContentParts = await this._processFilesForPrompt(
-        attachedFilesMeta,
-        conversationId
-      );
-      userMessageContentParts.unshift(...fileContentParts);
-    }
-
-    if (userMessageContentParts.length > 0) {
-      historyMessages.push({ role: "user", content: userMessageContentParts });
-    } else {
-      console.warn(
-        "[ConversationService] No user text or file content found in turnData. Submitting without user message."
-      );
-    }
-
-    const turnSystemPrompt = turnData.metadata?.turnSystemPrompt as
-      | string
-      | undefined;
-    let baseSystemPrompt =
-      turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
-
-    if (systemRulesContent.length > 0) {
-      baseSystemPrompt = `${
-        baseSystemPrompt
-          ? `${baseSystemPrompt}
-
-        `
-          : ""
-      }${systemRulesContent.join(`
-`)}`;
-    }
-
-    const finalParameters = {
-      temperature: promptState.temperature,
-      max_tokens: promptState.maxTokens,
-      top_p: promptState.topP,
-      top_k: promptState.topK,
-      presence_penalty: promptState.presencePenalty,
-      frequency_penalty: promptState.frequencyPenalty,
-      ...(turnData.parameters ?? {}),
-    };
-    Object.keys(finalParameters).forEach((key) => {
-      if (
-        finalParameters[key as keyof typeof finalParameters] === null ||
-        finalParameters[key as keyof typeof finalParameters] === undefined
-      ) {
-        delete finalParameters[key as keyof typeof finalParameters];
-      }
-    });
-
-    const promptObject: PromptObject = {
-      system: baseSystemPrompt,
-      messages: historyMessages,
-      parameters: finalParameters,
-      metadata: {
-        ...(({
-          turnSystemPrompt: _turnSystemPrompt,
-          activeTagIds,
-          activeRuleIds,
-          effectiveRulesContent: _effectiveRulesContent,
-          autoTitleEnabledForTurn,
-          ...restMeta
-        }) => ({
-          ...restMeta,
-          effectivelyAppliedTagIds: activeTagIds,
-          effectivelyAppliedRuleIds: activeRuleIds,
-        }))(turnData.metadata ?? {}),
-        modelId: promptState.modelId ?? undefined,
-        attachedFiles: turnData.metadata.attachedFiles?.map(
-          ({ contentBase64, contentText, ...rest }) => rest
-        ),
-      },
-    };
+    // Use centralized prompt compilation service
+    const promptObject = await PromptCompilationService.compilePrompt(
+      turnData,
+      conversationId
+    );
 
     try {
       const mainInteractionPromise = InteractionService.startInteraction(
@@ -213,9 +71,9 @@ ${userContent}`;
       );
 
       if (shouldGenerateTitle) {
-        console.log(
-          "[ConversationService] Triggering asynchronous title generation."
-        );
+        // console.log(
+        //   "[ConversationService] Triggering asynchronous title generation."
+        // );
         const rulesForTitleContext: DbRule[] = (
           turnData.metadata?.effectiveRulesContent ?? []
         ).map((erc) => ({
@@ -338,9 +196,9 @@ ${userContent}`;
   },
 
   async regenerateInteraction(interactionId: string): Promise<void> {
-    console.log(
-      `[ConversationService] regenerateInteraction called for ID: ${interactionId}`
-    );
+    // console.log(
+    //   `[ConversationService] regenerateInteraction called for ID: ${interactionId}`
+    // );
     const interactionStore = useInteractionStore.getState();
     const projectStoreState = useProjectStore.getState();
     const promptState = usePromptStateStore.getState();
@@ -349,7 +207,7 @@ ${userContent}`;
     const targetInteraction = interactionStore.interactions.find(
       (i) => i.id === interactionId
     );
-    console.log("[ConversationService] Target interaction for regen:", JSON.parse(JSON.stringify(targetInteraction)));
+    // console.log("[ConversationService] Target interaction for regen:", JSON.parse(JSON.stringify(targetInteraction)));
 
     if (!targetInteraction || !targetInteraction.prompt) {
       toast.error("Cannot regenerate: Original interaction data missing.");
@@ -388,7 +246,7 @@ ${userContent}`;
       originalTurnData.metadata?.effectiveRulesContent ?? [];
 
     const systemRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "system")
+      .filter((r) => r.type === "system" || r.type === "control")
       .map((r) => r.content);
     const beforeRulesContent = effectiveRulesContent
       .filter((r) => r.type === "before")
@@ -525,24 +383,31 @@ ${userContent}`;
 
       let finalNewInteractionState = newGeneratedInteraction;
       if (newInteractionWasModified) {
-        interactionStore._updateInteractionInState(newGeneratedInteraction.id, updatesForNewInteraction);
+        interactionStore._updateInteractionInState(
+          newGeneratedInteraction.id,
+          updatesForNewInteraction
+        );
         finalNewInteractionState = {
-            ...newGeneratedInteraction, 
-            ...updatesForNewInteraction
+          ...newGeneratedInteraction,
+          ...updatesForNewInteraction,
         } as Interaction;
         await PersistenceService.saveInteraction(finalNewInteractionState);
       }
-      console.log("[ConversationService] New active interaction state after potential updates:", JSON.parse(JSON.stringify(finalNewInteractionState)));
-      
+      // console.log("[ConversationService] New active interaction state after potential updates:", JSON.parse(JSON.stringify(finalNewInteractionState)));
+
       // Build the chain of interactions to update (original and any previous regens)
       const versionsToUpdate: Interaction[] = [];
-      let currentInteractionInChain: Interaction | undefined | null = targetInteraction;
+      let currentInteractionInChain: Interaction | undefined | null =
+        targetInteraction;
 
       while (currentInteractionInChain) {
         versionsToUpdate.push(currentInteractionInChain);
-        const regeneratedFromId: string | undefined = currentInteractionInChain.metadata?.regeneratedFromId;
+        const regeneratedFromId: string | undefined =
+          currentInteractionInChain.metadata?.regeneratedFromId;
         if (regeneratedFromId) {
-          currentInteractionInChain = interactionStore.interactions.find(i => i.id === regeneratedFromId);
+          currentInteractionInChain = interactionStore.interactions.find(
+            (i) => i.id === regeneratedFromId
+          );
         } else {
           currentInteractionInChain = null;
         }
@@ -563,15 +428,17 @@ ${userContent}`;
           parentId: finalNewInteractionState.id, // Make them children of the NEW interaction
           index: i, // Children get sequential index starting from 0
         };
-        console.log(`[ConversationService] Updating old version ${interactionToUpdate.id} to be child of ${finalNewInteractionState.id} with childIndex ${i}`, JSON.parse(JSON.stringify(updatesForOldVersion)));
+        // console.log(`[ConversationService] Updating old version ${interactionToUpdate.id} to be child of ${finalNewInteractionState.id} with childIndex ${i}`, JSON.parse(JSON.stringify(updatesForOldVersion)));
 
-        interactionStore._updateInteractionInState(interactionToUpdate.id, updatesForOldVersion);
+        interactionStore._updateInteractionInState(
+          interactionToUpdate.id,
+          updatesForOldVersion
+        );
         await PersistenceService.saveInteraction({
           ...interactionToUpdate,
           ...updatesForOldVersion,
         } as Interaction);
       }
-
     } catch (error) {
       console.error(
         "[ConversationService] Error during regeneration process:",
@@ -591,19 +458,21 @@ ${userContent}`;
   _pendingCompactForks: new Set<string>(),
 
   async forkConversation(interactionId: string): Promise<void> {
-    console.log(
-      `[ConversationService] forkConversation called for ID: ${interactionId}`
-    );
-    
+    // console.log(
+    //   `[ConversationService] forkConversation called for ID: ${interactionId}`
+    // );
+
     // Prevent multiple simultaneous forks of the same interaction
     if (this._pendingForks.has(interactionId)) {
-      console.warn(`[ConversationService] Fork already in progress for ${interactionId}`);
+      console.warn(
+        `[ConversationService] Fork already in progress for ${interactionId}`
+      );
       toast.info("Fork already in progress for this interaction.");
       return;
     }
-    
+
     this._pendingForks.add(interactionId);
-    
+
     try {
       const interactionStore = useInteractionStore.getState();
       const conversationStoreState = useConversationStore.getState();
@@ -632,7 +501,8 @@ ${userContent}`;
             i.conversationId === targetInteraction.conversationId &&
             i.index <= targetInteraction.index &&
             i.parentId === null && // Only main spine interactions
-            (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
+            (i.type === "message.user_assistant" ||
+              i.type === "message.assistant_regen")
         )
         .sort((a, b) => a.index - b.index);
 
@@ -664,15 +534,17 @@ ${userContent}`;
       }
 
       // Select the new conversation and focus input
-      await conversationStoreState.selectItem(newConversationId, "conversation");
+      await conversationStoreState.selectItem(
+        newConversationId,
+        "conversation"
+      );
       emitter.emit(promptEvent.focusInputRequest, undefined);
 
-      toast.success(`Conversation forked successfully: "${newConversationTitle}"`);
-    } catch (error) {
-      console.error(
-        "[ConversationService] Error during fork process:",
-        error
+      toast.success(
+        `Conversation forked successfully: "${newConversationTitle}"`
       );
+    } catch (error) {
+      console.error("[ConversationService] Error during fork process:", error);
       toast.error(
         `Failed to fork conversation: ${
           error instanceof Error ? error.message : String(error)
@@ -685,23 +557,28 @@ ${userContent}`;
     }
   },
 
-  async forkConversationCompact(interactionId: string, compactModelId: string): Promise<void> {
-    console.log(
-      `[ConversationService] forkConversationCompact called for ID: ${interactionId} with model: ${compactModelId}`
-    );
-    
+  async forkConversationCompact(
+    interactionId: string,
+    compactModelId: string
+  ): Promise<void> {
+    // console.log(
+    //   `[ConversationService] forkConversationCompact called for ID: ${interactionId} with model: ${compactModelId}`
+    // );
+
     // Prevent multiple simultaneous compact forks of the same interaction
     if (this._pendingCompactForks.has(interactionId)) {
-      console.warn(`[ConversationService] Compact fork already in progress for ${interactionId}`);
+      console.warn(
+        `[ConversationService] Compact fork already in progress for ${interactionId}`
+      );
       toast.info("Compact fork already in progress for this interaction.");
       return;
     }
-    
+
     this._pendingCompactForks.add(interactionId);
-    
+
     // The _pendingCompactForks set above already handles rapid-fire duplicate requests
     // Users should be able to create multiple compacts of the same conversation if they want
-    
+
     try {
       const interactionStore = useInteractionStore.getState();
       const conversationStoreState = useConversationStore.getState();
@@ -731,50 +608,60 @@ ${userContent}`;
             i.conversationId === targetInteraction.conversationId &&
             i.index <= targetInteraction.index &&
             i.parentId === null && // Only main spine interactions
-            (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
+            (i.type === "message.user_assistant" ||
+              i.type === "message.assistant_regen")
         )
         .sort((a, b) => a.index - b.index);
 
       // Build the conversation history for compacting
-      const historyMessages: CoreMessage[] = buildHistoryMessages(interactionsToCompact);
-      
+      const historyMessages: CoreMessage[] = buildHistoryMessages(
+        interactionsToCompact
+      );
+
       // Helper function to safely format message content for text summarization
       const formatMessageContent = (content: any): string => {
-        if (typeof content === 'string') {
+        if (typeof content === "string") {
           return content;
         }
-        
+
         if (Array.isArray(content)) {
-          return content.map(part => {
-            if (part.type === 'text') {
-              return part.text;
-            } else if (part.type === 'image') {
-              // For images, just indicate their presence without including the data
-              return '[Image attached]';
-            } else {
-              // For other content types, provide a brief description
-              return `[${part.type || 'Content'} attached]`;
-            }
-          }).join(' ');
+          return content
+            .map((part) => {
+              if (part.type === "text") {
+                return part.text;
+              } else if (part.type === "image") {
+                // For images, just indicate their presence without including the data
+                return "[Image attached]";
+              } else {
+                // For other content types, provide a brief description
+                return `[${part.type || "Content"} attached]`;
+              }
+            })
+            .join(" ");
         }
-        
+
         // For other object types, try to extract meaningful text or provide a placeholder
-        if (typeof content === 'object' && content !== null) {
+        if (typeof content === "object" && content !== null) {
           // If it has a text property, use that
-          if ('text' in content && typeof content.text === 'string') {
+          if ("text" in content && typeof content.text === "string") {
             return content.text;
           }
           // Otherwise, just indicate non-text content
-          return '[Non-text content]';
+          return "[Non-text content]";
         }
-        
+
         return String(content);
       };
 
       // Format conversation history for text-based summarization
-      const formattedHistory = historyMessages.map(msg => 
-        `**${msg.role.toUpperCase()}:** ${formatMessageContent(msg.content)}`
-      ).join('\n\n');
+      const formattedHistory = historyMessages
+        .map(
+          (msg) =>
+            `**${msg.role.toUpperCase()}:** ${formatMessageContent(
+              msg.content
+            )}`
+        )
+        .join("\n\n");
 
       // Use custom prompt from settings or default, ensuring history is always included
       const customPrompt = settingsStoreState.forkCompactPrompt;
@@ -787,15 +674,17 @@ ${userContent}`;
 Keep the summary detailed enough that we can seamlessly continue our discussion, but compact enough to be efficient.`;
 
       // If custom prompt is provided, use it as the instruction but always append the history
-      const compactPrompt = customPrompt 
+      const compactPrompt = customPrompt
         ? `${customPrompt}\n\nHere is our conversation history to summarize:\n\n${formattedHistory}`
         : `${defaultPrompt}\n\nHere is our conversation history to summarize:\n\n${formattedHistory}`;
 
       // Use custom model from settings if available, otherwise use the provided model
-      const effectiveModelId = settingsStoreState.forkCompactModelId || compactModelId;
+      const effectiveModelId =
+        settingsStoreState.forkCompactModelId || compactModelId;
 
       const compactPromptObject: PromptObject = {
-        system: "You are an expert at creating comprehensive conversation summaries. Provide a detailed but concise summary that captures all important context and information needed to continue the conversation seamlessly.",
+        system:
+          "You are an expert at creating comprehensive conversation summaries. Provide a detailed but concise summary that captures all important context and information needed to continue the conversation seamlessly.",
         messages: [{ role: "user", content: compactPrompt }],
         parameters: {
           temperature: 0.3,
@@ -819,7 +708,7 @@ Keep the summary detailed enough that we can seamlessly continue our discussion,
 
       // Create the user message asking for conversation summary
       const userMessage = `Please provide a comprehensive summary of our previous conversation titled "${originalConversation.title}". Include the main topics, key decisions, and important context needed to continue seamlessly.`;
-      
+
       const initialUserInteraction: Interaction = {
         id: nanoid(),
         conversationId: newConversationId,
@@ -856,8 +745,11 @@ Keep the summary detailed enough that we can seamlessly continue our discussion,
       interactionStoreState._addInteractionToState(initialUserInteraction);
 
       // FIRST: Select the new conversation so the interaction store is in the right context
-      await conversationStoreState.selectItem(newConversationId, "conversation");
-      
+      await conversationStoreState.selectItem(
+        newConversationId,
+        "conversation"
+      );
+
       // Wait for conversation selection and interaction loading to complete
       await new Promise<void>((resolve) => {
         const handleInteractionLoaded = (payload: any) => {
@@ -867,7 +759,7 @@ Keep the summary detailed enough that we can seamlessly continue our discussion,
           }
         };
         emitter.on(interactionEvent.loaded, handleInteractionLoaded);
-        
+
         // Fallback timeout in case event doesn't fire
         setTimeout(() => {
           emitter.off(interactionEvent.loaded, handleInteractionLoaded);
@@ -900,7 +792,9 @@ Keep the summary detailed enough that we can seamlessly continue our discussion,
       // Focus input
       emitter.emit(promptEvent.focusInputRequest, undefined);
 
-      toast.success(`Conversation compacted and forked: "${newConversationTitle}"`);
+      toast.success(
+        `Conversation compacted and forked: "${newConversationTitle}"`
+      );
     } catch (error) {
       console.error(
         "[ConversationService] Error during compact fork process:",
@@ -987,9 +881,9 @@ Keep the summary detailed enough that we can seamlessly continue our discussion,
   async _ensureVfsReady(
     targetVfsKey: string
   ): Promise<typeof FsType | undefined> {
-    console.log(
-      `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`
-    );
+    // console.log(
+    //   `[ConversationService] Ensuring VFS ready for key "${targetVfsKey}"...`
+    // );
     return new Promise((resolve, reject) => {
       const handleFsInstanceChanged = (
         payload: VfsEventPayloads[typeof vfsEvent.fsInstanceChanged]

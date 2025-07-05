@@ -438,68 +438,75 @@ jobs:
 
 ### Docker Deployment
 
+LiteChat uses a minimal Docker setup based on [lipanski/docker-static-website](https://github.com/lipanski/docker-static-website) for optimal performance and size (~80KB base image).
+
 #### Dockerfile
 ```dockerfile
-# Multi-stage build
-FROM node:20-alpine AS builder
+# Minimal static website container
+FROM lipanski/docker-static-website:latest
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
+# Copy the built application files
+COPY build/ .
 
-COPY . .
-RUN npm run build
+# Create httpd.conf for SPA routing and any needed configuration
+COPY docker/httpd.conf .
 
-# Production stage
-FROM nginx:alpine
-
-# Copy build output
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Add health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# The base image already exposes port 3000 and runs the httpd server
+# No additional configuration needed
 ```
 
-#### Nginx Configuration
-```nginx
-# docker/nginx.conf
-server {
-    listen 80;
-    server_name localhost;
-    root /usr/share/nginx/html;
-    index index.html;
+#### BusyBox httpd Configuration
+```bash
+# docker/httpd.conf
+# BusyBox httpd configuration for SPA (Single Page Application)
+# This configuration ensures that all routes serve the index.html file
+# which is necessary for client-side routing in React/Vue applications
 
-    # Enable gzip compression
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+# Custom 404 page that serves index.html for SPA routing
+E404:index.html
 
-    # Handle client-side routing
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
+# Optional: Enable gzip compression by having .gz files alongside originals
+# For example, if you have index.html.gz, it will be served when index.html is requested
 
-    # Cache static assets
-    location /assets/ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
+# Optional: Security headers and access controls
+# Uncomment and modify as needed:
 
-    # Security headers
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-}
+# Allow all origins (CORS) - modify as needed for production
+# A:*
+
+# Basic auth example (uncomment and modify as needed):
+# /admin:admin:password123
+
+# Reverse proxy example for API calls (uncomment and modify as needed):
+# P:/api/:http://your-api-server:port/api/
 ```
 
-#### Docker Compose
+#### Build Script Integration
+
+The `bin/builder` script supports automated Docker image creation and publishing:
+
+```bash
+# Build and create Docker image (but don't push)
+bin/builder --release v1.0.0 --docker-repo myuser/litechat --no-publish
+
+# Build, create, and push Docker image to Docker Hub
+bin/builder --release v1.0.0 --docker-repo myuser/litechat
+
+# Build with custom configuration and Docker image
+VITE_USER_CONFIG_FILE=prod-config.json bin/builder --release v1.0.0 --docker-repo myuser/litechat
+```
+
+**Builder Docker Options:**
+- `--docker-repo <repo>`: Docker repository (e.g., `myuser/litechat`)
+- `--release <name>`: Release name used as Docker tag
+- `--no-publish`: Create images locally without pushing to registry
+
+**Docker Tags Created:**
+- `myuser/litechat:v1.0.0` (release-specific tag)
+- `myuser/litechat:latest` (always updated to latest release)
+
+#### Docker Compose with MCP Bridge
+
 ```yaml
 # docker-compose.yml
 version: '3.8'
@@ -508,19 +515,44 @@ services:
   litechat:
     build: .
     ports:
-      - "8080:80"
+      - "${LITECHAT_PORT:-8080}:3000"
+    restart: unless-stopped
     environment:
       - NODE_ENV=production
+    depends_on:
+      - mcp-bridge
+    
+  # Alternative: Use pre-built image from Docker Hub
+  # litechat-hub:
+  #   image: myuser/litechat:latest
+  #   ports:
+  #     - "${LITECHAT_PORT:-8080}:3000"
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - mcp-bridge
+
+  mcp-bridge:
+    image: node:20-alpine
+    working_dir: /app
+    command: ["node", "bin/mcp-bridge.js", "--host", "0.0.0.0"]
+    ports:
+      - "${MCP_BRIDGE_PORT:-3001}:${MCP_BRIDGE_INTERNAL_PORT:-3001}"
+    environment:
+      - MCP_BRIDGE_PORT=${MCP_BRIDGE_INTERNAL_PORT:-3001}
+      - MCP_BRIDGE_HOST=0.0.0.0
+      - MCP_BRIDGE_VERBOSE=${MCP_BRIDGE_VERBOSE:-false}
+    volumes:
+      - ./bin/mcp-bridge.js:/app/bin/mcp-bridge.js:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${MCP_BRIDGE_INTERNAL_PORT:-3001}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 10s
 
-  # Optional: Reverse proxy
-  nginx:
+  # Optional: Reverse proxy with SSL
+  nginx-proxy:
     image: nginx:alpine
     ports:
       - "80:80"
@@ -532,6 +564,71 @@ services:
       - litechat
     restart: unless-stopped
 ```
+
+#### Environment Configuration
+
+Create a `.env` file for easy configuration:
+
+```bash
+# .env
+LITECHAT_PORT=8080
+MCP_BRIDGE_PORT=3001
+MCP_BRIDGE_INTERNAL_PORT=3001
+MCP_BRIDGE_VERBOSE=false
+```
+
+#### Manual Docker Build
+
+```bash
+# Build your app first
+npm run build
+
+# Build Docker image
+docker build -t litechat .
+
+# Run container (serves on port 3000)
+docker run -d -p 8080:3000 litechat
+
+# Or with Docker Compose (includes MCP bridge)
+docker-compose up -d
+```
+
+#### Language-Specific Docker Images
+
+For multi-language builds, the builder script creates optimized images for each language:
+
+```bash
+# Build multi-language release with Docker images
+bin/builder --release v1.0.0 --docker-repo myuser/litechat
+
+# Manual language-specific build (example for French)
+cat > dockerfile.fr << EOF
+FROM lipanski/docker-static-website:latest
+COPY build/fr/ .
+COPY docker/httpd.conf .
+EOF
+
+docker build -f dockerfile.fr -t myuser/litechat:v1.0.0-fr .
+rm dockerfile.fr
+
+# Run language-specific container
+docker run -d -p 8080:3000 myuser/litechat:v1.0.0-fr
+```
+
+**Benefits of Language-Specific Images:**
+- **Smaller Size**: Only contains files for one language
+- **Faster Startup**: Reduced file system overhead
+- **Clean URLs**: No language prefixes needed in the container
+- **CDN Optimization**: Different images can be deployed to region-specific CDNs
+
+#### Docker Image Benefits
+
+- **Minimal Size**: ~80KB base image + your application files
+- **Fast Startup**: BusyBox httpd starts almost instantly
+- **SPA Support**: Proper client-side routing configuration
+- **Gzip Support**: Automatic compression if `.gz` files are provided
+- **Security**: Minimal attack surface with BusyBox
+- **Resource Efficient**: Very low memory and CPU usage
 
 ### Self-Hosted Options
 

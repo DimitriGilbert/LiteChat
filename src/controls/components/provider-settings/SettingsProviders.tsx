@@ -17,12 +17,14 @@ import { GlobalModelOrganizer } from "./GlobalModelOrganizer";
 import { ModelDataDisplay } from "./ModelDataDisplay";
 import { SettingsApiKeys } from "./ApiKeys";
 import { ModelBrowserList } from "./ModelBrowserList";
+import { useTranslation } from "react-i18next";
 // Removed ProviderSettingsModule import as it's not directly used for data here
 
 // ProviderConfigList remains largely the same, fetching its own data from the store
 const ProviderConfigList: React.FC<{
   onSelectModelForDetails: (id: string | null) => void;
 }> = ({ onSelectModelForDetails }) => {
+  const { t } = useTranslation('settings');
   const {
     addDbProviderConfig,
     updateDbProviderConfig,
@@ -66,12 +68,10 @@ const ProviderConfigList: React.FC<{
     <div className="space-y-6 h-full flex flex-col">
       <div>
         <h3 className="text-lg font-semibold text-card-foreground">
-          Provider Configuration
+          {t('providerSettings.title', 'Provider Configuration')}
         </h3>
         <p className="text-sm text-muted-foreground">
-          Add, remove, or configure connections to AI providers. Enable models
-          within each provider's edit section. Click a model name to view its
-          details.
+          {t('providerSettings.description', 'Add, remove, or configure connections to AI providers. Enable models within each provider\'s edit section. Click a model name to view its details.')}
         </p>
       </div>
       <div className="flex-shrink-0">
@@ -82,7 +82,7 @@ const ProviderConfigList: React.FC<{
             className="w-full"
             disabled={isLoading}
           >
-            <PlusIcon className="h-4 w-4 mr-1" /> Add Provider Configuration
+            <PlusIcon className="h-4 w-4 mr-1" /> {t('providerSettings.addProvider', 'Add Provider Configuration')}
           </Button>
         ) : (
           <AddProviderForm
@@ -118,8 +118,7 @@ const ProviderConfigList: React.FC<{
           )}
           {!isLoading && providersToDisplay.length === 0 && !isAdding && (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No providers configured yet. Click "Add Provider Configuration"
-              above.
+              {t('providerSettings.noProviders', 'No providers configured yet. Click "Add Provider Configuration" above.')}
             </p>
           )}
         </div>
@@ -136,6 +135,7 @@ interface SettingsProvidersProps {
 const SettingsProvidersComponent: React.FC<SettingsProvidersProps> = ({
   setGlobalModelSortOrderFromModule,
 }) => {
+  const { t } = useTranslation('settings');
   const { selectedModelForDetails, setSelectedModelForDetails } =
     useProviderStore(
       useShallow((state) => ({
@@ -160,7 +160,7 @@ const SettingsProvidersComponent: React.FC<SettingsProvidersProps> = ({
     () => [
       {
         value: "providers-config",
-        label: "Configuration",
+        label: t('providerSettings.tabs.config', 'Configuration'),
         content: (
           <ProviderConfigList
             onSelectModelForDetails={handleSelectModelAndSwitchTab}
@@ -169,7 +169,7 @@ const SettingsProvidersComponent: React.FC<SettingsProvidersProps> = ({
       },
       {
         value: "providers-order",
-        label: "Model Order",
+        label: t('providerSettings.tabs.order', 'Model Order'),
         content: (
           // GlobalModelOrganizer now fetches its own data from the store,
           // but receives the sort order update function from the module.
@@ -182,17 +182,17 @@ const SettingsProvidersComponent: React.FC<SettingsProvidersProps> = ({
       },
       {
         value: "api-keys",
-        label: "API Keys",
+        label: t('providerSettings.tabs.apiKeys', 'API Keys'),
         content: <SettingsApiKeys />,
       },
       {
         value: "providers-details-current",
-        label: "Selected Model",
+        label: t('providerSettings.tabs.selectedModel', 'Selected Model'),
         content: <ModelDataDisplay modelId={selectedModelForDetails} />,
       },
       {
         value: "providers-browse-all",
-        label: "Browse Models",
+        label: t('providerSettings.tabs.browse', 'Browse Models'),
         content: (
           <ModelBrowserList
             onSelectModelForDetails={handleSelectModelAndSwitchTab}
@@ -205,6 +205,7 @@ const SettingsProvidersComponent: React.FC<SettingsProvidersProps> = ({
       selectedModelForDetails,
       handleSelectModelAndSwitchTab,
       setGlobalModelSortOrderFromModule,
+      t,
     ]
   );
 

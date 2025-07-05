@@ -1,0 +1,174 @@
+{
+  "tabs": {
+    "general": "Général",
+    "assistant": "Assistant",
+    "providers": "Fournisseurs",
+    "rules": "Règles & Tags",
+    "data": "Données",
+    "git": "Git",
+    "mcp": "MCP"
+  },
+  "modelBrowser": {
+    "notApplicable": "N/A",
+    "perMillionTokens": "par 1M de jetons",
+    "filterPlaceholder": "Filtrer les modèles par nom ou fournisseur...",
+    "noModelsMatchFilters": "Aucun modèle ne correspond aux filtres actuels.",
+    "context": "Contexte",
+    "inputPrice": "Prix d'entrée",
+    "outputPrice": "Prix de sortie",
+    "releaseDate": "Date de sortie",
+    "capabilities": "Capacités",
+    "modalities": "Modalités",
+    "input": "Entrée",
+    "output": "Sortie",
+    "selectModel": "Sélectionnez un modèle dans la liste pour voir les détails",
+    "noModelSelected": "Aucun modèle sélectionné"
+  },
+  "providerSettings": {
+    "title": "Configuration des fournisseurs",
+    "description": "Ajoutez, supprimez ou configurez les connexions aux fournisseurs d'IA. Activez les modèles dans la section d'édition de chaque fournisseur. Cliquez sur le nom d'un modèle pour voir ses détails.",
+    "addProvider": "Ajouter une configuration de fournisseur",
+    "noProviders": "Aucun fournisseur configuré pour le moment. Cliquez sur \"Ajouter une configuration de fournisseur\" ci-dessus.",
+    "tabs": {
+      "config": "Configuration",
+      "order": "Ordre des modèles",
+      "apiKeys": "Clés API",
+      "selectedModel": "Modèle sélectionné",
+      "browse": "Parcourir les modèles"
+    }
+  },
+  "modelEnablement": {
+    "searchPlaceholder": "Filtrer les modèles par nom...",
+    "noModelsAvailable": "Aucun modèle disponible pour ce fournisseur. Essayez de récupérer les modèles.",
+    "noModelsMatchFilters": "Aucun modèle ne correspond aux filtres actuels.",
+    "initializingList": "Initialisation de la liste...",
+    "filter": {
+      "all": "Tous",
+      "enabled": "Activés",
+      "disabled": "Désactivés"
+    },
+    "sort": {
+      "name": "Nom",
+      "inputPrice": "Prix d'entrée",
+      "outputPrice": "Prix de sortie",
+      "contextLength": "Longueur du contexte",
+      "created": "Créé"
+    },
+    "capabilities": {
+      "reasoning": "Raisonnement",
+      "webSearch": "Recherche Web",
+      "tools": "Outils",
+      "multimodal": "Multimodal"
+    },
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "dataManagement": {
+    "title": "Gestion des Données",
+    "description": "Importez, exportez ou effacez les données de votre application. Utilisez l'import/export complet pour les sauvegardes ou les migrations.",
+    "importConversationsTitle": "Importer des Conversations (Ancien)",
+    "importConversationsDescription": "Importez des conversations à partir d'un fichier JSON précédemment exporté. Ceci n'importe que l'historique des chats.",
+    "importConversationsButton": "Importer depuis un Fichier",
+    "exportConversationsTitle": "Exporter Toutes les Conversations (Ancien)",
+    "exportConversationsDescription": "Exportez toutes vos conversations dans un seul fichier JSON. Ceci n'inclut que l'historique des chats.",
+    "exportConversationsButton": "Tout Exporter en JSON",
+    "fullExportTitle": "Exportation Complète",
+    "fullExportDescription": "Sélectionnez les données à inclure dans votre fichier de sauvegarde complet.",
+    "exportButton": "Exporter la Sauvegarde Complète",
+    "fullImportTitle": "Importation Complète",
+    "fullImportDescription": "Importez un fichier de sauvegarde complet. Cela écrasera les données existantes pour les catégories sélectionnées.",
+    "importButton": "Importer depuis une Sauvegarde",
+    "dangerZoneTitle": "Zone de Danger",
+    "dangerZoneDescription": "Ces actions sont destructrices et ne peuvent pas être annulées. Procédez avec prudence.",
+    "clearAllDataButton": "Effacer Toutes les Données Locales",
+    "importConfirmation": "L'importation de ce fichier ÉCRASERA les données existantes pour les catégories sélectionnées. Êtes-vous sûr de vouloir continuer ?",
+    "clearDataConfirmationTitle": "🚨 ÊTES-VOUS ABSOLUMENT SÛR ? 🚨",
+    "clearDataConfirmationMessage": "Cela supprimera de manière permanente TOUTES les conversations, messages, mods, paramètres, fournisseurs et clés API stockées de votre navigateur. Cette action est irréversible.",
+    "clearDataSecondConfirmation": "DEUXIÈME CONFIRMATION :\n\nVraiment tout supprimer ? Envisagez d'exporter d'abord.",
+    "dataClearedSuccess": "Toutes les données locales ont été effacées. Rechargement de l'application...",
+    "dataClearedError": "Échec de la suppression de toutes les données",
+    "options": {
+      "settings": "Paramètres",
+      "apiKeys": "Clés API",
+      "providerConfigs": "Configurations Fournisseur",
+      "projects": "Projets",
+      "conversations": "Conversations",
+      "rulesAndTags": "Règles & Tags",
+      "mods": "Mods",
+      "syncRepos": "Dépôts Git Sync",
+      "mcpServers": "Serveurs MCP",
+      "promptTemplates": "Modèles de Prompt",
+      "agents": "Agents",
+      "workflows": "Workflows"
+    }
+  },
+  "generalSettings": {
+    "title": "Paramètres Généraux",
+    "advancedSettings": "Paramètres Avancés",
+    "advancedVisible": "Les options de configuration avancées sont visibles. Désactivez pour masquer les paramètres complexes.",
+    "advancedHidden": "Mode de base - les options de configuration avancées sont masquées. Activez pour afficher tous les paramètres.",
+    "streamingDisplayTitle": "Streaming & Affichage",
+    "enableStreamingMarkdownLabel": "Analyser le Markdown pendant le Streaming",
+    "enableStreamingMarkdownDescription": "Affiche le formatage Markdown à mesure que la réponse arrive (peut affecter légèrement les performances).",
+    "enableStreamingCodeBlockParsingLabel": "Utiliser les Blocs de Code Complets pendant le Streaming",
+    "enableStreamingCodeBlockParsingDescription": "Utilise le composant de coloration syntaxique pour les blocs de code pendant le streaming.",
+    "foldStreamingCodeBlocksLabel": "Replier les Blocs de Code par Défaut pendant le Streaming",
+    "foldStreamingCodeBlocksDescription": "Réduit automatiquement les blocs de code à mesure qu'ils arrivent. Utile pour les longues sorties de code.",
+    "foldUserMessagesOnCompletionLabel": "Replier les Messages Utilisateur après la Réponse",
+    "foldUserMessagesOnCompletionDescription": "Réduit automatiquement le message de l'utilisateur une fois que l'assistant a fini de répondre.",
+    "enableAutoScrollOnStreamLabel": "Défilement Automatique pendant le Streaming",
+    "enableAutoScrollOnStreamDescription": "Fait défiler automatiquement vers le bas à mesure que du nouveau contenu arrive.",
+    "streamingUpdateRateLabel": "Taux de Mise à Jour du Streaming",
+    "streamingUpdateRateDescription": "Contrôle la fréquence de mise à jour de l'interface utilisateur pendant le streaming (3-60 FPS).",
+    "fpsInputLabel": "Entrée FPS",
+    "autoScrollIntervalLabel": "Intervalle de Défilement Automatique",
+    "autoScrollIntervalDescription": "Le délai entre les vérifications de défilement automatique pendant le streaming (50-5000 ms).",
+    "msInputLabel": "Entrée ms",
+    "resetButton": "Réinitialiser les Paramètres de Streaming & Affichage",
+    "resetConfirmation": "Êtes-vous sûr de vouloir réinitialiser les paramètres de Streaming & Affichage à leurs valeurs par défaut ?",
+    "validation": {
+      "minFps": "Min 3 FPS",
+      "maxFps": "Max 60 FPS",
+      "minMs": "Min 50ms",
+      "maxMs": "Max 5000ms"
+    },
+    "fpsSuffix": " FPS",
+    "msSuffix": " ms",
+    "streamingUpdateRateAriaLabel": "Valeur FPS du rendu en streaming",
+    "autoScrollIntervalAriaLabel": "Valeur de l'intervalle de défilement automatique",
+    "saving": "Enregistrement...",
+    "validating": "Validation...",
+    "saveChanges": "Enregistrer les modifications"
+  },
+  "modelSelector": {
+    "title": "Sélection du modèle",
+    "globalModel": "Modèle global",
+    "noModelSelected": "Aucun modèle sélectionné",
+    "selectModel": "Sélectionner un modèle"
+  },
+  "settingsModal": {
+    "title": "Paramètres",
+    "description": "Gérez les paramètres de l'application, le comportement de l'IA, les clés API, les fournisseurs et les données.",
+    "noTabs": {
+      "message": "Aucun onglet de paramètres disponible ou en cours de chargement. Vérifiez la console pour les erreurs d'enregistrement de module.",
+      "toast": "L'onglet de paramètres \"{{tabName}}\" n'a pas été trouvé. Ouverture de l'onglet par défaut."
+    },
+    "closeButton": "Fermer"
+  },
+  "assistantTabs": {
+    "systemPrompt": "Prompt Système",
+    "library": "Bibliothèque",
+    "agents": "Agents",
+    "autoTitles": "Titres Auto",
+    "tools": "Outils",
+    "mcp": "MCP",
+    "parameters": "Paramètres",
+    "forkCompact": "Fork Compact"
+  },
+  "assistantPrompts": {
+    "templates": "Modèles",
+    "newTemplate": "Nouveau modèle",
+    "editTemplate": "Modifier : {{name}}",
+    "deleteConfirmation": "Êtes-vous sûr de vouloir supprimer ce modèle ?"
+  }
+}

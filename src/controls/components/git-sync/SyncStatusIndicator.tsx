@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface SyncStatusIndicatorProps {
   className?: string;
@@ -28,6 +29,7 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
   showLabel = true,
   size = "md"
 }) => {
+  const { t } = useTranslation('git');
   const { 
     syncRepos, 
     conversations, 
@@ -83,59 +85,64 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
         status: 'none',
         variant: 'secondary' as const,
         icon: <GitBranchIcon className="h-4 w-4" />,
-        label: 'No Repos',
-        tooltipText: 'No Git repositories configured'
+        label: t('syncIndicator.labelNoRepos'),
+        tooltipText: t('syncIndicator.tooltipNoRepos')
       };
     }
 
     if (syncStatus.uninitializedRepos > 0 || syncStatus.initializingRepos > 0) {
+      const count = syncStatus.uninitializedRepos + syncStatus.initializingRepos;
       return {
         status: 'initializing',
         variant: 'secondary' as const,
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
-        label: 'Initializing',
-        tooltipText: `${syncStatus.uninitializedRepos + syncStatus.initializingRepos} repositories need initialization`
+        label: t('syncIndicator.labelInitializing'),
+        tooltipText: t('syncIndicator.tooltipInitializing', { count })
       };
     }
 
     if (syncStatus.errorConversations > 0) {
+      const count = syncStatus.errorConversations;
       return {
         status: 'error',
         variant: 'destructive' as const,
         icon: <AlertCircleIcon className="h-4 w-4" />,
-        label: 'Sync Errors',
-        tooltipText: `${syncStatus.errorConversations} conversations have sync errors`
+        label: t('syncIndicator.labelSyncErrors'),
+        tooltipText: t('syncIndicator.tooltipSyncErrors', { count })
       };
     }
 
     if (syncStatus.syncingConversations > 0) {
+      const count = syncStatus.syncingConversations;
       return {
         status: 'syncing',
         variant: 'default' as const,
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
-        label: 'Syncing',
-        tooltipText: `Syncing ${syncStatus.syncingConversations} conversations`
+        label: t('syncIndicator.labelSyncing'),
+        tooltipText: t('syncIndicator.tooltipSyncing', { count })
       };
     }
 
     if (syncStatus.pendingConversations > 0) {
+      const count = syncStatus.pendingConversations;
       return {
         status: 'pending',
         variant: 'outline' as const,
         icon: <ClockIcon className="h-4 w-4" />,
-        label: `${syncStatus.pendingConversations} Pending`,
-        tooltipText: `${syncStatus.pendingConversations} conversations need syncing`
+        label: t('syncIndicator.labelPending', { count }),
+        tooltipText: t('syncIndicator.tooltipPending', { count })
       };
     }
 
+    const count = syncStatus.totalConversations;
     return {
       status: 'synced',
       variant: 'default' as const,
       icon: <CheckCircle2Icon className="h-4 w-4 text-green-600" />,
-      label: 'All Synced',
-      tooltipText: `All ${syncStatus.totalConversations} conversations are synced`
+      label: t('syncIndicator.labelAllSynced'),
+      tooltipText: t('syncIndicator.tooltipAllSynced', { count })
     };
-  }, [syncStatus]);
+  }, [syncStatus, t]);
 
   const iconSize = size === 'sm' ? 'h-3 w-3' : size === 'lg' ? 'h-5 w-5' : 'h-4 w-4';
   const clonedIcon = React.cloneElement(icon, { 
@@ -172,8 +179,8 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
             <p>{tooltipText}</p>
             {syncStatus.totalRepos > 0 && (
               <div className="text-xs text-muted-foreground">
-                <div>{syncStatus.totalRepos} repositories configured</div>
-                <div>{syncStatus.totalConversations} conversations with sync</div>
+                <div>{t('syncIndicator.reposConfigured', { count: syncStatus.totalRepos })}</div>
+                <div>{t('syncIndicator.convosWithSync', { count: syncStatus.totalConversations })}</div>
               </div>
             )}
           </div>

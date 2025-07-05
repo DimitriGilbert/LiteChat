@@ -4,6 +4,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ActionDialog } from "@/components/LiteChat/common/ActionDialog";
+import { useTranslation } from "react-i18next";
 
 interface CommitDialogProps {
   isOpen: boolean;
@@ -24,18 +25,19 @@ export const CommitDialog: React.FC<CommitDialogProps> = ({
   isCommitting,
   onSubmitCommit,
 }) => {
+  const { t } = useTranslation('git');
+
   return (
     <ActionDialog
       isOpen={isOpen}
       onOpenChange={onOpenChange}
-      title="Commit Changes"
+      title={t('commitDialog.title')}
       description={
         <>
-          Enter a commit message for the changes in <code>{commitPath}</code>.
-          All current changes in this directory will be staged and committed.
+          {t('commitDialog.description', { commitPath })}
         </>
       }
-      submitLabel="Commit"
+      submitLabel={t('commitDialog.commitButton')}
       onSubmit={onSubmitCommit}
       isSubmitting={isCommitting}
       submitDisabled={!commitMessage.trim()}
@@ -44,14 +46,14 @@ export const CommitDialog: React.FC<CommitDialogProps> = ({
       <div className="grid gap-4">
         <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="commit-msg" className="text-right">
-            Message
+            {t('commitDialog.messageLabel')}
           </Label>
           <Input
             id="commit-msg"
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             className="col-span-3"
-            placeholder="e.g., Add feature X"
+            placeholder={t('commitDialog.messagePlaceholder')}
             disabled={isCommitting}
           />
         </div>

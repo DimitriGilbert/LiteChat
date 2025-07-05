@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useMcpStore, type McpServerConfig } from "@/store/mcp.store";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ function FieldMetaMessages({ field }: { field: AnyFieldApi }) {
 
 // Bridge Configuration Component
 function BridgeConfigurationTab() {
+  const { t } = useTranslation('assistantSettings');
   const { bridgeConfig, setBridgeConfig } = useMcpStore(
     useShallow((state) => ({
       bridgeConfig: state.bridgeConfig,
@@ -94,7 +96,7 @@ function BridgeConfigurationTab() {
   }, [bridgeConfig, form]);
 
   const handleReset = () => {
-    if (window.confirm("Reset bridge configuration to defaults?")) {
+    if (window.confirm(t('mcp.bridge.resetConfirm'))) {
       setBridgeConfig({});
     }
   };
@@ -109,10 +111,9 @@ function BridgeConfigurationTab() {
       className="space-y-6"
     >
       <div>
-        <h3 className="font-medium">Dynamic MCP Bridge Configuration</h3>
+        <h3 className="font-medium">{t('mcp.bridge.dynamicConfiguration')}</h3>
         <p className="text-sm text-muted-foreground">
-          Configure where LiteChat looks for the dynamic MCP bridge service (required for stdio:// servers). 
-          Start the bridge with: <code className="bg-muted px-1 rounded">npm run mcp-proxy</code>
+          {t('mcp.bridge.configDescription')}
         </p>
       </div>
 
@@ -120,10 +121,10 @@ function BridgeConfigurationTab() {
         <CardHeader>
           <CardTitle className="text-base flex items-center">
             <SettingsIcon className="mr-2 h-4 w-4" />
-            Bridge Location
+            {t('mcp.bridge.location')}
           </CardTitle>
           <CardDescription>
-            Specify where your dynamic MCP bridge is running (default: localhost:3001)
+            {t('mcp.bridge.locationDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -131,7 +132,7 @@ function BridgeConfigurationTab() {
             <form.Field name="url">
               {(field) => (
                 <div className="space-y-2">
-                  <Label htmlFor={field.name}>Full Bridge URL (highest priority)</Label>
+                  <Label htmlFor={field.name}>{t('mcp.bridge.fullUrl')}</Label>
                   <Input
                     id={field.name}
                     value={field.state.value}
@@ -140,7 +141,7 @@ function BridgeConfigurationTab() {
                     placeholder="http://192.168.1.100:3001"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Complete URL where the dynamic MCP bridge is running
+                    {t('mcp.bridge.fullUrlDescription')}
                   </p>
                   <FieldMetaMessages field={field} />
                 </div>
@@ -148,7 +149,7 @@ function BridgeConfigurationTab() {
             </form.Field>
             
             <div className="space-y-2">
-              <Label>Or configure Host + Port</Label>
+              <Label>{t('mcp.bridge.hostPort')}</Label>
               <div className="flex gap-2">
                 <form.Field name="host">
                   {(field) => (
@@ -179,20 +180,20 @@ function BridgeConfigurationTab() {
                 </form.Field>
               </div>
               <p className="text-xs text-muted-foreground">
-                Host and port (uses HTTP by default)
+                {t('mcp.bridge.hostPortDescription')}
               </p>
             </div>
           </div>
           
           <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-            <p className="font-medium mb-1">Bridge Detection Priority:</p>
+            <p className="font-medium mb-1">{t('mcp.bridge.detectionPriority')}</p>
             <ol className="list-decimal list-inside space-y-1 text-xs">
-              <li>Full URL (if specified above)</li>
-              <li>Host + Port combination (if specified above)</li>
-              <li>Auto-detection fallback: localhost:3001</li>
+              <li>{t('mcp.bridge.priority1')}</li>
+              <li>{t('mcp.bridge.priority2')}</li>
+              <li>{t('mcp.bridge.priority3')}</li>
             </ol>
             <p className="mt-2 text-xs">
-              Leave empty for auto-detection. For remote bridge, use full URL or configure host binding.
+              {t('mcp.bridge.priorityNote')}
             </p>
           </div>
         </CardContent>
@@ -200,16 +201,16 @@ function BridgeConfigurationTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Bridge Setup Instructions</CardTitle>
+          <CardTitle className="text-base">{t('mcp.bridge.setupInstructions')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="text-sm space-y-2">
-            <p className="font-medium">To use stdio MCP servers, install and run the bridge:</p>
+            <p className="font-medium">{t('mcp.bridge.instructionsText')}</p>
             <div className="bg-muted p-3 rounded font-mono text-xs">
-              <p># Start the bridge (from LiteChat project directory)</p>
+              <p># {t('mcp.bridge.startBridge')}</p>
               <p>node bin/mcp-bridge.js</p>
               <p></p>
-              <p># Or with custom settings</p>
+              <p># {t('mcp.bridge.customSettings')}</p>
               <p>node bin/mcp-bridge.js --host 0.0.0.0 --port 3001</p>
             </div>
           </div>
@@ -226,10 +227,10 @@ function BridgeConfigurationTab() {
                 disabled={!state.canSubmit || state.isSubmitting || state.isValidating || !state.isValid}
               >
                 {state.isSubmitting
-                  ? "Saving..."
+                  ? t('common.saving')
                   : state.isValidating
-                  ? "Validating..."
-                  : "Save Bridge Config"}
+                  ? t('common.validating')
+                  : t('mcp.bridge.saveConfig')}
               </Button>
               <Button
                 variant="outline"
@@ -238,7 +239,7 @@ function BridgeConfigurationTab() {
                 type="button"
               >
                 <RotateCcwIcon className="mr-2 h-4 w-4" />
-                Reset
+                {t('common.reset')}
               </Button>
             </div>
           )}
@@ -250,6 +251,7 @@ function BridgeConfigurationTab() {
 
 // Connection Settings Component
 function ConnectionSettingsTab() {
+  const { t } = useTranslation('assistantSettings');
   const {
     retryAttempts,
     retryDelay,
@@ -302,7 +304,7 @@ function ConnectionSettingsTab() {
   }, [retryAttempts, retryDelay, connectionTimeout, maxResponseSize, form]);
 
   const handleReset = () => {
-    if (window.confirm("Reset connection settings to defaults?")) {
+    if (window.confirm(t('mcp.connection.resetConfirm'))) {
       setRetryAttempts(3);
       setRetryDelay(2000);
       setConnectionTimeout(10000);
@@ -320,17 +322,17 @@ function ConnectionSettingsTab() {
       className="space-y-6"
     >
       <div>
-        <h3 className="font-medium">Connection Settings</h3>
+        <h3 className="font-medium">{t('mcp.connection.title')}</h3>
         <p className="text-sm text-muted-foreground">
-          Configure retry behavior and timeouts for MCP server connections
+          {t('mcp.connection.description')}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Retry Configuration</CardTitle>
+          <CardTitle className="text-base">{t('mcp.connection.retryConfiguration')}</CardTitle>
           <CardDescription>
-            How LiteChat handles failed connections
+            {t('mcp.connection.retryDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -338,7 +340,7 @@ function ConnectionSettingsTab() {
             <form.Field name="retryAttempts">
               {(field) => (
                 <div className="space-y-2">
-                  <Label htmlFor={field.name}>Retry Attempts</Label>
+                  <Label htmlFor={field.name}>{t('mcp.connection.retryAttempts')}</Label>
                   <Input
                     id={field.name}
                     type="number"
@@ -351,7 +353,7 @@ function ConnectionSettingsTab() {
                   />
                   <FieldMetaMessages field={field} />
                   <p className="text-xs text-muted-foreground">
-                    Number of retry attempts (0-10)
+                    {t('mcp.connection.retryAttemptsHelp')}
                   </p>
                 </div>
               )}
@@ -360,7 +362,7 @@ function ConnectionSettingsTab() {
             <form.Field name="retryDelay">
               {(field) => (
                 <div className="space-y-2">
-                  <Label htmlFor={field.name}>Retry Delay (ms)</Label>
+                  <Label htmlFor={field.name}>{t('mcp.connection.retryDelay')}</Label>
                   <Input
                     id={field.name}
                     type="number"
@@ -374,7 +376,7 @@ function ConnectionSettingsTab() {
                   />
                   <FieldMetaMessages field={field} />
                   <p className="text-xs text-muted-foreground">
-                    Initial delay between retries (500-30000ms)
+                    {t('mcp.connection.retryDelayHelp')}
                   </p>
                 </div>
               )}
@@ -383,7 +385,7 @@ function ConnectionSettingsTab() {
             <form.Field name="connectionTimeout">
               {(field) => (
                 <div className="space-y-2">
-                  <Label htmlFor={field.name}>Connection Timeout (ms)</Label>
+                  <Label htmlFor={field.name}>{t('mcp.connection.timeout')}</Label>
                   <Input
                     id={field.name}
                     type="number"
@@ -397,7 +399,7 @@ function ConnectionSettingsTab() {
                   />
                   <FieldMetaMessages field={field} />
                   <p className="text-xs text-muted-foreground">
-                    Connection timeout (1000-60000ms)
+                    {t('mcp.connection.timeoutHelp')}
                   </p>
                 </div>
               )}
@@ -406,7 +408,7 @@ function ConnectionSettingsTab() {
             <form.Field name="maxResponseSize">
               {(field) => (
                 <div className="space-y-2">
-                  <Label htmlFor={field.name}>Max Response Size (bytes)</Label>
+                  <Label htmlFor={field.name}>{t('mcp.connection.maxResponseSize')}</Label>
                   <Input
                     id={field.name}
                     type="number"
@@ -420,7 +422,7 @@ function ConnectionSettingsTab() {
                   />
                   <FieldMetaMessages field={field} />
                   <p className="text-xs text-muted-foreground">
-                    Max tool response size (1KB-10MB)
+                    {t('mcp.connection.maxResponseSizeHelp')}
                   </p>
                 </div>
               )}
@@ -456,10 +458,10 @@ function ConnectionSettingsTab() {
                 disabled={!state.canSubmit || state.isSubmitting || state.isValidating || !state.isValid}
               >
                 {state.isSubmitting
-                  ? "Saving..."
+                  ? t('common.saving')
                   : state.isValidating
-                  ? "Validating..."
-                  : "Save Connection Settings"}
+                  ? t('common.validating')
+                  : t('mcp.connection.saveSettings')}
               </Button>
               <Button
                 variant="outline"
@@ -468,7 +470,7 @@ function ConnectionSettingsTab() {
                 type="button"
               >
                 <RotateCcwIcon className="mr-2 h-4 w-4" />
-                Reset
+                {t('common.reset')}
               </Button>
             </div>
           )}
@@ -488,6 +490,7 @@ function ServerForm({
   onSubmit: (data: McpServerFormData) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation('assistantSettings');
   const form = useForm({
     defaultValues: {
       name: server?.name || "",
@@ -526,12 +529,12 @@ function ServerForm({
     >
       <div>
         <h3 className="text-lg font-medium">
-          {server ? "Edit MCP Server" : "Add New MCP Server"}
+          {server ? t('mcp.server.editTitle') : t('mcp.server.addTitle')}
         </h3>
         <p className="text-sm text-muted-foreground">
           {server
-            ? "Modify the server configuration below."
-            : "Configure a new MCP server to connect to."}
+            ? t('mcp.server.editDescription')
+            : t('mcp.server.addDescription')}
         </p>
       </div>
 
@@ -539,20 +542,20 @@ function ServerForm({
         <CardHeader>
           <CardTitle className="text-base flex items-center">
             <ServerIcon className="mr-2 h-4 w-4" />
-            Server Details
+            {t('mcp.server.details')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <form.Field name="name">
             {(field) => (
               <div className="space-y-2">
-                <Label htmlFor={field.name}>Server Name</Label>
+                <Label htmlFor={field.name}>{t('mcp.server.nameLabel')}</Label>
                 <Input
                   id={field.name}
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  placeholder="My MCP Server"
+                  placeholder={t('mcp.server.namePlaceholder')}
                 />
                 <FieldMetaMessages field={field} />
               </div>
@@ -562,17 +565,17 @@ function ServerForm({
           <form.Field name="url">
             {(field) => (
               <div className="space-y-2">
-                <Label htmlFor={field.name}>Server URL</Label>
+                <Label htmlFor={field.name}>{t('mcp.server.urlLabel')}</Label>
                 <Input
                   id={field.name}
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  placeholder="https://api.example.com/mcp or stdio://npx?args=-y,@modelcontextprotocol/server-filesystem,."
+                  placeholder={t('mcp.server.urlPlaceholder')}
                 />
                 <FieldMetaMessages field={field} />
                 <p className="text-xs text-muted-foreground">
-                  HTTP/HTTPS URLs for remote servers, or stdio://command?args=arg1,arg2 for dynamic bridge servers
+                  {t('mcp.server.urlHelp')}
                 </p>
               </div>
             )}
@@ -581,13 +584,13 @@ function ServerForm({
           <form.Field name="description">
             {(field) => (
               <div className="space-y-2">
-                <Label htmlFor={field.name}>Description (Optional)</Label>
+                <Label htmlFor={field.name}>{t('mcp.server.descriptionLabel')}</Label>
                 <Textarea
                   id={field.name}
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  placeholder="Brief description of this server's purpose"
+                  placeholder={t('mcp.server.descriptionPlaceholder')}
                   rows={2}
                 />
                 <FieldMetaMessages field={field} />
@@ -598,18 +601,18 @@ function ServerForm({
           <form.Field name="headers">
             {(field) => (
               <div className="space-y-2">
-                <Label htmlFor={field.name}>Authentication Headers (Optional)</Label>
+                <Label htmlFor={field.name}>{t('mcp.server.headersLabel')}</Label>
                 <Textarea
                   id={field.name}
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
-                  placeholder='{"Authorization": "Bearer your-token-here"}'
+                  placeholder={t('mcp.server.headersPlaceholder')}
                   rows={3}
                 />
                 <FieldMetaMessages field={field} />
                 <p className="text-xs text-muted-foreground">
-                  JSON object with authentication headers (not applicable for stdio servers)
+                  {t('mcp.server.headersHelp')}
                 </p>
               </div>
             )}
@@ -623,7 +626,7 @@ function ServerForm({
                   checked={field.state.value}
                   onCheckedChange={field.handleChange}
                 />
-                <Label htmlFor={field.name}>Enable this server</Label>
+                <Label htmlFor={field.name}>{t('mcp.server.enableLabel')}</Label>
               </div>
             )}
           </form.Field>
@@ -638,13 +641,13 @@ function ServerForm({
                 disabled={!canSubmit || isSubmitting}
               >
                 {isSubmitting
-                  ? (server ? "Updating..." : "Adding...")
-                  : (server ? "Update Server" : "Add Server")}
+                  ? (server ? t('mcp.server.updating') : t('mcp.server.adding'))
+                  : (server ? t('mcp.server.updateButton') : t('mcp.server.addButton'))}
               </Button>
             )}
           </form.Subscribe>
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         </CardFooter>
       </Card>
@@ -660,6 +663,7 @@ function ServersTab({
   onNewServer: () => void;
   onEditServer: (server: McpServerConfig) => void;
 }) {
+  const { t } = useTranslation('assistantSettings');
   const { servers, deleteServer, updateServer } = useMcpStore(
     useShallow((state) => ({
       servers: state.servers,
@@ -669,7 +673,7 @@ function ServersTab({
   );
 
   const handleDelete = (serverId: string) => {
-    if (window.confirm("Are you sure you want to delete this MCP server?")) {
+    if (window.confirm(t('mcp.server.deleteConfirm'))) {
       deleteServer(serverId);
     }
   };
@@ -682,38 +686,38 @@ function ServersTab({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-medium">MCP Servers</h3>
+          <h3 className="font-medium">{t('mcp.servers.title')}</h3>
           <p className="text-sm text-muted-foreground">
-            Manage your Model Context Protocol servers
+            {t('mcp.servers.description')}
           </p>
         </div>
         <Button onClick={onNewServer}>
           <PlusIcon className="mr-2 h-4 w-4" />
-          Add Server
+          {t('mcp.servers.addButton')}
         </Button>
       </div>
 
       {servers.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed rounded-lg">
           <ServerIcon className="h-12 w-12 text-muted-foreground mb-4 mx-auto" />
-          <h4 className="font-medium text-muted-foreground">No MCP Servers</h4>
+          <h4 className="font-medium text-muted-foreground">{t('mcp.servers.noServers')}</h4>
           <p className="text-sm text-muted-foreground mt-1 mb-4">
-            Add HTTP-based MCP servers to extend LiteChat with additional tools and capabilities
+            {t('mcp.servers.noServersDescription')}
           </p>
           <Button onClick={onNewServer}>
             <PlusIcon className="mr-2 h-4 w-4" />
-            Add Your First Server
+            {t('mcp.servers.addFirstButton')}
           </Button>
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>URL</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t('mcp.servers.nameColumn')}</TableHead>
+              <TableHead>{t('mcp.servers.urlColumn')}</TableHead>
+              <TableHead>{t('mcp.servers.statusColumn')}</TableHead>
+              <TableHead>{t('mcp.servers.descriptionColumn')}</TableHead>
+              <TableHead className="text-right">{t('mcp.servers.actionsColumn')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -728,12 +732,12 @@ function ServersTab({
                     {server.enabled ? (
                       <>
                         <CheckCircleIcon className="mr-1 h-3 w-3" />
-                        Enabled
+                        {t('mcp.servers.enabled')}
                       </>
                     ) : (
                       <>
                         <XCircleIcon className="mr-1 h-3 w-3" />
-                        Disabled
+                        {t('mcp.servers.disabled')}
                       </>
                     )}
                   </Badge>
@@ -774,6 +778,7 @@ function ServersTab({
 }
 
 export const SettingsAssistantMcp: React.FC = () => {
+  const { t } = useTranslation('assistantSettings');
   const [activeTab, setActiveTab] = useState("servers");
   const [editingServer, setEditingServer] = useState<McpServerConfig | undefined>();
 
@@ -797,7 +802,7 @@ export const SettingsAssistantMcp: React.FC = () => {
       setActiveTab("servers");
     } catch (error) {
       console.error("Invalid headers JSON:", error);
-      toast.error("Invalid JSON in headers field");
+      toast.error(t('mcp.server.invalidHeaders'));
     }
   };
 
@@ -816,7 +821,7 @@ export const SettingsAssistantMcp: React.FC = () => {
       setEditingServer(undefined);
     } catch (error) {
       console.error("Invalid headers JSON:", error);
-      toast.error("Invalid JSON in headers field");
+      toast.error(t('mcp.server.invalidHeaders'));
     }
   };
 
@@ -838,7 +843,7 @@ export const SettingsAssistantMcp: React.FC = () => {
   const tabs: TabDefinition[] = [
     {
       value: "servers",
-      label: "Servers",
+      label: t('mcp.tabs.servers'),
       content: (
         <ServersTab
           onNewServer={handleNewServer}
@@ -848,17 +853,17 @@ export const SettingsAssistantMcp: React.FC = () => {
     },
     {
       value: "bridge",
-      label: "Bridge Config",
+      label: t('mcp.tabs.bridge'),
       content: <BridgeConfigurationTab />,
     },
     {
       value: "connection",
-      label: "Connection",
+      label: t('mcp.tabs.connection'),
       content: <ConnectionSettingsTab />,
     },
     {
       value: "new",
-      label: "Add Server",
+      label: t('mcp.tabs.addServer'),
       content: (
         <ServerForm
           key="new-server-form"
@@ -873,7 +878,7 @@ export const SettingsAssistantMcp: React.FC = () => {
   if (editingServer) {
     tabs.push({
       value: "edit",
-      label: `Edit: ${editingServer.name}`,
+      label: t('mcp.tabs.editServer', { name: editingServer.name }),
       content: (
         <ServerForm
           key={`edit-server-form-${editingServer.id}`}
@@ -891,7 +896,6 @@ export const SettingsAssistantMcp: React.FC = () => {
       initialValue={activeTab}
       onValueChange={setActiveTab}
       defaultValue="servers"
-      contentContainerClassName="pb-2 sm:pb-6 pr-1 sm:pr-2 -mr-1 sm:-mr-2"
       scrollable={false}
     />
   );

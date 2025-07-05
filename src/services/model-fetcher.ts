@@ -25,6 +25,21 @@ const mapToOpenRouterModel = (
   const modelId = fetchedData.id || fetchedData.name;
   const modelName = fetchedData.name || modelId;
 
+  // Extract homepage URL from various possible fields
+  let homepageUrl: string | null = null;
+  if (fetchedData.homepage) {
+    homepageUrl = fetchedData.homepage;
+  } else if (fetchedData.id && fetchedData.id.includes("huggingface:")) {
+    // Extract HuggingFace model URL from ID like "huggingface:user/repo"
+    const hfMatch = fetchedData.id.match(/huggingface:(.+)/);
+    if (hfMatch) {
+      homepageUrl = `https://huggingface.co/${hfMatch[1]}`;
+    }
+  } else if (fetchedData.source && typeof fetchedData.source === "string") {
+    // Some APIs might provide source URL
+    homepageUrl = fetchedData.source;
+  }
+
   // Basic structure
   const model: OpenRouterModel = {
     id: modelId,
@@ -63,6 +78,7 @@ const mapToOpenRouterModel = (
       fetchedData.supported_parameters ??
       DEFAULT_SUPPORTED_PARAMS[providerType] ??
       [],
+    homepageUrl: homepageUrl,
   };
 
   // Specific overrides or defaults based on provider type if needed

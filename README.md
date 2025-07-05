@@ -134,21 +134,96 @@ npm run build
 
 ### Docker
 
-A sample `docker/nginx.conf` is provided. You can use the following `Dockerfile` (ensure paths are correct for your build output, typically `dist`):
+LiteChat uses a minimal Docker setup based on [lipanski/docker-static-website](https://github.com/lipanski/docker-static-website) (~80KB image) with BusyBox httpd for optimal performance and size.
 
-```dockerfile
-FROM nginx:alpine
-COPY ./dist /usr/share/nginx/html  # Assuming your build output is in 'dist'
-COPY ./docker/nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-```
-
-Build and run:
+#### Manual Docker Build
 
 ```bash
+# Build your app first
+npm run build
+
+# Build Docker image
 docker build -t litechat .
-docker run -d -p 8080:80 litechat
+
+# Run container (serves on port 3000)
+docker run -d -p 8080:3000 litechat
+
+# Or use Docker Compose (includes MCP bridge service)
+docker-compose up -d
 ```
+
+#### Docker Compose with MCP Bridge
+
+The included `docker-compose.yml` provides a complete setup with MCP bridge:
+
+```yaml
+# Environment variables (create .env file)
+LITECHAT_PORT=8080
+MCP_BRIDGE_PORT=3001
+MCP_BRIDGE_VERBOSE=false
+
+# Start services
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f litechat
+docker-compose logs -f mcp-bridge
+```
+
+**Services included:**
+- **litechat**: Main application (port configurable via `LITECHAT_PORT`)
+- **mcp-bridge**: MCP bridge service (port configurable via `MCP_BRIDGE_PORT`)
+
+**Environment Variables:**
+- `LITECHAT_PORT`: External port for LiteChat (default: 8080)
+- `MCP_BRIDGE_PORT`: External port for MCP bridge (default: 3001)
+- `MCP_BRIDGE_INTERNAL_PORT`: Internal container port (default: 3001)
+- `MCP_BRIDGE_VERBOSE`: Enable verbose logging (default: false)
+
+#### Automated Build with Builder Script
+
+The builder script supports automatic Docker image creation and publishing:
+
+```bash
+# Build and create Docker image (but don't push)
+bin/builder --release v1.0.0 --docker-repo myuser/litechat --no-publish
+
+# Build, create, and push Docker image to Docker Hub
+bin/builder --release v1.0.0 --docker-repo myuser/litechat
+
+# Build multiple language versions with Docker (creates language-specific images)
+bin/builder --release v1.0.0 --docker-repo myuser/litechat
+```
+
+**Builder Options:**
+- `--docker-repo <repo>`: Docker repository (e.g., `myuser/litechat`)
+- `--release <name>`: Release name used as Docker tag
+- `--no-publish`: Create images locally without pushing to registry
+
+**Docker Tags Created:**
+
+*Single Language Build:*
+- `myuser/litechat:v1.0.0` (release-specific tag)
+- `myuser/litechat:latest` (always updated to latest release)
+
+*Multi-Language Build:*
+- `myuser/litechat:v1.0.0` (default language: en)
+- `myuser/litechat:latest` (always points to default)
+- `myuser/litechat:v1.0.0-fr` (French version)
+- `myuser/litechat:v1.0.0-de` (German version)
+- `myuser/litechat:v1.0.0-es` (Spanish version)
+- etc. (one for each detected language)
+
+#### Docker Configuration
+
+The image uses BusyBox httpd with SPA (Single Page Application) routing configured in `docker/httpd.conf`. The configuration:
+- Serves all routes through `index.html` for client-side routing
+- Supports gzip compression (if `.gz` files are provided)
+- Runs on port 3000 by default
+- Minimal footprint (~80KB base image)
 
 ### CORS
 

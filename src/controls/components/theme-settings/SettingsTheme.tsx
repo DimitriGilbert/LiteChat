@@ -15,6 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Separator } from "@/components/ui/separator";
 import { SettingsSection } from "@/components/LiteChat/common/SettingsSection";
 import type { CustomThemeColors } from "@/store/settings.store";
+import { THEME_OPTIONS, type Theme } from "@/types/litechat/common";
 
 const ColorInput: React.FC<{
   label: string;
@@ -216,14 +217,7 @@ const PRISM_THEMES = [
   },
 ];
 
-const themeEnum = z.enum([
-  "system",
-  "light",
-  "dark",
-  "TijuLight",
-  "TijuDark",
-  "custom",
-]);
+const themeEnum = z.enum(THEME_OPTIONS as [Theme, ...Theme[]]);
 const themeSettingsSchema = z.object({
   theme: themeEnum,
   prismThemeUrl: z.string(),
@@ -253,6 +247,7 @@ const SettingsThemeComponent: React.FC = () => {
       customFontSize: state.customFontSize,
       chatMaxWidth: state.chatMaxWidth,
       _rawCustomThemeColors: state.customThemeColors,
+      enableAdvancedSettings: state.enableAdvancedSettings,
     }))
   );
 
@@ -286,8 +281,6 @@ const SettingsThemeComponent: React.FC = () => {
       onChangeAsyncDebounceMs: 300,
     },
   });
-
-
 
   useEffect(() => {
     form.reset({
@@ -385,14 +378,18 @@ const SettingsThemeComponent: React.FC = () => {
             form={form}
             name="theme"
             label="Theme"
-            options={[
-              { value: "light", label: "Default Light" },
-              { value: "dark", label: "Default Dark" },
-              { value: "system", label: "System" },
-              { value: "TijuLight", label: "Tiju Light" },
-              { value: "TijuDark", label: "Tiju Dark" },
-              { value: "custom", label: "User Custom" },
-            ]}
+            options={THEME_OPTIONS.map((theme) => {
+              switch (theme) {
+                case "TijuLight":
+                  return { value: "TijuLight", label: "Tiju Light" };
+                case "TijuDark":
+                  return { value: "TijuDark", label: "Tiju Dark" };
+                case "custom":
+                  return { value: "custom", label: "User Custom" };
+                default:
+                  return { value: theme, label: theme };
+              }
+            })}
             triggerClassName="w-[180px]"
           />
         </div>
@@ -447,31 +444,33 @@ const SettingsThemeComponent: React.FC = () => {
       </SettingsSection>
 
       {/* Code Block Theme */}
-      <SettingsSection
-        title="Code Block Theme"
-        description="Customize syntax highlighting appearance."
-        contentClassName="rounded-lg border p-3 shadow-sm bg-card space-y-3"
-      >
-        <SelectField
-          form={form}
-          name="prismThemeUrl"
-          label="Code Block Theme"
-          options={PRISM_THEMES}
-          triggerClassName="w-full"
-        />
-        <TextField
-          form={form}
-          name="prismThemeUrl"
-          label="Or paste custom theme URL here..."
-          placeholder="Or paste custom theme URL here..."
-          type="url"
-          className="mt-1"
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Select a preset theme or paste a URL to a PrismJS CSS file. Leave
-          blank or select 'Default' to use themes matching light/dark mode.
-        </p>
-      </SettingsSection>
+      {storeValues.enableAdvancedSettings && (
+        <SettingsSection
+          title="Code Block Theme"
+          description="Customize syntax highlighting appearance."
+          contentClassName="rounded-lg border p-3 shadow-sm bg-card space-y-3"
+        >
+          <SelectField
+            form={form}
+            name="prismThemeUrl"
+            label="Code Block Theme"
+            options={PRISM_THEMES}
+            triggerClassName="w-full"
+          />
+          <TextField
+            form={form}
+            name="prismThemeUrl"
+            label="Or paste custom theme URL here..."
+            placeholder="Or paste custom theme URL here..."
+            type="url"
+            className="mt-1"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Select a preset theme or paste a URL to a PrismJS CSS file. Leave
+            blank or select 'Default' to use themes matching light/dark mode.
+          </p>
+        </SettingsSection>
+      )}
 
       {/* Custom Theme Colors, only display if selected theme is custom */}
       {form.getFieldValue("theme") === "custom" && (

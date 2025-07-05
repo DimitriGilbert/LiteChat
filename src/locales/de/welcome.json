@@ -1,0 +1,74 @@
+{
+  "configureTheme": {
+    "title": "Theme konfigurieren",
+    "description": "Farben, Schriftarten und das Aussehen von Codeblöcken anpassen."
+  },
+  "manageRules": {
+    "title": "Regeln & Tags verwalten",
+    "description": "Wiederverwendbare Prompt-Snippets definieren und organisieren."
+  },
+  "addFiles": {
+    "title": "Dateien hinzufügen",
+    "description": "Dateien im virtuellen Dateisystem hochladen oder verwalten."
+  },
+  "addProvider": {
+    "title": "Anbieter hinzufügen",
+    "description": "Mit KI-Diensten wie OpenAI, Ollama usw. verbinden."
+  },
+  "addApiKey": {
+    "title": "API-Schlüssel hinzufügen",
+    "description": "API-Schlüssel sicher in Ihrem Browser speichern."
+  },
+  "setupGitSync": {
+    "title": "Git-Synchronisation einrichten",
+    "description": "Repositories konfigurieren, um Konversationen mit Git zu synchronisieren."
+  },
+  "startChatting": {
+    "title": "Chatten starten",
+    "description": "Wählen Sie eine bestehende Konversation oder ein Projekt aus der Seitenleiste aus oder klicken Sie auf die Schaltfläche '+', um einen neuen Chat zu starten. Sie können auch diese Einrichtungsoptionen erkunden:"
+  },
+  "clickToExpand": "Zum Erweitern klicken",
+  "loadingTitle": "Ihre Einrichtung wird geladen...",
+  "loadingDescription": "Alles wird für Sie vorbereitet. Dies sollte nur einen Moment dauern.",
+  "progressTitle": "Konfigurationsfortschritt",
+  "progressDescription": "Schließen Sie diese Schritte ab, um die volle Leistungsfähigkeit von LiteChat freizuschalten.",
+  "stepsComplete": "Schritte abgeschlossen",
+  "complete": "vollständig",
+  "orSkipSetup": "Oder Einrichtung überspringen und erkunden",
+  "newConversationName": "Neue Konversation",
+  "toasts": {
+    "providerAddedSuccess": "Anbieter '{{name}}' erfolgreich hinzugefügt!",
+    "providerAddedError": "Fehler beim Hinzufügen des Anbieters.",
+    "modelsUpdatedSuccess": "Modelle für '{{name}}' aktualisiert.",
+    "modelsUpdatedError": "Fehler beim Aktualisieren der Modelle.",
+    "startChatError": "Fehler beim Starten eines neuen Chats."
+  },
+  "steps": {
+    "apiKey": {
+      "title": "Einen API-Schlüssel hinzufügen",
+      "description": "Um sich mit Diensten wie OpenAI zu verbinden, benötigen Sie einen API-Schlüssel. Ihre Schlüssel werden sicher im lokalen Speicher Ihres Browsers gespeichert und verlassen niemals Ihr Gerät.",
+      "submitButton": "API-Schlüssel speichern"
+    },
+    "provider": {
+      "title": "Einen Anbieter konfigurieren",
+      "description": {
+        "part1": "Ein Anbieter ist ein KI-Dienst (wie OpenAI, Google, Ollama usw.). Sie können hier einen neuen hinzufügen oder bestehende Anbieter in ",
+        "link": "Einstellungen.",
+        "part2": " verwalten"
+      },
+      "alreadyConfigured": "Sie haben bereits einen Anbieter konfiguriert! Sie können weitere hinzufügen oder bestehende über die Einstellungen verwalten.",
+      "manageButton": "Anbieter verwalten"
+    },
+    "enableModels": {
+      "title": "Modelle aktivieren",
+      "description": "Wählen Sie aus, welche Modelle Sie von Ihrem konfigurierten Anbieter verwenden möchten. Nur aktivierte Modelle werden in der Modellauswahl angezeigt.",
+      "noProvider": "Bitte fügen Sie zuerst einen Anbieter hinzu und konfigurieren Sie ihn, um verfügbare Modelle anzuzeigen."
+    }
+  },
+  "allStepsComplete": {
+    "title": "Einrichtung abgeschlossen!",
+    "description": "Sie sind komplett eingerichtet und bereit. Starten Sie jetzt Ihre erste Konversation.",
+    "startButton": "Ersten Chat starten",
+    "startingButton": "Startet..."
+  }
+} 

@@ -8,6 +8,7 @@ import React, {
   useCallback,
   memo,
 } from "react";
+import { useTranslation } from "react-i18next";
 import Prism from "prismjs";
 import "prismjs/components/prism-typescript";
 import "prismjs/components/prism-python";
@@ -44,6 +45,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   interactionId,
   blockId,
 }) => {
+  const { t } = useTranslation('renderers');
   const { foldStreamingCodeBlocks } = useSettingsStore(
     useShallow((state) => ({
       foldStreamingCodeBlocks: state.foldStreamingCodeBlocks,
@@ -169,7 +171,7 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
       <div className="code-block-header sticky top-0 z-[var(--z-sticky)] flex items-center justify-between px-3 py-2 border border-b-0 border-border bg-muted/50 rounded-t-lg">
         <div className="flex items-center gap-1">
           <div className="text-sm font-medium">
-            {lang ? lang.toUpperCase() : "CODE"}
+            {lang ? lang.toUpperCase() : t('codeBlock.defaultHeader')}
           </div>
           {filepath && (
             <div className="text-xs text-muted-foreground font-mono">

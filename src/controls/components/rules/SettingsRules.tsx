@@ -7,6 +7,12 @@ import { RuleForm } from "./RuleForm";
 import { RulesList } from "./RulesList";
 import type { DbRule } from "@/types/litechat/rules";
 import type { RulesControlModule } from "@/controls/modules/RulesControlModule";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
+import { rulesEvent } from "@/types/litechat/events/rules.events";
+import { SettingsAutoRules } from "./SettingsAutoRules";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 
 interface SettingsRulesProps {
   module: RulesControlModule;
@@ -14,8 +20,11 @@ interface SettingsRulesProps {
 
 export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
   const [, setLastUpdated] = useState(Date.now());
+  const { t } = useTranslation('controls');
 
-  const rules = module.getAllRules();
+  // Get ALL rules through module (includes both DB and control rules)
+  // This avoids direct Zustand store access and uses the module's abstraction
+  const allRules = module.getAllRules();
   const isLoading = module.getIsLoadingRules();
 
   const [showForm, setShowForm] = useState(false);
@@ -24,9 +33,19 @@ export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
   const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    // Listen to both rules and control rules events for reactive updates (event-driven)
+    const handleRulesChanged = () => setLastUpdated(Date.now());
+    const handleControlRulesChanged = () => setLastUpdated(Date.now());
+    
+    emitter.on(rulesEvent.dataLoaded, handleRulesChanged);
+    emitter.on(controlRegistryEvent.controlRulesChanged, handleControlRulesChanged);
+
+    // Keep the module callback for backward compatibility with existing trigger component
     module.setNotifySettingsCallback(() => setLastUpdated(Date.now()));
 
     return () => {
+      emitter.off(rulesEvent.dataLoaded, handleRulesChanged);
+      emitter.off(controlRegistryEvent.controlRulesChanged, handleControlRulesChanged);
       module.setNotifySettingsCallback(null);
     };
   }, [module]);
@@ -37,6 +56,11 @@ export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
   };
 
   const handleEdit = (rule: DbRule) => {
+    // Prevent editing control rules
+    if (rule.type === "control") {
+      toast.error(t('rulesModule.cannotEditControlRule', { name: rule.name }));
+      return;
+    }
     setEditingRule(rule);
     setShowForm(true);
   };
@@ -84,49 +108,69 @@ export const SettingsRules: React.FC<SettingsRulesProps> = ({ module }) => {
     [module, editingRule, handleCancel]
   );
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-card-foreground">
-          Manage Rules
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          Create reusable text snippets (rules) that can be automatically
-          injected into prompts based on assigned tags. Rules can modify the
-          system prompt, or be added before/after the user's input.
-        </p>
-      </div>
+  const handleRuleToggle = useCallback(
+    (ruleId: string, alwaysOn: boolean) => {
+      // Use the module's method which handles both control and DB rules appropriately
+      // This avoids direct store access and maintains the event-driven pattern
+      module.updateRule(ruleId, { alwaysOn });
+    },
+    [module]
+  );
 
-      {!showForm && (
-        <Button
-          onClick={handleAddNew}
-          variant="outline"
-          className="w-full"
-          disabled={isLoading}
-        >
-          <PlusIcon className="h-4 w-4 mr-1" /> Add New Rule
-        </Button>
-      )}
+  const handleControlRuleToggle = useCallback(
+    (ruleId: string, isOn: boolean) => {
+      // Use module's updateRule method which handles both settings update and notifications
+      module.updateRule(ruleId, { alwaysOn: isOn });
+    },
+    [module]
+  );
 
-      {showForm && (
+  if (showForm) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">
+            {editingRule ? t('editRule') : t('addNewRule')}
+          </h3>
+          <Button variant="outline" onClick={handleCancel}>
+            {t('backToList')}
+          </Button>
+        </div>
         <RuleForm
           initialData={editingRule ?? undefined}
-          isSavingExt={isSaving}
           onSave={handleSave}
           onCancel={handleCancel}
-        />
-      )}
-
-      <div className="pt-4">
-        <h4 className="text-md font-medium mb-2">Existing Rules</h4>
-        <RulesList
-          rules={rules}
-          isLoading={isLoading}
-          isDeleting={isDeleting}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+          isSavingExt={isSaving}
         />
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">{t('rules')}</h3>
+        <Button onClick={handleAddNew} size="sm">
+          <PlusIcon className="h-4 w-4 mr-2" />
+          {t('addRule')}
+        </Button>
+      </div>
+      <RulesList
+        rules={allRules}
+        isLoading={isLoading}
+        isDeleting={isDeleting}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onToggleAlwaysOn={(ruleId, alwaysOn) => {
+          const rule = allRules.find(r => r.id === ruleId);
+          if (rule?.type === 'control') {
+            handleControlRuleToggle(ruleId, alwaysOn);
+          } else {
+            handleRuleToggle(ruleId, alwaysOn);
+          }
+        }}
+      />
+      <SettingsAutoRules />
     </div>
   );
 };

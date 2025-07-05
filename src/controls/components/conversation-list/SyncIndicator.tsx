@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { SyncStatus } from "@/types/litechat/sync";
+import i18next from "i18next";
 
 // Helper to get sync icon and tooltip
 export const getSyncIndicator = (
@@ -24,33 +25,33 @@ export const getSyncIndicator = (
   if (!repoName) return null;
   let IconComponent: React.ElementType = GitBranchIcon;
   let className = "text-muted-foreground/70";
-  let tooltipText = `Linked to ${repoName}`;
+  let tooltipText = i18next.t('git:syncIndicatorHelper.linked', { repoName });
   switch (status) {
     case "syncing":
       IconComponent = Loader2;
       className = "animate-spin text-blue-500";
-      tooltipText = `Syncing with ${repoName}...`;
+      tooltipText = i18next.t('git:syncIndicatorHelper.syncing', { repoName });
       break;
     case "error":
       IconComponent = AlertCircleIcon;
       className = "text-destructive";
-      tooltipText = `Sync error with ${repoName}`;
+      tooltipText = i18next.t('git:syncIndicatorHelper.error', { repoName });
       break;
     case "needs-sync":
       IconComponent = AlertTriangleIcon
       className = "text-orange-500";
-      tooltipText = `Needs sync with ${repoName}`;
+      tooltipText = i18next.t('git:syncIndicatorHelper.needsSync', { repoName });
       break;
     case "idle":
       IconComponent = CheckCircle2Icon;
       className = "text-green-500";
-      tooltipText = `Synced with ${repoName}`;
+      tooltipText = i18next.t('git:syncIndicatorHelper.synced', { repoName });
       break;
     default:
       // Handle undefined or unexpected status gracefully
       IconComponent = GitBranchIcon;
       className = "text-muted-foreground/70";
-      tooltipText = `Linked to ${repoName} (Status: ${status ?? "Unknown"})`;
+      tooltipText = i18next.t('git:syncIndicatorHelper.unknownStatus', { repoName, status: status ?? "Unknown" });
       break;
   }
   return (

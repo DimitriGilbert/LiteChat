@@ -1,0 +1,83 @@
+{
+  "sendMessagePlaceholder": "Enviar un mensaje...",
+  "promptSubmissionCancelled": "Envío del prompt cancelado por el middleware.",
+  "failedToSendMessage": "No se pudo enviar el mensaje: {{errorMessage}}",
+  "sendMessage": "Enviar mensaje",
+  "inputAreaPlaceholder": "Escriba un mensaje... (Shift+Enter para nueva línea)",
+  "chatInputAriaLabel": "Entrada de chat",
+  "parameterControl": {
+    "title": "Parámetros Avanzados",
+    "ariaLabel": "Ajustar Parámetros Avanzados",
+    "temperature": "Temperatura",
+    "topP": "Top P",
+    "maxTokens": "Máx. Tokens",
+    "topK": "Top K",
+    "presencePenalty": "Penalización de Presencia",
+    "frequencyPenalty": "Penalización de Frecuencia",
+    "placeholder": "Predeterminado: {{defaultValue}}",
+    "none": "Ninguno",
+    "useDefault": "Usar Predeterminado ({{defaultValue}})"
+  },
+  "rules": {
+    "autoSelectDisabled": "La selección automática de reglas está deshabilitada en la configuración.",
+    "noPromptForSelect": "No se encontró un prompt de usuario para basar la selección.",
+    "noRulesForSelect": "No hay reglas disponibles para la selección.",
+    "noModelForSelect": "No se seleccionó ningún modelo para la selección automática de reglas en la configuración.",
+    "selectingRules": "La IA está seleccionando reglas relevantes...",
+    "selectionFailed": "La selección de reglas de IA falló: {{error}}",
+    "selectionSuccess": "La IA seleccionó {{count}} reglas.",
+    "noRulesSelected": "La IA no seleccionó ninguna regla."
+  },
+  "rulesControl": {
+    "trigger": {
+      "configureAria": "Configurar Reglas y Etiquetas para el Siguiente Turno",
+      "addAria": "Añadir Reglas y Etiquetas (Abre Configuración)",
+      "tooltipActive": "Reglas/Etiquetas Activas ({{tagsCount}} etiquetas, {{rulesCount}} reglas)",
+      "tooltipInactive": "Activar Reglas/Etiquetas (Siguiente Turno)",
+      "tooltipAdd": "Añadir Reglas y Etiquetas (Abre Configuración)"
+    },
+    "dialog": {
+      "filterTagsPlaceholder": "Filtrar etiquetas...",
+      "openSettingsTooltip": "Abrir Configuración de Reglas",
+      "manageButton": "Administrar",
+      "noTagsDefined": "No hay etiquetas definidas.",
+      "noTagsMatchFilter": "Ninguna etiqueta coincide con el filtro.",
+      "includes": "Incluye: {{ruleNames}}",
+      "filterRulesPlaceholder": "Filtrar reglas...",
+      "autoSelectTooltip": "Seleccionar reglas automáticamente según el contexto del prompt",
+      "autoSelectButton": "Selección Automática",
+      "noRulesDefined": "No hay reglas definidas.",
+      "noRulesMatchFilter": "Ninguna regla coincide con el filtro.",
+      "ruleType": "Tipo: {{type}}",
+      "ruleContent": "Contenido: {{content}}",
+      "tabs": {
+        "activateRules": "Activar Reglas",
+        "activateTags": "Activar Etiquetas"
+      }
+    }
+  },
+  "toolSelector": {
+    "title": "Selector de Herramientas",
+    "filterPlaceholder": "Filtrar herramientas...",
+    "allToolsFilter": "Todas las herramientas",
+    "enabledToolsFilter": "Herramientas habilitadas",
+    "disabledToolsFilter": "Herramientas deshabilitadas",
+    "mcpToolsFilter": "Herramientas MCP",
+    "systemToolsFilter": "Herramientas del sistema",
+    "refreshButton": "Actualizar herramientas",
+    "applyButton": "Aplicar",
+    "loadingTools": "Cargando herramientas...",
+    "noToolsAvailable": "No hay herramientas disponibles",
+    "noToolsMatchFilter": "Ninguna herramienta coincide con el filtro '{{filter}}'",
+    "mcpServer": "Servidor MCP",
+    "toolDescription": "Descripción: {{description}}",
+    "noDescription": "Sin descripción disponible",
+    "enabled": "Habilitado",
+    "disabled": "Deshabilitado"
+  },
+  "fileControl": {
+    "attachFiles": "Adjuntar archivos",
+    "attachFilesTooltip": "Adjuntar archivos al prompt",
+    "filesAttached": "{{count}} archivo(s) adjuntado(s)"
+  }
+}

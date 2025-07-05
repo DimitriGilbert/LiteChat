@@ -17,6 +17,7 @@ export const canvasEvent = {
   // CodeBlock Action Request Events
   copyCodeBlockRequest: "canvas.codeblock.copy.request",
   editCodeBlockRequest: "canvas.codeblock.edit.request",
+  repairEnhanceCodeBlockRequest: "canvas.codeblock.repair.enhance.request",
   // foldCodeBlockRequest: "canvas.codeblock.fold.request", // Keep folding local for now
   // TODO: Add more codeblock action requests (e.g., run, save to file)
 
@@ -80,6 +81,15 @@ export interface CanvasEventPayloads {
     filepath?: string; // Filepath if available
     originalContent: string; // Original code content
     newContent: string; // New code content
+  };
+  [canvasEvent.repairEnhanceCodeBlockRequest]: {
+    interactionId: string; // ID of the interaction containing this code block
+    codeBlockId: string; // A unique ID for the code block within the interaction
+    language?: string; // Language of the code block
+    filepath?: string; // Filepath if available
+    originalContent: string; // Original code content
+    mode: "repair" | "enhance" | "complete-message" | "complete-conversation" | "other-blocks-message" | "other-blocks-conversation";
+    errorMessage?: string; // Error message if repairing
   };
   // [canvasEvent.codeBlockCopied]: { // Removing this for now, will add back if needed for feedback
   //   interactionId?: string;

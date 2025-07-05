@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { VfsControlModule } from "@/controls/modules/VfsControlModule";
 import { useInputStore } from "@/store/input.store";
 import { useVfsStore } from "@/store/vfs.store";
+import { useTranslation } from "react-i18next";
 
 interface VfsTriggerButtonProps {
   module: VfsControlModule;
@@ -22,6 +23,7 @@ interface VfsTriggerButtonProps {
 export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
   module,
 }) => {
+  const { t } = useTranslation('vfs');
   const [, forceUpdate] = useState({});
   useEffect(() => {
     if (module && typeof module.setNotifyTriggerUpdate === "function") {
@@ -52,7 +54,7 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
   const handleAttachSelectedFiles = () => {
     const selectedIds = useVfsStore.getState().selectedFileIds;
     if (selectedIds.size === 0) {
-      toast.info("No files selected in VFS to attach.");
+      toast.info(t('modal.noFilesSelected'));
       return;
     }
 
@@ -74,7 +76,7 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
 
     if (attachedCount > 0) {
       toast.success(
-        `Attached ${attachedCount} file(s) from VFS to the next prompt.`
+        t('modal.filesAttached', { count: attachedCount })
       );
       if (typeof module.clearVfsSelection === "function") {
         module.clearVfsSelection();
@@ -84,7 +86,7 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
         // module.toggleVfsModal(); // Or explicitly module.closeVfsModal() if that exists
       }
     } else {
-      toast.warning("No valid files were selected to attach.");
+      toast.warning(t('modal.noValidFilesSelected'));
     }
   };
 
@@ -109,12 +111,12 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
                 typeof module.toggleVfsModal === "function" &&
                 module.toggleVfsModal()
               }
-              aria-label="Toggle Virtual File System"
+              aria-label={t('triggerButton.toggleVfs')}
             >
               <HardDriveIcon className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="top">Virtual Filesystem</TooltipContent>
+          <TooltipContent side="top">{t('triggerButton.virtualFilesystem')}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
@@ -127,14 +129,14 @@ export const VfsTriggerButton: React.FC<VfsTriggerButtonProps> = ({
                 size="sm"
                 className="h-8 animate-fadeIn px-2"
                 onClick={handleAttachSelectedFiles}
-                aria-label={`Attach ${selectedFileIdsCount} selected VFS file(s)`}
+                aria-label={t('triggerButton.attachVfsFiles', { count: selectedFileIdsCount })}
               >
                 <PaperclipIcon className="h-4 w-4 mr-1" />
-                Attach ({selectedFileIdsCount})
+                {t('triggerButton.attachButtonText', { count: selectedFileIdsCount })}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
-              Attach selected VFS files to prompt
+              {t('triggerButton.attachSelectedTooltip')}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

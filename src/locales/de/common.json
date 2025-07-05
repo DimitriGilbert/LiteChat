@@ -1,0 +1,130 @@
+{
+  "initializingLiteChat": "LiteChat wird initialisiert...",
+  "liteChatMenu": "LiteChat Menü",
+  "closeMenu": "Menü schließen",
+  "openMenu": "Menü öffnen",
+  "loadingMenu": "Menü wird geladen...",
+  "pleaseWaitInitialization": "Bitte warten Sie, während die Anwendung initialisiert wird.",
+  "footerControlsLoading": "Fußzeilen-Steuerelemente werden geladen...",
+  "applicationCoreNotReady": "Anwendungskern nicht bereit. Bitte versuchen Sie es erneut.",
+  "failedToStartNewChat": "Fehler beim Starten eines neuen Chats.",
+  "failedToSendMessage": "Fehler beim Senden der Nachricht.",
+  "modalManager": {
+    "noProvider": "Kein Anbieter für modalId: {{id}}"
+  },
+  "universalBlockRenderer": {
+    "code": "CODE",
+    "renderError": "Renderfehler"
+  },
+  "codeEditor": {
+    "saveButtonText": "Speichern",
+    "saving": "Wird gespeichert...",
+    "syntaxHighlightingError": "Fehler bei der Syntaxhervorhebung:"
+  },
+  "theme": {
+    "toggle": "Theme umschalten",
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System"
+  },
+  "app": {
+    "initializationError": "Anwendung konnte nicht initialisiert werden. Bitte aktualisieren Sie die Seite.",
+    "initializationErrorDetails": "Initialisierungsfehler",
+    "initializing": "Wird initialisiert...",
+    "noConversationSelected": "Keine Konversation ausgewählt",
+    "startNewConversation": "Starten Sie eine neue Konversation oder wählen Sie eine aus der Seitenleiste.",
+    "newConversation": "Neue Konversation",
+    "createConversationError": "Fehler beim Erstellen der Konversation",
+    "loadConversationError": "Fehler beim Laden der Konversation",
+    "loadInteractionsError": "Fehler beim Laden der Interaktionen",
+    "runningWorkflow": "Workflow wird ausgeführt...",
+    "workflowAborted": "Workflow abgebrochen",
+    "workflowError": "Workflow-Ausführung fehlgeschlagen",
+    "workflowCompleted": "Workflow abgeschlossen",
+    "updateError": "Aktualisierung fehlgeschlagen",
+    "noInteractions": "Noch keine Interaktionen",
+    "startTyping": "Beginnen Sie mit der Eingabe, um die Konversation zu starten.",
+    "genericError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+  },
+  "close": "Schließen",
+  "apiKeyAddedSuccess": "API-Schlüssel erfolgreich hinzugefügt!",
+  "providerAddedSuccess": "Anbieter erfolgreich hinzugefügt!",
+  "modelEnabledSuccess": "Modell erfolgreich aktiviert!",
+  "modelDisabledSuccess": "Modell erfolgreich deaktiviert!",
+  "failedToUpdateModel": "Fehler beim Aktualisieren des Modellstatus.",
+  "newChat": "Neuer Chat",
+  "welcomeFirstChat": "Willkommen zu Ihrem ersten Chat!",
+  "failedToStartChat": "Fehler beim Starten Ihres ersten Chats.",
+  "submit": "Senden",
+  "cancel": "Abbrechen",
+  "submitting": "Wird gesendet...",
+  "apiKeyForm": {
+    "keyNameRequired": "Schlüsselname ist erforderlich.",
+    "providerTypeRequired": "Anbieter-Typ ist erforderlich.",
+    "apiKeyValueRequired": "API-Schlüsselwert ist erforderlich.",
+    "providerTypeLabel": "Anbieter-Typ",
+    "keyNameLabel": "Schlüsselname",
+    "apiKeyValueLabel": "API-Schlüsselwert",
+    "selectProviderPlaceholder": "Anbieter-Typ auswählen",
+    "keyNamePlaceholder": "z.B. Mein OpenAI-Schlüssel",
+    "keyValuePlaceholder": "Geben Sie Ihren API-Schlüssel ein",
+    "saving": "Wird gespeichert...",
+    "updateApiKey": "API-Schlüssel aktualisieren",
+    "saveApiKey": "API-Schlüssel speichern"
+  },
+  "errorBoundary": {
+    "copySuccess": "{label} in die Zwischenablage kopiert!",
+    "copyFailed": "Fehler beim Kopieren von {label}.",
+    "copied": "Kopiert!",
+    "copyLabel": "{label} kopieren",
+    "title": "Ups! Etwas ist schief gelaufen.",
+    "description": "LiteChat hat einen unerwarteten Fehler festgestellt. Bitte aktualisieren Sie die Seite. Wenn das Problem weiterhin besteht, erwägen Sie, das Problem zu melden. Kopieren Sie die Details und fügen Sie sie in das GitHub-Problem ein.",
+    "unknownError": "Unbekannter Fehler",
+    "refreshButton": "Seite aktualisieren",
+    "detailsLabel": "Details",
+    "aiDebugPromptLabel": "AI Debug-Prompt",
+    "reportButton": "Auf GitHub melden",
+    "reportSuccess": "Fehlerbericht in die Zwischenablage kopiert. Fügen Sie ihn in den GitHub-Problemtext ein.",
+    "reportFailed": "Fehler beim Kopieren des Fehlerberichts. Bitte manuell kopieren."
+  },
+  "filePreview": {
+    "decodeError": "Fehler beim Dekodieren des Dateiinhalts für die Vorschau.",
+    "tooLargeForPreview": "Textdatei zu groß für die Vorschau ({{size}} KB).",
+    "missingContent": "Textinhalt fehlt in den Metadaten.",
+    "alreadyInVfs": "Datei ist bereits in VFS.",
+    "reconstructError": "Kann nicht zu VFS hinzugefügt werden: Fehler beim Rekonstruieren der Dateidaten.",
+    "addSuccess": "\"{{name}}\" erfolgreich zum VFS-Stammverzeichnis hinzugefügt.",
+    "addFailed": "Fehler beim Hinzufügen von \"{{name}}\" zu VFS.",
+    "reconstructDownloadError": "Dateidaten konnten nicht rekonstruiert werden.",
+    "downloadFailed": "Download fehlgeschlagen: {error}",
+    "vfsAttached": "VFS-Datei angehängt. Inhalt wird beim Senden geladen.",
+    "addToVfsTooltip": "Zum virtuellen Dateisystem hinzufügen",
+    "downloadTooltip": "Datei herunterladen"
+  },
+  "loadingStateWrapper": {
+    "loading": "Wird geladen...",
+    "error": "Fehler: {{error}}",
+    "noItems": "Keine Elemente gefunden."
+  },
+  "sortableModelItem": {
+    "dragToReorder": "Ziehen, um Modell {{name}} neu anzuordnen",
+    "modelInfo": "Modellinformationen",
+    "moveToTop": "Nach oben verschieben",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten"
+  },
+  "stopButton": {
+    "stop": "Stopp",
+    "stopGeneration": "Generierung stoppen"
+  },
+  "cloneDialog": {
+    "title": "Git-Repository klonen",
+    "description": "Geben Sie die Repository-URL ein. Es wird in einen neuen Ordner mit dem Namen des Repositorys innerhalb von {{path}} geklont.",
+    "clone": "Klonen",
+    "url": "URL",
+    "branch": "Branch",
+    "urlPlaceholder": "https://github.com/user/repo.git",
+    "branchPlaceholder": "main (Standard)",
+    "httpsRecommendation": "Empfehlung: Verwenden Sie HTTPS-URLs für bessere Browserkompatibilität und Authentifizierung (z.B. https://github.com/user/repo.git)"
+  }
+}

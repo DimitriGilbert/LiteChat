@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ReasoningControlModule } from "@/controls/modules/ReasoningControlModule";
+import { useTranslation } from "react-i18next";
 
 interface ReasoningControlTriggerProps {
   module: ReasoningControlModule;
@@ -19,6 +20,7 @@ interface ReasoningControlTriggerProps {
 export const ReasoningControlTrigger: React.FC<
   ReasoningControlTriggerProps
 > = ({ module }) => {
+  const { t } = useTranslation('controls');
   const [, forceUpdate] = useState({});
   useEffect(() => {
     module.setNotifyCallback(() => forceUpdate({}));
@@ -52,8 +54,8 @@ export const ReasoningControlTrigger: React.FC<
             disabled={isStreaming}
             aria-label={
               isExplicitlyEnabled
-                ? "Disable Reasoning for Next Turn"
-                : "Enable Reasoning for Next Turn"
+                ? t('reasoningControl.disableAriaLabel')
+                : t('reasoningControl.enableAriaLabel')
             }
           >
             <BrainCircuitIcon
@@ -66,8 +68,8 @@ export const ReasoningControlTrigger: React.FC<
         </TooltipTrigger>
         <TooltipContent side="top">
           {isExplicitlyEnabled
-            ? "Reasoning Enabled (Click to Disable)"
-            : "Reasoning Disabled (Click to Enable)"}
+            ? t('reasoningControl.enabledTooltip')
+            : t('reasoningControl.disabledTooltip')}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

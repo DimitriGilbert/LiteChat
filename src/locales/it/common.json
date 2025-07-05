@@ -1,0 +1,130 @@
+{
+  "initializingLiteChat": "Inizializzazione LiteChat...",
+  "liteChatMenu": "Menu LiteChat",
+  "closeMenu": "Chiudi menu",
+  "openMenu": "Apri menu",
+  "loadingMenu": "Caricamento menu...",
+  "pleaseWaitInitialization": "Attendere prego mentre l'applicazione si inizializza.",
+  "footerControlsLoading": "Caricamento controlli a piè di pagina...",
+  "applicationCoreNotReady": "Core applicazione non pronto. Riprova.",
+  "failedToStartNewChat": "Impossibile avviare nuova chat.",
+  "failedToSendMessage": "Impossibile inviare messaggio.",
+  "modalManager": {
+    "noProvider": "Nessun provider per modalId: {{id}}"
+  },
+  "universalBlockRenderer": {
+    "code": "CODICE",
+    "renderError": "Errore di Rendering"
+  },
+  "codeEditor": {
+    "saveButtonText": "Salva",
+    "saving": "Salvataggio...",
+    "syntaxHighlightingError": "Errore di evidenziazione sintattica:"
+  },
+  "theme": {
+    "toggle": "Cambia tema",
+    "light": "Chiaro",
+    "dark": "Scuro",
+    "system": "Sistema"
+  },
+  "app": {
+    "initializationError": "Applicazione non riuscita a inizializzarsi. Aggiorna la pagina.",
+    "initializationErrorDetails": "Errore di Inizializzazione",
+    "initializing": "Inizializzazione...",
+    "noConversationSelected": "Nessuna conversazione selezionata",
+    "startNewConversation": "Avvia una nuova conversazione o selezionane una dalla barra laterale.",
+    "newConversation": "Nuova Conversazione",
+    "createConversationError": "Impossibile creare conversazione",
+    "loadConversationError": "Impossibile caricare conversazione",
+    "loadInteractionsError": "Impossibile caricare interazioni",
+    "runningWorkflow": "Esecuzione workflow...",
+    "workflowAborted": "Workflow abortito",
+    "workflowError": "Esecuzione workflow fallita",
+    "workflowCompleted": "Workflow completato",
+    "updateError": "Aggiornamento fallito",
+    "noInteractions": "Nessuna interazione ancora",
+    "startTyping": "Inizia a digitare per avviare la conversazione.",
+    "genericError": "Si è verificato un errore imprevisto. Riprova."
+  },
+  "close": "Chiudi",
+  "apiKeyAddedSuccess": "Chiave API aggiunta con successo!",
+  "providerAddedSuccess": "Provider aggiunto con successo!",
+  "modelEnabledSuccess": "Modello abilitato con successo!",
+  "modelDisabledSuccess": "Modello disabilitato con successo!",
+  "failedToUpdateModel": "Impossibile aggiornare lo stato del modello.",
+  "newChat": "Nuova Chat",
+  "welcomeFirstChat": "Benvenuto nella tua prima chat!",
+  "failedToStartChat": "Impossibile avviare la tua prima chat.",
+  "submit": "Invia",
+  "cancel": "Annulla",
+  "submitting": "Invio...",
+  "apiKeyForm": {
+    "keyNameRequired": "Il nome della chiave è obbligatorio.",
+    "providerTypeRequired": "Il tipo di provider è obbligatorio.",
+    "apiKeyValueRequired": "Il valore della chiave API è obbligatorio.",
+    "providerTypeLabel": "Tipo di Provider",
+    "keyNameLabel": "Nome Chiave",
+    "apiKeyValueLabel": "Valore Chiave API",
+    "selectProviderPlaceholder": "Seleziona Tipo di Provider",
+    "keyNamePlaceholder": "es. Mia Chiave OpenAI",
+    "keyValuePlaceholder": "Inserisci la tua chiave API",
+    "saving": "Salvataggio...",
+    "updateApiKey": "Aggiorna Chiave API",
+    "saveApiKey": "Salva Chiave API"
+  },
+  "errorBoundary": {
+    "copySuccess": "{label} copiato negli appunti!",
+    "copyFailed": "Impossibile copiare {label}.",
+    "copied": "Copiato!",
+    "copyLabel": "Copia {label}",
+    "title": "Ops! Qualcosa è andato storto.",
+    "description": "LiteChat ha riscontrato un errore inaspettato. Prova ad aggiornare la pagina. Se il problema persiste, considera di segnalarlo. Copia i dettagli e incollali nel problema di GitHub.",
+    "unknownError": "Errore Sconosciuto",
+    "refreshButton": "Aggiorna Pagina",
+    "detailsLabel": "Dettagli",
+    "aiDebugPromptLabel": "Prompt di Debug AI",
+    "reportButton": "Segnala su GitHub",
+    "reportSuccess": "Rapporto di errore copiato negli appunti. Incollalo nel corpo del problema di GitHub.",
+    "reportFailed": "Impossibile copiare il rapporto di errore. Copia manualmente."
+  },
+  "filePreview": {
+    "decodeError": "Impossibile decodificare il contenuto del file per l'anteprima.",
+    "tooLargeForPreview": "File di testo troppo grande per l'anteprima ({{size}} KB).",
+    "missingContent": "Contenuto testuale mancante dai metadati.",
+    "alreadyInVfs": "Il file è già in VFS.",
+    "reconstructError": "Impossibile aggiungere a VFS: Impossibile ricostruire i dati del file.",
+    "addSuccess": "\"{{name}}\" aggiunto con successo alla radice VFS.",
+    "addFailed": "Impossibile aggiungere \"{{name}}\" a VFS.",
+    "reconstructDownloadError": "Impossibile ricostruire i dati del file.",
+    "downloadFailed": "Download fallito: {error}",
+    "vfsAttached": "File VFS allegato. Il contenuto verrà caricato all'invio.",
+    "addToVfsTooltip": "Aggiungi al File System Virtuale",
+    "downloadTooltip": "Scarica file"
+  },
+  "loadingStateWrapper": {
+    "loading": "Caricamento...",
+    "error": "Errore: {{error}}",
+    "noItems": "Nessun elemento trovato."
+  },
+  "sortableModelItem": {
+    "dragToReorder": "Trascina per riordinare il modello {{name}}",
+    "modelInfo": "Informazioni modello",
+    "moveToTop": "Sposta in Cima",
+    "moveUp": "Sposta Su",
+    "moveDown": "Sposta Giù"
+  },
+  "stopButton": {
+    "stop": "Ferma",
+    "stopGeneration": "Ferma Generazione"
+  },
+  "cloneDialog": {
+    "title": "Clona Repository Git",
+    "description": "Inserisci l'URL del repository. Verrà clonato in una nuova cartella con il nome del repository all'interno di {{path}}.",
+    "clone": "Clona",
+    "url": "URL",
+    "branch": "Branch",
+    "urlPlaceholder": "https://github.com/user/repo.git",
+    "branchPlaceholder": "main (predefinito)",
+    "httpsRecommendation": "Raccomandazione: Usa URL HTTPS per una migliore compatibilità del browser e autenticazione (es. https://github.com/user/repo.git)"
+  }
+}
