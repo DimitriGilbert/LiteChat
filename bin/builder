@@ -171,6 +171,9 @@ create_directories() {
   if [ ${#LANGUAGES[@]} -gt 0 ]; then
     for lang in "${LANGUAGES[@]}"; do
       mkdir -p "$BUILD_DIR/$lang"
+      if [[ "$lang" != "$DEFAULT_LANG" ]]; then
+        mkdir -p "$BUILD_DIR/docker-$lang"
+      fi
     done
   fi
 }
@@ -232,7 +235,8 @@ build_project() {
         continue # Skip default language as it's already built
       fi
       
-      log_info "Building language: $lang (will be placed in $BUILD_DIR/$lang/)"
+      # Build for GitHub Pages (with language base path)
+      log_info "Building language: $lang for GitHub Pages (with /$lang/ base)"
       rm -rf "$DIST_DIR"
       export VITE_APP_LANG="$lang"
       export VITE_BASE="/$lang/"
@@ -242,16 +246,32 @@ build_project() {
         exit 1
       fi
 
-      # Copy to language-specific directory
-      log_info "Copying $lang build to $BUILD_DIR/$lang/"
+      # Copy GitHub Pages build to language-specific directory
+      log_info "Copying $lang GitHub Pages build to $BUILD_DIR/$lang/"
       cp -r "$DIST_DIR"/* "$BUILD_DIR/$lang/"
 
-      # Create language-specific release zip
+      # Build for Docker (with root base path)
+      log_info "Building language: $lang for Docker (with / base)"
+      rm -rf "$DIST_DIR"
+      export VITE_APP_LANG="$lang"
+      export VITE_BASE="/"
+      npm run build
+      if [[ ! -d "$DIST_DIR" ]]; then
+        log_error "Build failed for Docker language $lang - dist directory not found"
+        exit 1
+      fi
+
+      # Copy Docker build to docker-specific directory
+      mkdir -p "$BUILD_DIR/docker-$lang"
+      log_info "Copying $lang Docker build to $BUILD_DIR/docker-$lang/"
+      cp -r "$DIST_DIR"/* "$BUILD_DIR/docker-$lang/"
+
+      # Create language-specific release zip (using GitHub Pages build)
       if [[ -n "$RELEASE_NAME" ]]; then
         log_info "Creating language-specific release zip: $RELEASE_DIR/$RELEASE_NAME.$lang.zip"
-        (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.$lang.zip" .)
+        (cd "$BUILD_DIR/$lang" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.$lang.zip" .)
       fi
-      log_success "Language $lang build completed"
+      log_success "Language $lang builds completed (GitHub Pages + Docker)"
     done
   fi
 }
@@ -263,8 +283,8 @@ create_language_specific_dockerfile() {
   cat > "$temp_dockerfile" << EOF
 FROM lipanski/docker-static-website:latest
 
-# Copy the built application files for specific language
-COPY build/$lang/ .
+# Copy the built application files for specific language (Docker build with / base)
+COPY build/docker-$lang/ .
 
 # Copy httpd.conf for SPA routing and any needed configuration
 COPY docker/httpd.conf .
@@ -466,13 +486,14 @@ deploy_gh_pages() {
   find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
   
   log_info "Copying build files..."
-  # Copies from the build dir using an absolute path
-  cp -r "$absolute_build_dir"/* .
+  # Copy files from build dir, excluding docker-* directories
+  find "$absolute_build_dir" -mindepth 1 -maxdepth 1 ! -name "docker-*" -exec cp -r {} . \;
 
   if [[ -n "$CNAME_CONTENT" ]]; then
     log_info "Restoring CNAME file..."
     echo "$CNAME_CONTENT" > ./CNAME
   fi
+
 
   log_info "Committing and pushing to GitHub Pages..."
   git add .
@@ -495,6 +516,7 @@ deploy_gh_pages() {
 
   popd > /dev/null
 }
+
 
 handle_version_bump() {
   if [[ -z "$VERSION_BUMP_LEVEL" ]]; then
@@ -607,7 +629,8 @@ show_summary() {
     echo "│   ├── (root: default language $DEFAULT_LANG)"
     for lang in "${LANGUAGES[@]}"; do
       if [[ "$lang" != "$DEFAULT_LANG" ]]; then
-        echo "│   └── $lang/ (language-specific)"
+        echo "│   ├── $lang/ (GitHub Pages build)"
+        echo "│   └── docker-$lang/ (Docker build)"
       fi
     done
   else
