@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { ApiKeySelector } from "./ApiKeySelector";
 import {
   requiresApiKey,
+  optionalApiKey,
   requiresBaseURL,
   supportsModelFetching,
   PROVIDER_TYPES,
@@ -189,6 +190,8 @@ export const ProviderConfigForm: React.FC<ProviderConfigFormProps> = ({
   // Directly use form.state.values for conditional rendering logic
   const currentType = form.state.values.type;
   const needsKey = requiresApiKey(currentType ?? null);
+  const hasOptionalKey = optionalApiKey(currentType ?? null);
+  const showApiKeyField = needsKey || hasOptionalKey;
   const needsURL = requiresBaseURL(currentType ?? null);
   const canFetch = supportsModelFetching(currentType ?? null);
 
@@ -266,12 +269,12 @@ export const ProviderConfigForm: React.FC<ProviderConfigFormProps> = ({
           wrapperClassName="md:col-span-1"
         />
 
-        {needsKey && (
+        {showApiKeyField && (
           <form.Field
             name="apiKeyId"
             children={(field: AnyFieldApi) => (
               <div className="space-y-1.5 md:col-span-2">
-                <Label htmlFor={`${field.name}-trigger`}>API Key</Label>{" "}
+                <Label htmlFor={`${field.name}-trigger`}>API Key {!needsKey && "(Optional)"}</Label>{" "}
                 <ApiKeySelector
                   selectedKeyId={field.state.value ?? null}
                   onKeySelected={(keyId: string | null) => {
