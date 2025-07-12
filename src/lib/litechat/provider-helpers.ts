@@ -48,6 +48,10 @@ export const requiresApiKey = (type: DbProviderType | null): boolean => {
   return type === "openai" || type === "openrouter" || type === "google";
 };
 
+export const optionalApiKey = (type: DbProviderType | null): boolean => {
+  return type === "openai-compatible";
+};
+
 export const requiresBaseURL = (type: DbProviderType | null): boolean => {
   return type === "ollama" || type === "openai-compatible";
 };
@@ -73,6 +77,10 @@ export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
   "openai",
   "openrouter",
   "google",
+];
+
+export const OPTIONAL_API_KEY_TYPES: DbProviderType[] = [
+  "openai-compatible",
 ];
 
 // --- Default Models (Simplified - Primary source should be fetched) ---
