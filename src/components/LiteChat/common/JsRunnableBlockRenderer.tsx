@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   CodeSecurityService,
@@ -136,7 +137,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   const [lastClickTime, setLastClickTime] = useState(0);
 
   // Execution mode - Safe by default
-  const [useSafeMode, setUseSafeMode] = useState(true);
+  const [executionMode, setExecutionMode] = useState<'safe' | 'iframe' | 'unsafe'>('safe');
   
   // Unique ID for this block
   const blockUniqueId = useMemo(() => blockId || `js-block-${Math.random().toString(36).substr(2, 9)}`, [blockId]);
@@ -583,9 +584,216 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     }
   }, [module]);
 
+  // IFRAME MODE EXECUTION - Completely isolated in iframe
+  const executeIframeMode = useCallback(async (codeToRun: string, capturedLogs: string[]) => {
+    try {
+      // Clear preview first
+      if (previewRef.current) {
+        previewRef.current.innerHTML = '';
+      }
+
+      // Create iframe for isolated execution
+      const iframe = document.createElement('iframe');
+      iframe.style.width = '100%';
+      iframe.style.height = `${Math.floor(window.innerHeight * 0.67)}px`;
+      iframe.style.border = 'none';
+      iframe.style.borderRadius = '8px';
+      iframe.sandbox.add('allow-scripts');
+      
+      // Create the iframe content with minimal LiteChat API
+      const iframeContent = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteChat Iframe Execution</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 16px; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: white;
+        }
+        #litechat-target { 
+            width: 100%; 
+            min-height: 200px; 
+        }
+    </style>
+</head>
+<body>
+    <div id="litechat-target"></div>
+    
+    <script type="module">
+        const target = document.getElementById('litechat-target');
+        const logs = [];
+        
+        // Minimal LiteChat API for iframe mode
+        window.litechat = {
+            target: target,
+            utils: {
+                log: (...args) => {
+                    const formatted = args.map(arg => 
+                        typeof arg === "object" ? JSON.stringify(arg) : String(arg)
+                    ).join(" ");
+                    logs.push(formatted);
+                    console.log(...args);
+                    // Send log to parent (if needed)
+                    window.parent.postMessage({
+                        type: 'litechat-log',
+                        message: formatted
+                    }, '*');
+                },
+                toast: (message) => {
+                    // Simple toast in iframe
+                    const toast = document.createElement('div');
+                    toast.style.cssText = 'position:fixed;top:16px;right:16px;background:#3b82f6;color:white;padding:12px;border-radius:8px;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+                    toast.textContent = message;
+                    document.body.appendChild(toast);
+                    setTimeout(() => {
+                        if (toast.parentNode) toast.parentNode.removeChild(toast);
+                    }, 3000);
+                },
+                loadModule: async (moduleUrl, moduleName, globalKey, importMap) => {
+                    const key = globalKey || moduleName;
+                    if (window[key]) return window[key];
+                    
+                    try {
+                        if (importMap) {
+                            const existingMap = document.querySelector('script[type="importmap"]');
+                            if (existingMap) existingMap.remove();
+                            
+                            const mapScript = document.createElement('script');
+                            mapScript.type = 'importmap';
+                            mapScript.textContent = JSON.stringify({ imports: importMap });
+                            document.head.appendChild(mapScript);
+                            
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                        
+                        const module = await import(moduleUrl);
+                        window[key] = module;
+                        return module;
+                    } catch (error) {
+                        console.error(\`Error loading module \${moduleName}:\`, error);
+                        throw error;
+                    }
+                },
+                loadModules: async (moduleConfigs) => {
+                    // Simplified version for iframe
+                    const loadedModules = {};
+                    for (const config of moduleConfigs) {
+                        const module = await window.litechat.utils.loadModule(
+                            config.url, 
+                            config.name, 
+                            config.globalKey, 
+                            config.importMap
+                        );
+                        loadedModules[config.globalKey || config.name] = module;
+                    }
+                    return loadedModules;
+                },
+                loadScript: async (src) => {
+                    return new Promise((resolve, reject) => {
+                        if ([...document.scripts].some(s => s.src === src)) {
+                            resolve();
+                            return;
+                        }
+                        const script = document.createElement('script');
+                        script.src = src;
+                        script.async = true;
+                        script.onload = () => resolve();
+                        script.onerror = (e) => reject(new Error(\`Failed to load script: \${src}\`));
+                        document.head.appendChild(script);
+                    });
+                }
+            },
+            emit: (eventName, payload) => {
+                window.parent.postMessage({
+                    type: 'litechat-event',
+                    eventName,
+                    payload
+                }, '*');
+            }
+        };
+        
+        // Auto-resize iframe to content
+        function resizeIframe() {
+            const height = Math.max(document.body.scrollHeight, 200);
+            window.parent.postMessage({
+                type: 'litechat-resize',
+                height: height
+            }, '*');
+        }
+        
+        // Execute user code
+        try {
+            ${codeToRun}
+            // Resize after code execution
+            setTimeout(resizeIframe, 100);
+        } catch (error) {
+            console.error('Iframe execution error:', error);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'p-4 text-red-600 bg-red-100 border border-red-200 rounded-md';
+            errorDiv.textContent = \`Error: \${error.message}\`;
+            target.appendChild(errorDiv);
+            
+            window.parent.postMessage({
+                type: 'litechat-error',
+                error: error.message
+            }, '*');
+            
+            // Resize after error display
+            setTimeout(resizeIframe, 100);
+        }
+    </script>
+</body>
+</html>`;
+
+      // Set up message listener for iframe communication
+      const messageHandler = (event: MessageEvent) => {
+        if (event.source === iframe.contentWindow) {
+          switch (event.data.type) {
+            case 'litechat-log':
+              capturedLogs.push(event.data.message);
+              break;
+            case 'litechat-error':
+              capturedLogs.push(`Iframe Error: ${event.data.error}`);
+              break;
+            case 'litechat-resize':
+              iframe.style.height = `${event.data.height}px`;
+              break;
+            case 'litechat-event':
+              // Handle events if needed
+              break;
+          }
+        }
+      };
+
+      window.addEventListener('message', messageHandler);
+
+      // Set iframe content and append to preview
+      iframe.srcdoc = iframeContent;
+      previewRef.current?.appendChild(iframe);
+
+      // Wait a bit for iframe to load and execute
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Cleanup message listener
+      window.removeEventListener('message', messageHandler);
+
+      if (capturedLogs.length === 0) {
+        capturedLogs.push("Code executed successfully in iframe mode");
+      }
+
+    } catch (error) {
+      capturedLogs.push(`Iframe execution error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, []);
+
   // Main execution function
   const executeCode = useCallback(async () => {
-    if (useSafeMode && (!window.liteChatQuickJS?.isReady || !window.liteChatQuickJS.context)) {
+    if (executionMode === 'safe' && (!window.liteChatQuickJS?.isReady || !window.liteChatQuickJS.context)) {
       toast.error('Safe execution environment not ready. Please try again.');
       setIsRunning(false);
       return;
@@ -607,10 +815,16 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     const codeToRun = isEditing ? editedCode : code;
 
     try {
-      if (useSafeMode) {
-        await executeSafeMode(codeToRun, capturedLogs);
-      } else {
-        await executeUnsafeMode(codeToRun, capturedLogs);
+      switch (executionMode) {
+        case 'safe':
+          await executeSafeMode(codeToRun, capturedLogs);
+          break;
+        case 'iframe':
+          await executeIframeMode(codeToRun, capturedLogs);
+          break;
+        case 'unsafe':
+          await executeUnsafeMode(codeToRun, capturedLogs);
+          break;
       }
     } catch (error) {
       capturedLogs.push(`Execution Error: ${error instanceof Error ? error.message : String(error)}`);
@@ -619,9 +833,9 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       setHasRun(true);
       setIsRunning(false);
 
-      // Always show preview first in unsafe mode, then check for content
-      if (!useSafeMode) {
-        // Force preview mode immediately for unsafe execution
+      // Always show preview first for unsafe and iframe modes, then check for content
+      if (executionMode === 'unsafe' || executionMode === 'iframe') {
+        // Force preview mode immediately for unsafe/iframe execution
         setShowPreview(true);
         setShowOutput(false);
         
@@ -635,7 +849,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
             setShowOutput(true);
             setShowPreview(false);
           }
-        }, 200); // Increased delay to allow for async operations
+        }, executionMode === 'iframe' ? 1500 : 200); // Longer delay for iframe
       } else {
         // Safe mode - check content immediately
         const hasPreviewContent = previewRef.current && 
@@ -654,10 +868,13 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       if (capturedLogs.some((log) => log.includes("Error:"))) {
         toast.error(t('jsRunnableBlock.executionFailed'));
       } else {
-                  toast.success(t('jsRunnableBlock.executionSuccess', { mode: useSafeMode ? t('jsRunnableBlock.safeMode') : t('jsRunnableBlock.unsafeMode') }));
+        const modeText = executionMode === 'safe' ? t('jsRunnableBlock.safeMode') : 
+                        executionMode === 'iframe' ? t('jsRunnableBlock.iframeMode') : 
+                        t('jsRunnableBlock.unsafeMode');
+        toast.success(t('jsRunnableBlock.executionSuccess', { mode: modeText }));
       }
     }
-  }, [code, editedCode, isEditing, useSafeMode, executeSafeMode, executeUnsafeMode]);
+  }, [code, editedCode, isEditing, executionMode, executeSafeMode, executeIframeMode, executeUnsafeMode]);
 
   // Click handler with security validation
   const handleRunClick = useCallback(async () => {
@@ -697,7 +914,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 
     setIsRunning(true);
     
-    if (useSafeMode) {
+    if (executionMode === 'safe') {
       if (!window.liteChatQuickJS?.isReady || !window.liteChatQuickJS.context) {
         try {
           await waitForQuickJS();
@@ -709,7 +926,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     }
     
     executeCode();
-  }, [runnableBlocksEnabled, useSafeMode, executeCode, securityResult, clickCount, lastClickTime]);
+  }, [runnableBlocksEnabled, executionMode, executeCode, securityResult, clickCount, lastClickTime]);
 
   // View toggles
   const toggleConsole = () => {
@@ -745,7 +962,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   const getRunButtonText = () => {
     if (isRunning) return t('jsRunnableBlock.running');
     if (quickjsStatus === 'loading') return t('jsRunnableBlock.loading');
-    if (useSafeMode && quickjsStatus !== 'ready') return t('jsRunnableBlock.run');
+    if (executionMode === 'safe' && quickjsStatus !== 'ready') return t('jsRunnableBlock.run');
     if (securityResult && clickCount > 0 && clickCount < securityResult.clicksRequired) {
       return t('jsRunnableBlock.clickMore', { count: securityResult.clicksRequired - clickCount });
     }
@@ -850,14 +1067,13 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="text-2xl font-bold mb-2">🚀 LiteChat JS Executable</h1>
-            <p class="text-blue-100">Generated from LiteChat Runnable JavaScript Block</p>
+            <h1 class="text-2xl font-bold mb-2">🚀 LiteChat Executable</h1>
         </div>
         <div class="content">
             <div id="litechat-target"></div>
         </div>
         <div class="footer">
-            Generated by <strong>LiteChat</strong> • Visit <a href="https://litechat.dbuild.dev" class="text-blue-600 hover:underline">litechat.dbuild.dev</a>
+            Generated by <strong>LiteChat</strong> • Visit <a href="https://litechat.dev" class="text-blue-600 hover:underline">litechat.dev</a>
         </div>
     </div>
 
@@ -1176,9 +1392,13 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           
           {/* Mode indicator */}
           <span className={`text-xs px-1.5 py-0.5 rounded ${
-            useSafeMode ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+            executionMode === 'safe' ? "bg-green-100 text-green-700" : 
+            executionMode === 'iframe' ? "bg-blue-100 text-blue-700" :
+            "bg-orange-100 text-orange-700"
           }`}>
-            {useSafeMode ? t('jsRunnableBlock.safe') : t('jsRunnableBlock.unsafe')}
+            {executionMode === 'safe' ? t('jsRunnableBlock.safe') : 
+             executionMode === 'iframe' ? t('jsRunnableBlock.iframe') :
+             t('jsRunnableBlock.unsafe')}
           </span>
           
           {/* Security result */}
@@ -1196,18 +1416,32 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         </div>
         
         <div className="flex items-center gap-1">
-          {/* Safe/Unsafe toggle */}
-          <div className="flex items-center gap-2">
-            <Label htmlFor={`safe-mode-toggle-${blockUniqueId}`} className="text-xs">
-              {useSafeMode ? t('jsRunnableBlock.safe') : t('jsRunnableBlock.unsafe')}
-            </Label>
-            <Switch
-              id={`safe-mode-toggle-${blockUniqueId}`}
-              checked={useSafeMode}
-              onCheckedChange={setUseSafeMode}
-              className="scale-75"
-            />
-          </div>
+          {/* Execution Mode Selector */}
+          <Select value={executionMode} onValueChange={(value: 'safe' | 'iframe' | 'unsafe') => setExecutionMode(value)}>
+            <SelectTrigger className="w-24 h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="safe" className="text-xs">
+                <div className="flex items-center gap-1">
+                  <ShieldCheckIcon className="h-3 w-3 text-green-600" />
+                  Safe
+                </div>
+              </SelectItem>
+              <SelectItem value="iframe" className="text-xs">
+                <div className="flex items-center gap-1">
+                  <MonitorSpeakerIcon className="h-3 w-3 text-blue-600" />
+                  Iframe
+                </div>
+              </SelectItem>
+              <SelectItem value="unsafe" className="text-xs">
+                <div className="flex items-center gap-1">
+                  <ShieldIcon className="h-3 w-3 text-orange-600" />
+                  Unsafe
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           
           {/* Security check button */}
           <ActionTooltipButton
@@ -1282,7 +1516,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
           >
             {isRunning || quickjsStatus === 'loading' ? (
               <Loader2Icon className="h-3 w-3 mr-1 animate-spin" />
-            ) : quickjsStatus !== 'ready' && useSafeMode ? (
+            ) : quickjsStatus !== 'ready' && executionMode === 'safe' ? (
               <DownloadIcon className="h-3 w-3 mr-1" />
             ) : (
               <PlayIcon className="h-3 w-3 mr-1" />
