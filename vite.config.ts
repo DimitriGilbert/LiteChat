@@ -68,9 +68,13 @@ function buildTimeConfigPlugin() {
   };
 }
 
+// Get build configuration from environment
+const base = process.env.VITE_BASE || '/';
+const lang = process.env.VITE_APP_LANG || 'en';
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: process.env.VITE_BASE || '/',
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -88,6 +92,12 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt}'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB limit
+        navigateFallback: `${base}index.html`,
+        navigateFallbackDenylist: [/^\/__.*$/],
+        // Fix: Add modifyURLPrefix to ensure assets use correct base path
+        modifyURLPrefix: {
+          '': base  // Transform relative URLs to use the correct base path
+        },
         runtimeCaching: [
           // {
           //   urlPattern: /^https:\/\/api\.openai\.com\/.*/i,
@@ -121,22 +131,23 @@ export default defineConfig({
         theme_color: '#4fd1c5',
         background_color: '#1a2a3a',
         display: 'standalone',
-        scope: '/',
-        start_url: '/',
+        lang: lang,
+        scope: base,
+        start_url: base,
         icons: [
           {
-            src: '/icons/192.png',
+            src: `${base}icons/192.png`,
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable'
           },
           {
-            src: '/icons/384.png',
+            src: `${base}icons/384.png`,
             sizes: '384x384',
             type: 'image/png'
           },
           {
-            src: '/icons/512.png',
+            src: `${base}icons/512.png`,
             sizes: '512x512',
             type: 'image/png'
           }

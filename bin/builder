@@ -195,6 +195,11 @@ build_project() {
     fi
     log_info "Copying build to $BUILD_DIR/"
     cp -r "$DIST_DIR"/* "$BUILD_DIR/"
+    
+    # Add .nojekyll file to disable Jekyll processing on GitHub Pages
+    log_info "Adding .nojekyll file to disable Jekyll processing"
+    touch "$BUILD_DIR/.nojekyll"
+    
     if [[ -n "$RELEASE_NAME" ]]; then
       log_info "Creating release zip: $RELEASE_DIR/$RELEASE_NAME.zip"
       (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" .)
@@ -221,6 +226,10 @@ build_project() {
     # Also copy to language-specific directory for consistency
     mkdir -p "$BUILD_DIR/$DEFAULT_LANG"
     cp -r "$DIST_DIR"/* "$BUILD_DIR/$DEFAULT_LANG/"
+    
+    # Add .nojekyll file to disable Jekyll processing on GitHub Pages
+    log_info "Adding .nojekyll file to disable Jekyll processing"
+    touch "$BUILD_DIR/.nojekyll"
     
     # Create default release zip
     if [[ -n "$RELEASE_NAME" ]]; then
