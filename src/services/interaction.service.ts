@@ -528,7 +528,13 @@ export const InteractionService = {
       canvasEvent.explainSelectionRequest,
       async (payload) => {
         const { selectedText, interactionId } = payload;
-        console.log(`[InteractionService] Received explainSelectionRequest for ${interactionId}`);
+
+        if (!selectedText || selectedText.trim().length === 0) {
+          toast.error("No text selected for explanation.");
+          return;
+        }
+
+        // console.log(`[InteractionService] Received explainSelectionRequest for ${interactionId}`);
 
         const interaction = useInteractionStore
           .getState()

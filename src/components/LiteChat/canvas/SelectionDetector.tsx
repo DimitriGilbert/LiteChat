@@ -49,7 +49,7 @@ export const SelectionDetector: React.FC<SelectionDetectorProps> = ({
     }
 
     const selectionBounds = range.getBoundingClientRect();
-    const containerBounds = containerElement.getBoundingClientRect();
+    // const containerBounds = containerElement.getBoundingClientRect();
 
     setSelectionContext({
       selectedText,
@@ -59,9 +59,22 @@ export const SelectionDetector: React.FC<SelectionDetectorProps> = ({
     });
 
     // Position controls relative to container
+    const containerBounds = containerElement.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    // const viewportHeight = window.innerHeight;
+    
+    let x = selectionBounds.right - containerBounds.left + 8;
+    let y = selectionBounds.bottom - containerBounds.top + 8;
+    
+    // Adjust if controls would appear outside viewport
+    const controlWidth = 200; // Approximate control panel width
+    if (containerBounds.left + x + controlWidth > viewportWidth) {
+      x = selectionBounds.left - containerBounds.left - controlWidth - 8;
+    }
+    
     setSelectionPosition({
-      x: selectionBounds.right - containerBounds.left + 8,
-      y: selectionBounds.bottom - containerBounds.top + 8,
+      x,
+      y,
     });
   }, [interactionId, responseContent]);
 
