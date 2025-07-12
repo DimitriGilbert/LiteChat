@@ -131,10 +131,10 @@ const CodeBlockRendererComponent: React.FC<CodeBlockRendererProps> = ({
   }, [code]);
 
   useEffect(() => {
-    if (!isFolded) {
+    if (!isFolded && !isEditing) {
       highlightCode();
     }
-  }, [code, lang, isFolded, highlightCode]);
+  }, [code, lang, isFolded, isEditing, highlightCode]);
 
   const toggleFold = () => {
     const unfolding = isFolded;
