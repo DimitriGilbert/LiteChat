@@ -453,6 +453,123 @@ ${userContent}`;
     }
   },
 
+  async explainSelection(selectedText: string, parentInteractionId: string): Promise<void> {
+    console.log(
+      `[ConversationService] explainSelection called for parent ID: ${parentInteractionId}`
+    );
+    const interactionStore = useInteractionStore.getState();
+    const promptState = usePromptStateStore.getState();
+
+    const parentInteraction = interactionStore.interactions.find(
+      (i) => i.id === parentInteractionId
+    );
+
+    if (!parentInteraction || !parentInteraction.prompt) {
+      toast.error("Cannot explain: Original interaction data missing.");
+      return;
+    }
+
+    // Find the next available child index for this parent
+    const existingChildren = interactionStore.interactions.filter(
+      (i) => i.parentId === parentInteractionId
+    );
+    const nextChildIndex = existingChildren.length;
+
+    const conversationId = parentInteraction.conversationId;
+
+    // Create a system prompt focused on explaining the selected text
+    const explanationSystemPrompt = `Please provide a detailed explanation of the following selected text. Focus on clarifying its meaning, context, and any technical details that might not be immediately obvious:
+
+"${selectedText}"
+
+Provide a clear, comprehensive explanation that would help someone understand this content better.`;
+
+    const finalParameters = {
+      temperature: promptState.temperature,
+      max_tokens: promptState.maxTokens,
+      top_p: promptState.topP,
+      top_k: promptState.topK,
+      presence_penalty: promptState.presencePenalty,
+      frequency_penalty: promptState.frequencyPenalty,
+    };
+
+    // Remove null/undefined parameters
+    Object.keys(finalParameters).forEach((key) => {
+      if (
+        finalParameters[key as keyof typeof finalParameters] === null ||
+        finalParameters[key as keyof typeof finalParameters] === undefined
+      ) {
+        delete finalParameters[key as keyof typeof finalParameters];
+      }
+    });
+
+    const promptObject: PromptObject = {
+      system: explanationSystemPrompt,
+      messages: [
+        {
+          role: "user",
+          content: `Please explain this selected text: "${selectedText}"`
+        }
+      ],
+      parameters: finalParameters,
+      metadata: {
+        modelId: promptState.modelId ?? undefined,
+        explainedText: selectedText,
+        parentInteractionId: parentInteractionId,
+      },
+    };
+
+    const turnData: PromptTurnObject = {
+      id: nanoid(),
+      content: `Please explain this selected text: "${selectedText}"`,
+      parameters: finalParameters,
+      metadata: {
+        modelId: promptState.modelId ?? undefined,
+        explainedText: selectedText,
+        parentInteractionId: parentInteractionId,
+      },
+    };
+
+    try {
+      const newExplanationInteraction = await InteractionService.startInteraction(
+        promptObject,
+        conversationId,
+        turnData,
+        "message.assistant_explain"
+      );
+
+      if (newExplanationInteraction) {
+        // Update the interaction to be a child of the parent
+        interactionStore._updateInteractionInState(
+          newExplanationInteraction.id,
+          {
+            parentId: parentInteractionId,
+            index: nextChildIndex,
+          }
+        );
+        
+        // Save the updated interaction
+        const updatedInteraction = {
+          ...newExplanationInteraction,
+          parentId: parentInteractionId,
+          index: nextChildIndex,
+        };
+        await PersistenceService.saveInteraction(updatedInteraction);
+      }
+    } catch (error) {
+      console.error(
+        `[ConversationService] Error explaining selection for ${parentInteractionId}:`,
+        error
+      );
+      toast.error(
+        `Failed to explain selection: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      throw error;
+    }
+  },
+
   // Add a set to track ongoing fork operations
   _pendingForks: new Set<string>(),
   _pendingCompactForks: new Set<string>(),

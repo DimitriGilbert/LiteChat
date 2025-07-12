@@ -6,6 +6,7 @@ import type { Metadata } from "./common";
 export type InteractionType =
   | "message.user_assistant"
   | "message.assistant_regen"
+  | "message.assistant_explain"
   | "message.user_edit"
   | "message.workflow_step"
   | "conversation.title_generation"

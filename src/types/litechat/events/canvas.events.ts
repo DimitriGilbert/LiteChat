@@ -11,6 +11,7 @@ export const canvasEvent = {
   forkConversationCompactRequest: "canvas.interaction.fork.conversation.compact.request",
   raceInteractionRequest: "canvas.interaction.race.request",
   editResponseRequest: "canvas.interaction.edit.response.request",
+  explainSelectionRequest: "canvas.selection.explain.request",
   // rateInteractionRequest: "canvas.interaction.rate.request", // Removed
   // TODO: Add more interaction action requests as needed (e.g., edit, delete)
 
@@ -57,6 +58,10 @@ export interface CanvasEventPayloads {
   [canvasEvent.editResponseRequest]: {
     interactionId: string;
     newContent: string;
+  };
+  [canvasEvent.explainSelectionRequest]: {
+    selectedText: string;
+    interactionId: string;
   };
   // [canvasEvent.rateInteractionRequest]: { // Removed
   //   interactionId: string;

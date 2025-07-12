@@ -10,8 +10,6 @@ npm run build              # Build for production with TypeScript compilation
 npm run build:en           # Build English version specifically
 npm run build:fr           # Build French version specifically
 npm run build:all          # Build all language versions
-npm run lint               # Run ESLint with TypeScript rules
-npm run preview            # Preview production build
 ```
 
 ### Deployment & Services

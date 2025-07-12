@@ -524,6 +524,46 @@ export const InteractionService = {
       }
     );
 
+    emitter.on(
+      canvasEvent.explainSelectionRequest,
+      async (payload) => {
+        const { selectedText, interactionId } = payload;
+        console.log(`[InteractionService] Received explainSelectionRequest for ${interactionId}`);
+
+        const interaction = useInteractionStore
+          .getState()
+          .interactions.find((i) => i.id === interactionId);
+
+        if (!interaction) {
+          toast.error(
+            `Explanation failed: Interaction ${interactionId} not found.`
+          );
+          console.warn(
+            `[InteractionService] Explanation request for unknown interaction ${interactionId}`
+          );
+          return;
+        }
+
+        // Add safety checks: is global streaming off?
+        const interactionStoreState = useInteractionStore.getState();
+        const globalStreamingStatus = interactionStoreState.status;
+        if (globalStreamingStatus === "streaming") {
+          toast.info("Cannot explain while another response is streaming.");
+          return;
+        }
+
+        try {
+          await ConversationService.explainSelection(selectedText, interactionId);
+        } catch (error) {
+          toast.error(`Failed to explain selection: ${String(error)}`);
+          console.error(
+            `[InteractionService] Error explaining selection for ${interactionId}:`,
+            error
+          );
+        }
+      }
+    );
+
     // TODO: Add listeners for other canvas events like regenerate, rate, etc.
     // emitter.on(canvasEvent.regenerateInteractionRequest, async (payload) => { ... });
     // emitter.on(canvasEvent.rateInteractionRequest, async (payload) => { ... });

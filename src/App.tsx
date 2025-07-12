@@ -70,6 +70,7 @@ import { DownloadCodeBlockControlModule } from "@/controls/modules/canvas/codebl
 import { UniversalRepairEnhanceControlModule } from "@/controls/modules/canvas/codeblock/RepairEnhanceCodeBlockControlModule";
 import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCallStepControlModule";
 import { QuoteSelectionControlModule } from "@/controls/modules/canvas/QuoteSelectionControlModule";
+import { ExplainSelectionControlModule } from "@/controls/modules/canvas/ExplainSelectionControlModule";
 
 // Import block renderer modules
 import { CodeBlockRendererModule } from "@/controls/modules/CodeBlockRendererModule";
@@ -151,6 +152,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   // ExampleCanvasControlModule,
   ToolCallStepControlModule,
   QuoteSelectionControlModule, // For text selection controls
+  ExplainSelectionControlModule, // For text selection controls
 ];
 
 function App() {
