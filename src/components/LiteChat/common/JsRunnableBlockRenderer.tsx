@@ -29,8 +29,6 @@ import {
   SquareIcon,
   RocketIcon,
 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
@@ -310,6 +308,16 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
     return () => {
       if (previewRef.current) {
         try {
+          // Clean up iframe message listeners before clearing content
+          const iframes = previewRef.current.querySelectorAll('iframe');
+          iframes.forEach(iframe => {
+            const messageHandler = (iframe as any).__litechatMessageHandler;
+            if (messageHandler) {
+              window.removeEventListener('message', messageHandler);
+              delete (iframe as any).__litechatMessageHandler;
+            }
+          });
+          
           // Simple cleanup during unmount
           previewRef.current.innerHTML = "";
         } catch (error) {
@@ -586,6 +594,8 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 
   // IFRAME MODE EXECUTION - Completely isolated in iframe
   const executeIframeMode = useCallback(async (codeToRun: string, capturedLogs: string[]) => {
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+    
     try {
       // Clear preview first
       if (previewRef.current) {
@@ -751,7 +761,7 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 </html>`;
 
       // Set up message listener for iframe communication
-      const messageHandler = (event: MessageEvent) => {
+      messageHandler = (event: MessageEvent) => {
         if (event.source === iframe.contentWindow) {
           switch (event.data.type) {
             case 'litechat-log':
@@ -776,11 +786,11 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
       iframe.srcdoc = iframeContent;
       previewRef.current?.appendChild(iframe);
 
+      // Store reference to iframe and messageHandler for cleanup
+      (iframe as any).__litechatMessageHandler = messageHandler;
+
       // Wait a bit for iframe to load and execute
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Cleanup message listener
-      window.removeEventListener('message', messageHandler);
 
       if (capturedLogs.length === 0) {
         capturedLogs.push("Code executed successfully in iframe mode");
@@ -788,6 +798,9 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
 
     } catch (error) {
       capturedLogs.push(`Iframe execution error: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      // Note: We don't remove the message listener here anymore
+      // It will be cleaned up when the component unmounts or iframe is removed
     }
   }, []);
 
@@ -973,6 +986,16 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
   const handleStop = useCallback(() => {
     // Clear preview content
     if (previewRef.current) {
+      // Clean up iframe message listeners before clearing content
+      const iframes = previewRef.current.querySelectorAll('iframe');
+      iframes.forEach(iframe => {
+        const messageHandler = (iframe as any).__litechatMessageHandler;
+        if (messageHandler) {
+          window.removeEventListener('message', messageHandler);
+          delete (iframe as any).__litechatMessageHandler;
+        }
+      });
+      
       previewRef.current.innerHTML = '';
     }
     
