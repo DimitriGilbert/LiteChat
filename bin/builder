@@ -235,7 +235,7 @@ build_project() {
       log_info "Building language: $lang (will be placed in $BUILD_DIR/$lang/)"
       rm -rf "$DIST_DIR"
       export VITE_APP_LANG="$lang"
-      export VITE_BASE="/"
+      export VITE_BASE="/$lang/"
       npm run build
       if [[ ! -d "$DIST_DIR" ]]; then
         log_error "Build failed for language $lang - dist directory not found"
