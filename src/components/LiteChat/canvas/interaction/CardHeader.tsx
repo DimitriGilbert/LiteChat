@@ -1,7 +1,7 @@
 // src/components/LiteChat/canvas/interaction/CardHeader.tsx
 // FULL FILE
 import React from "react";
-import { BotIcon, ClockIcon, ZapIcon, CoinsIcon, WandSparklesIcon } from "lucide-react";
+import { BotIcon, ClockIcon, ZapIcon, CoinsIcon, WandSparklesIcon, GaugeIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -59,6 +59,11 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
       ? promptTokens + completionTokens
       : undefined;
 
+  const tokensPerSecond =
+    completionTokens !== undefined && generationTime !== undefined && timeToFirstToken !== undefined && generationTime > timeToFirstToken
+      ? (completionTokens / ((generationTime - timeToFirstToken) / 1000)).toFixed(1)
+      : undefined;
+
   return (
     <div
       className={cn(
@@ -113,6 +118,19 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
                     Total Generation Time
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {tokensPerSecond !== undefined && (
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger className="flex items-center gap-0.5 cursor-default">
+                    <GaugeIcon className="h-3 w-3" />
+                    <span>{tokensPerSecond} TPS</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    Tokens Per Second
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
