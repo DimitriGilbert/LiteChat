@@ -729,7 +729,8 @@ const JsRunnableBlockRendererComponent: React.FC<JsRunnableBlockRendererProps> =
         
         // Auto-resize iframe to content
         function resizeIframe() {
-            const height = Math.max(document.body.scrollHeight, 200);
+            const minHeight = Math.floor(window.parent.innerHeight * 0.67);
+            const height = Math.max(document.body.scrollHeight, minHeight);
             window.parent.postMessage({
                 type: 'litechat-resize',
                 height: height
