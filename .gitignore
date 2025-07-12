@@ -32,3 +32,6 @@ src.*.d
 todo.*.md
 public/versions/
 **/*.bak
+
+# hides all local stuff :)
+*.local.*
