@@ -37,6 +37,7 @@ import { PromptLibraryControlModule } from "@/controls/modules/PromptLibraryCont
 import { AgentControlModule } from "@/controls/modules/AgentControlModule";
 import { WorkflowControlModule } from "@/controls/modules/WorkflowControlModule";
 import { WorkflowDisplayModule } from "@/controls/modules/WorkflowDisplayModule";
+import { OpenRouterProviderControlModule } from "@/controls/modules/OpenRouterProviderControlModule";
 
 
 // Import new/updated Settings Modules
@@ -103,6 +104,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   FileControlModule,
   VfsControlModule,
   RulesControlModule,
+  OpenRouterProviderControlModule,
   SystemPromptControlModule,
   ToolSelectorControlModule,
   ParameterControlModule,
