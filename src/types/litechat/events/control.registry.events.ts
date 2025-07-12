@@ -6,6 +6,7 @@ import type {
   ChatControl as CoreChatControlAliased,
   CanvasControl as CoreCanvasControlAliased, // Added
 } from "@/types/litechat/control";
+import type { SelectionControl } from "@/types/litechat/canvas/control";
 import type {
   ToolImplementation,
   ModalProvider,
@@ -19,6 +20,7 @@ export const controlRegistryEvent = {
   promptControlsChanged: "control.registry.prompt.controls.changed",
   chatControlsChanged: "control.registry.chat.controls.changed",
   canvasControlsChanged: "control.registry.canvas.controls.changed", // Added
+  selectionControlsChanged: "control.registry.selection.controls.changed",
   middlewareChanged: "control.registry.middleware.changed",
   toolsChanged: "control.registry.tools.changed",
   modalProvidersChanged: "control.registry.modal.providers.changed",
@@ -36,6 +38,10 @@ export const controlRegistryEvent = {
     "control.registry.register.canvas.control.request", // Added
   unregisterCanvasControlRequest:
     "control.registry.unregister.canvas.control.request", // Added
+  registerSelectionControlRequest:
+    "control.registry.register.selection.control.request",
+  unregisterSelectionControlRequest:
+    "control.registry.unregister.selection.control.request",
   registerMiddlewareRequest: "control.registry.register.middleware.request",
   unregisterMiddlewareRequest: "control.registry.unregister.middleware.request",
   registerToolRequest: "control.registry.register.tool.request",
@@ -58,6 +64,9 @@ export interface ControlRegistryEventPayloads {
   [controlRegistryEvent.canvasControlsChanged]: {
     // Added
     controls: Record<string, CoreCanvasControlAliased>;
+  };
+  [controlRegistryEvent.selectionControlsChanged]: {
+    controls: Record<string, SelectionControl>;
   };
   [controlRegistryEvent.middlewareChanged]: {
     middleware: ControlState["middlewareRegistry"];
@@ -82,6 +91,10 @@ export interface ControlRegistryEventPayloads {
     control: CoreCanvasControlAliased;
   };
   [controlRegistryEvent.unregisterCanvasControlRequest]: { id: string }; // Added
+  [controlRegistryEvent.registerSelectionControlRequest]: {
+    control: SelectionControl;
+  };
+  [controlRegistryEvent.unregisterSelectionControlRequest]: { id: string };
   [controlRegistryEvent.registerMiddlewareRequest]: {
     hookName: ModMiddlewareHookName;
     modId: string;

@@ -22,7 +22,7 @@ import { type UiEventPayloads } from "./events/ui.events";
 import { type VfsEventPayloads } from "./events/vfs.events";
 import { type McpEventPayloads } from "./events/mcp.events";
 import { type BlockRendererEventPayloads } from "./events/block-renderer.events";
-import type { CanvasControl as CoreCanvasControlFromTypes } from "./canvas/control";
+import type { CanvasControl as CoreCanvasControlFromTypes, SelectionControl } from "./canvas/control";
 import type { BlockRenderer } from "./canvas/block-renderer";
 import { type WorkflowEventPayloads } from "./events/workflow.events";
 
@@ -133,6 +133,7 @@ export interface LiteChatModApi {
   registerPromptControl: (control: ModPromptControl) => () => void;
   registerChatControl: (control: ModChatControl) => () => void;
   registerCanvasControl: (control: CoreCanvasControlFromTypes) => () => void; // Added
+  registerSelectionControl: (control: SelectionControl) => () => void;
   registerBlockRenderer: (renderer: BlockRenderer) => () => void;
   registerRule: (rule: ModControlRule) => () => void;
   registerTool: <P extends z.ZodSchema<any>>(

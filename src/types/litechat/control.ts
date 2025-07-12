@@ -2,7 +2,7 @@
 // FULL FILE
 import type { PromptControl as CorePromptControlFromTypes } from "@/types/litechat/prompt";
 import type { ChatControl as CoreChatControlFromTypes } from "@/types/litechat/chat";
-import type { CanvasControl as CoreCanvasControlFromTypes } from "@/types/litechat/canvas/control"; // Added
+import type { CanvasControl as CoreCanvasControlFromTypes, SelectionControl } from "@/types/litechat/canvas/control"; // Added
 import type { BlockRenderer } from "@/types/litechat/canvas/block-renderer";
 import type {
   ModMiddlewareHookName,
@@ -44,6 +44,7 @@ export interface ControlState {
   promptControls: Record<string, CorePromptControlFromTypes>;
   chatControls: Record<string, CoreChatControlFromTypes>;
   canvasControls: Record<string, CoreCanvasControlFromTypes>; // Added
+  selectionControls: Record<string, SelectionControl>;
   blockRenderers: Record<string, BlockRenderer>;
   middlewareRegistry: MiddlewareRegistry;
   tools: Record<
@@ -66,6 +67,8 @@ export interface ControlActions {
   unregisterChatControl: (id: string) => void;
   registerCanvasControl: (control: CoreCanvasControlFromTypes) => () => void; // Added
   unregisterCanvasControl: (id: string) => void; // Added
+  registerSelectionControl: (control: SelectionControl) => () => void;
+  unregisterSelectionControl: (id: string) => void;
   registerBlockRenderer: (renderer: BlockRenderer) => () => void;
   unregisterBlockRenderer: (id: string) => void;
   registerMiddleware: <H extends ModMiddlewareHookName>(

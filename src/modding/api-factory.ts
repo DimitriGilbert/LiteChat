@@ -15,7 +15,7 @@ import type {
 } from "@/types/litechat/modding";
 import type { ChatControl as CoreChatControlFromTypes } from "@/types/litechat/chat";
 import type { PromptControl as CorePromptControlFromTypes } from "@/types/litechat/prompt";
-import type { CanvasControl as CoreCanvasControlFromTypes } from "@/types/litechat/canvas/control";
+import type { CanvasControl as CoreCanvasControlFromTypes, SelectionControl } from "@/types/litechat/canvas/control";
 import type { BlockRenderer } from "@/types/litechat/canvas/block-renderer";
 
 import { Tool } from "ai";
@@ -73,6 +73,17 @@ export function createModApi(mod: DbMod): LiteChatModApi {
       });
       const u = () =>
         emitter.emit(controlRegistryEvent.unregisterCanvasControlRequest, {
+          id: control.id,
+        });
+      unsubscribers.push(u);
+      return u;
+    },
+    registerSelectionControl: (control: SelectionControl) => {
+      emitter.emit(controlRegistryEvent.registerSelectionControlRequest, {
+        control,
+      });
+      const u = () =>
+        emitter.emit(controlRegistryEvent.unregisterSelectionControlRequest, {
           id: control.id,
         });
       unsubscribers.push(u);

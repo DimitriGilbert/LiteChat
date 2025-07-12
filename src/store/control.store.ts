@@ -17,6 +17,7 @@ import type {
   RegisteredActionHandler,
   CanvasControl as CoreCanvasControlAliased, // Added alias
 } from "@/types/litechat/control";
+import type { SelectionControl } from "@/types/litechat/canvas/control";
 import type {
   ModalProvider,
   ModMiddlewareHookName,
@@ -30,6 +31,7 @@ export const useControlRegistryStore = create(
     promptControls: {},
     chatControls: {},
     canvasControls: {}, // Added
+    selectionControls: {},
     blockRenderers: {},
     middlewareRegistry: {},
     tools: {},
@@ -126,6 +128,36 @@ export const useControlRegistryStore = create(
       });
       emitter.emit(controlRegistryEvent.canvasControlsChanged, {
         controls: get().canvasControls,
+      });
+    },
+
+    registerSelectionControl: (control: SelectionControl) => {
+      set((state) => {
+        if (state.selectionControls[control.id]) {
+          console.warn(
+            `ControlRegistryStore: SelectionControl with ID "${control.id}" already registered. Overwriting.`
+          );
+        }
+        state.selectionControls[control.id] = control;
+      });
+      emitter.emit(controlRegistryEvent.selectionControlsChanged, {
+        controls: get().selectionControls,
+      });
+      return () => get().unregisterSelectionControl(control.id);
+    },
+
+    unregisterSelectionControl: (id: string) => {
+      set((state) => {
+        if (state.selectionControls[id]) {
+          delete state.selectionControls[id];
+        } else {
+          console.warn(
+            `ControlRegistryStore: SelectionControl with ID "${id}" not found for unregistration.`
+          );
+        }
+      });
+      emitter.emit(controlRegistryEvent.selectionControlsChanged, {
+        controls: get().selectionControls,
       });
     },
 
@@ -475,6 +507,24 @@ export const useControlRegistryStore = create(
             payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterControlRuleRequest]
           ) => {
             actions.unregisterControlRule(payload.id);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.registerSelectionControlRequest,
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerSelectionControlRequest]
+          ) => {
+            actions.registerSelectionControl(payload.control);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.unregisterSelectionControlRequest,
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterSelectionControlRequest]
+          ) => {
+            actions.unregisterSelectionControl(payload.id);
           },
           storeId,
         },

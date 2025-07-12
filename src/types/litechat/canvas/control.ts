@@ -71,3 +71,16 @@ export interface CanvasControl {
   getViewState?: () => Record<string, any>;
   restoreViewState?: (state: Record<string, any>) => void;
 }
+
+export interface SelectionControlContext {
+  selectedText: string;
+  selectionBounds: DOMRect;
+  interactionId?: string;
+  responseContent?: string;
+}
+
+export interface SelectionControl {
+  id: string;
+  renderer: (context: SelectionControlContext) => React.ReactNode;
+  showCondition?: (context: SelectionControlContext) => boolean;
+}

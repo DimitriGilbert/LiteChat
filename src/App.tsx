@@ -69,6 +69,7 @@ import { FoldCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/
 import { DownloadCodeBlockControlModule } from "@/controls/modules/canvas/codeblock/DownloadCodeBlockControlModule";
 import { UniversalRepairEnhanceControlModule } from "@/controls/modules/canvas/codeblock/RepairEnhanceCodeBlockControlModule";
 import { ToolCallStepControlModule } from "@/controls/modules/canvas/tool/ToolCallStepControlModule";
+import { QuoteSelectionControlModule } from "@/controls/modules/canvas/QuoteSelectionControlModule";
 
 // Import block renderer modules
 import { CodeBlockRendererModule } from "@/controls/modules/CodeBlockRendererModule";
@@ -149,6 +150,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   EditCodeBlockControlModule, // For CodeBlockRenderer header
   // ExampleCanvasControlModule,
   ToolCallStepControlModule,
+  QuoteSelectionControlModule, // For text selection controls
 ];
 
 function App() {

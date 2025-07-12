@@ -13,6 +13,7 @@ import {
   useMarkdownParser,
 } from "@/lib/litechat/useMarkdownParser";
 import { UniversalBlockRenderer } from "@/components/LiteChat/common/UniversalBlockRenderer";
+import { SelectionDetector } from "@/components/LiteChat/canvas/SelectionDetector";
 import { type ToolCallPart, type ToolResultPart } from "ai";
 import { toast } from "sonner";
 import { useControlRegistryStore } from "@/store/control.store";
@@ -31,31 +32,36 @@ const StaticContentView: React.FC<{ markdownContent: string | null, interactionI
   }
 
   return (
-    <div className="overflow-wrap-anywhere">
-      {parsedContent.map((item, index) => {
-        if (typeof item === "string") {
-          return (
-            <div
-              key={`html-${index}`}
-              className="markdown-content"
-              dangerouslySetInnerHTML={{ __html: item }}
-            />
-          );
-        } else if (item.type === "block") {
-          // Always use UniversalBlockRenderer for all code blocks
-          return (
-            <UniversalBlockRenderer
-              key={`block-${index}`}
-              lang={item.lang}
-              code={item.code}
-              filepath={item.filepath}
-              interactionId={interactionId}
-            />
-          );
-        }
-        return null;
-      })}
-    </div>
+    <SelectionDetector 
+      interactionId={interactionId} 
+      responseContent={markdownContent}
+    >
+      <div className="overflow-wrap-anywhere">
+        {parsedContent.map((item, index) => {
+          if (typeof item === "string") {
+            return (
+              <div
+                key={`html-${index}`}
+                className="markdown-content"
+                dangerouslySetInnerHTML={{ __html: item }}
+              />
+            );
+          } else if (item.type === "block") {
+            // Always use UniversalBlockRenderer for all code blocks
+            return (
+              <UniversalBlockRenderer
+                key={`block-${index}`}
+                lang={item.lang}
+                code={item.code}
+                filepath={item.filepath}
+                interactionId={interactionId}
+              />
+            );
+          }
+          return null;
+        })}
+      </div>
+    </SelectionDetector>
   );
 };
 
