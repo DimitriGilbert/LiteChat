@@ -171,15 +171,24 @@ export class OpenRouterProviderControlModule implements ControlModule {
         status: () => (this.isLoading ? "loading" : "ready"),
         triggerRenderer: () =>
           React.createElement(OpenRouterProviderControlTrigger, { module: this }),
-        getMetadata: () => {
-          // Only include provider metadata if not all providers are selected
-          if (this.selectedProviders.size > 0 && this.selectedProviders.size < this.availableProviders.length) {
+        getParameters: () => {
+          const hasSelected = this.selectedProviders.size > 0;
+          const hasAll = this.selectedProviders.size >= this.availableProviders.length;
+          const shouldInclude = hasSelected && !hasAll;
+          
+          // Only include provider options if not all providers are selected
+          if (shouldInclude) {
             return {
-              provider: {
-                only: Array.from(this.selectedProviders)
+              providerOptions: {
+                openrouter: {
+                  provider: {
+                    only: Array.from(this.selectedProviders)
+                  }
+                }
               }
             };
           }
+          
           return undefined;
         },
         clearOnSubmit: () => {
