@@ -5,13 +5,9 @@ import App from "./App.tsx";
 import "./index.css";
 import { enableMapSet } from "immer";
 import { PWAService } from "./services/pwa.service";
-// import { initializeWebSearch } from "./lib/litechat/websearch-initialization"; // DISABLED - now handled by control module
 import "./i18n/config"; // Initialize i18next
 
 enableMapSet();
-
-// Initialize websearch system - DISABLED, now handled by WorkflowWebSearchControlModule
-// initializeWebSearch();
 
 // Initialize PWA service for proper architecture
 if (import.meta.env.PROD) {
