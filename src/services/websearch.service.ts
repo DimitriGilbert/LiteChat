@@ -10,9 +10,9 @@ import type {
   CachedSearchResult,
   SearchQualityMetrics
 } from '../types/litechat/websearch';
+import { load } from 'cheerio';
 
 export class WebSearchService {
-  private static readonly DUCKDUCKGO_BASE_URL = 'https://duckduckgo.com';
   private static readonly URL_TO_MARKDOWN_SERVICE = 'https://urltomarkdown.herokuapp.com/';
   private static readonly DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
   
@@ -228,126 +228,152 @@ export class WebSearchService {
   // Private helper methods
 
   private static async performDuckDuckGoSearch(query: string, options: WebSearchOptions): Promise<SearchResult[]> {
-    // First, get the search token
-    const tokenResponse = await fetch(`${this.DUCKDUCKGO_BASE_URL}/?q=${encodeURIComponent(query)}`, {
-      headers: { 'User-Agent': this.DEFAULT_USER_AGENT }
+    const params = new URLSearchParams({ q: query });
+    const corsProxy = 'https://api.cors.lol/?url=';
+    const targetUrl = `https://duckduckgo.com/html?${params}`;
+    const response = await fetch(`${corsProxy}${encodeURIComponent(targetUrl)}`, {
+      headers: {
+        "User-Agent": this.DEFAULT_USER_AGENT,
+      },
     });
-    
-    const tokenHtml = await tokenResponse.text();
-    const vqd = this.extractVqd(tokenHtml);
-    
-    if (!vqd) {
-      throw new Error('Failed to extract search token');
+
+    if (!response.ok) {
+      throw new Error(`HTML fetch failed: ${response.status}`);
     }
 
-    // Build search parameters
-    const params = new URLSearchParams({
-      q: query,
-      vqd,
-      kl: options.region || 'us-en',
-      safesearch: options.safeSearch || 'moderate',
-      s: '0',
-      df: options.timeRange || '',
-      ex: '-1'
-    });
-
-    // Perform the actual search
-    const searchResponse = await fetch(`${this.DUCKDUCKGO_BASE_URL}/d.js?${params}`, {
-      headers: { 
-        'User-Agent': this.DEFAULT_USER_AGENT,
-        'Referer': `${this.DUCKDUCKGO_BASE_URL}/`
-      }
-    });
-
-    const searchData = await searchResponse.text();
-    return this.parseDuckDuckGoResults(searchData, options.maxResults || 10);
+    const html = await response.text();
+    return this.parseDuckDuckGoHtmlResults(html, options.maxResults || 10);
   }
 
   private static async performDuckDuckGoImageSearch(query: string, options: ImageSearchOptions): Promise<SearchResult[]> {
-    // Similar to web search but for images
-    const tokenResponse = await fetch(`${this.DUCKDUCKGO_BASE_URL}/?q=${encodeURIComponent(query)}&iax=images&ia=images`, {
-      headers: { 'User-Agent': this.DEFAULT_USER_AGENT }
+    // First get HTML page to extract vqd token
+    const params = new URLSearchParams({ q: query });
+    const corsProxy = 'https://api.cors.lol/?url=';
+    const targetUrl = `https://duckduckgo.com/html?${params}`;
+    const html = await fetch(`${corsProxy}${encodeURIComponent(targetUrl)}`, {
+      headers: {
+        "User-Agent": this.DEFAULT_USER_AGENT,
+      },
     });
     
-    const tokenHtml = await tokenResponse.text();
-    const vqd = this.extractVqd(tokenHtml);
+    if (!html.ok) {
+      throw new Error(`HTML fetch failed: ${html.status}`);
+    }
+    
+    const htmlText = await html.text();
+    const vqd = this.extractVqd(htmlText);
     
     if (!vqd) {
-      throw new Error('Failed to extract image search token');
+      throw new Error('Failed to extract vqd token');
     }
 
-    const params = new URLSearchParams({
-      l: options.region || 'us-en',
-      o: 'json',
-      q: query,
-      vqd,
-      f: [
-        options.color && `color:${options.color}`,
-        options.type && `type:${options.type}`,
-        options.layout && `layout:${options.layout}`,
-        options.size && `size:${options.size}`,
-        options.license && `license:${options.license}`
-      ].filter(Boolean).join(','),
-      p: '1'
+    // Now search images using i.js API
+    const imageParams = new URLSearchParams({ q: query, vqd, l: 'us-en' });
+    const imageUrl = `https://duckduckgo.com/i.js?${imageParams}`;
+    const imageResponse = await fetch(`${corsProxy}${encodeURIComponent(imageUrl)}`, {
+      headers: {
+        "User-Agent": this.DEFAULT_USER_AGENT,
+      },
     });
 
-    const imageResponse = await fetch(`${this.DUCKDUCKGO_BASE_URL}/i.js?${params}`, {
-      headers: { 
-        'User-Agent': this.DEFAULT_USER_AGENT,
-        'Referer': `${this.DUCKDUCKGO_BASE_URL}/`
-      }
-    });
+    if (!imageResponse.ok) {
+      throw new Error(`Image search failed: ${imageResponse.status}`);
+    }
 
-    const imageData = await imageResponse.text();
-    return this.parseDuckDuckGoImageResults(imageData, options.maxResults || 10);
+    const json = await imageResponse.json();
+    return this.parseDuckDuckGoImageResults(json, options.maxResults || 10);
   }
 
   private static extractVqd(html: string): string | null {
-    const vqdMatch = html.match(/vqd=['"]([^'"]+)['"]/);
-    return vqdMatch ? vqdMatch[1] : null;
+    const $ = load(html);
+    const vqd = $('input[name="vqd"]').attr("value");
+    return vqd || null;
   }
 
-  private static parseDuckDuckGoResults(data: string, maxResults: number): SearchResult[] {
+  private static parseDuckDuckGoHtmlResults(html: string, maxResults: number): SearchResult[] {
     try {
-      // Remove JSONP callback wrapper
-      const jsonData = data.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-      const parsed = JSON.parse(jsonData);
-      
+      const $ = load(html);
       const results: SearchResult[] = [];
       
-      if (parsed.results) {
-        for (const item of parsed.results.slice(0, maxResults)) {
+      $(".result__body").each((index, element) => {
+        if (index >= maxResults) return false;
+        
+        const $el = $(element);
+        const title = $el.find(".result__title .result__a").text().trim();
+
+        // Extract and unpack redirect URL
+        const rawHref = $el.find(".result__title .result__a").attr("href") || "";
+        let source = rawHref;
+        try {
+          const wrap = new URL(rawHref, "https://duckduckgo.com");
+          source = wrap.searchParams.get("uddg") || wrap.href;
+        } catch {
+          // leave source = rawHref
+        }
+
+        const publishedDate = $el.find(".result__extras span").text().trim() || undefined;
+        const snippet = $el.find(".result__snippet").text().trim() || undefined;
+
+        let favicon = $el.find(".result__icon__img").attr("src") || undefined;
+        if (favicon?.startsWith("//")) favicon = "https:" + favicon;
+
+        if (title && source) {
           results.push({
-            title: this.decodeHtml(item.t || ''),
-            source: item.u || '',
-            snippet: this.decodeHtml(item.a || ''),
-            favicon: item.i || undefined,
-            publishedDate: item.d || undefined
+            title,
+            source,
+            snippet,
+            publishedDate,
+            favicon,
+            author: undefined,
+            image: undefined,
           });
         }
-      }
+      });
       
       return results;
     } catch (error) {
-      console.error('Failed to parse DuckDuckGo results:', error);
+      console.error('Failed to parse DuckDuckGo HTML results:', error);
       return [];
     }
   }
 
-  private static parseDuckDuckGoImageResults(data: string, maxResults: number): SearchResult[] {
+  private static parseDuckDuckGoImageResults(json: any, maxResults: number): SearchResult[] {
     try {
-      const jsonData = data.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-      const parsed = JSON.parse(jsonData);
-      
+      const arr: any[] = json.results ?? json;
       const results: SearchResult[] = [];
-      
-      if (parsed.results) {
-        for (const item of parsed.results.slice(0, maxResults)) {
+
+      for (const item of arr.slice(0, maxResults)) {
+        const title = item.title || "";
+
+        // Prefer page URL, else fallback to image origin
+        let source = item.url || "";
+        if (!source && item.image) {
+          try {
+            source = new URL(item.image).origin;
+          } catch {
+            source = "";
+          }
+        }
+
+        // The direct image URL
+        let image = item.image || item.thumbnail;
+        if (image?.startsWith("//")) image = "https:" + image;
+        else if (image?.startsWith("/") && source) {
+          image = new URL(image, source).href;
+        }
+
+        const favicon = source
+          ? `https://external-content.duckduckgo.com/ip3/${new URL(source).host}.ico`
+          : undefined;
+
+        if (title && source) {
           results.push({
-            title: this.decodeHtml(item.title || ''),
-            source: item.url || '',
-            image: item.image || '',
-            favicon: item.source_icon || undefined
+            title,
+            source,
+            publishedDate: undefined,
+            author: undefined,
+            image,
+            favicon,
           });
         }
       }
@@ -359,11 +385,7 @@ export class WebSearchService {
     }
   }
 
-  private static decodeHtml(html: string): string {
-    const txt = document.createElement('textarea');
-    txt.innerHTML = html;
-    return txt.value;
-  }
+
 
   private static generateCacheKey(query: string, options: WebSearchOptions | ImageSearchOptions): string {
     return `${query}:${JSON.stringify(options)}`;

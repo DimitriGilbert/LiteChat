@@ -42,11 +42,7 @@ export const WorkflowWebSearchControlTrigger: React.FC<
   const hasActiveSearches = activeSearches.length > 0;
 
   const handleToggleEnabled = useCallback((enabled: boolean) => {
-    if (enabled) {
-      module.toggleEnabled();
-    } else {
-      module.toggleEnabled();
-    }
+    module.setEnabled(enabled);
   }, [module]);
 
   const handleMaxResultsChange = useCallback((value: string) => {

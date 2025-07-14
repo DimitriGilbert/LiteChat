@@ -176,9 +176,9 @@ export class WorkflowWebSearchControlModule implements ControlModule {
 
   private async registerWorkflowTemplates(): Promise<void> {
     try {
-      // Load workflow templates from assets
-      const basicWorkflowResponse = await fetch('/src/assets/workflows/basic-websearch.json');
-      const deepWorkflowResponse = await fetch('/src/assets/workflows/deep-websearch.json');
+      // Load workflow templates from public assets
+      const basicWorkflowResponse = await fetch('/assets/workflows/basic-websearch.json');
+      const deepWorkflowResponse = await fetch('/assets/workflows/deep-websearch.json');
       
       if (basicWorkflowResponse.ok && deepWorkflowResponse.ok) {
         const basicWorkflow = await basicWorkflowResponse.json();
@@ -249,6 +249,11 @@ export class WorkflowWebSearchControlModule implements ControlModule {
 
   public toggleEnabled = (): void => {
     this.isEnabled = !this.isEnabled;
+    this.notifyComponentUpdate?.();
+  };
+
+  public setEnabled = (enabled: boolean): void => {
+    this.isEnabled = enabled;
     this.notifyComponentUpdate?.();
   };
 

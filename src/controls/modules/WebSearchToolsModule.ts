@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { ControlModule } from "@/types/litechat/control";
 import type { LiteChatModApi } from "@/types/litechat/modding";
 import { Tool } from "ai";
+import { WebSearchService } from "@/services/websearch.service";
 
 // Schemas for websearch tools
 const webSearchSchema = z.object({
@@ -51,8 +52,6 @@ export class WebSearchToolsModule implements ControlModule {
         webSearchTool,
         async ({ query, maxResults }: z.infer<typeof webSearchSchema>) => {
           try {
-            // Use the existing websearch service
-            const { WebSearchService } = await import("@/services/websearch.service");
             const results = await WebSearchService.searchWeb(query, { maxResults });
             
             return {
@@ -60,7 +59,7 @@ export class WebSearchToolsModule implements ControlModule {
               query,
               results: results.map((result: any) => ({
                 title: result.title,
-                url: result.url,
+                url: result.source,
                 snippet: result.snippet,
                 source: result.source || "web"
               }))
@@ -87,7 +86,6 @@ export class WebSearchToolsModule implements ControlModule {
         webSearchMultipleTool,
         async ({ queries, maxResults }: z.infer<typeof webSearchMultipleSchema>) => {
           try {
-            const { WebSearchService } = await import("@/services/websearch.service");
             const searchPromises = queries.map(query => 
               WebSearchService.searchWeb(query, { maxResults })
             );
@@ -100,7 +98,7 @@ export class WebSearchToolsModule implements ControlModule {
                 query,
                 results: allResults[index].map((result: any) => ({
                   title: result.title,
-                  url: result.url,
+                  url: result.source,
                   snippet: result.snippet,
                   source: result.source || "web"
                 }))
@@ -128,7 +126,6 @@ export class WebSearchToolsModule implements ControlModule {
         webExtractContentTool,
         async ({ urls, maxContentLength }: z.infer<typeof webExtractContentSchema>) => {
           try {
-            const { WebSearchService } = await import("@/services/websearch.service");
             const extractPromises = urls.map(url => 
               WebSearchService.extractPageContent(url)
             );
@@ -172,7 +169,6 @@ export class WebSearchToolsModule implements ControlModule {
         webSearchAvenuesTool,
         async ({ avenues, maxResults }: z.infer<typeof webSearchAvenuesSchema>) => {
           try {
-            const { WebSearchService } = await import("@/services/websearch.service");
             const deepResults = [];
             
             for (const avenue of avenues) {
@@ -189,7 +185,7 @@ export class WebSearchToolsModule implements ControlModule {
                     query,
                     results: searchResults.map((result: any) => ({
                       title: result.title,
-                      url: result.url,
+                      url: result.source,
                       snippet: result.snippet,
                       source: result.source || "web"
                     })),
