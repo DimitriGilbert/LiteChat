@@ -27,6 +27,8 @@ import { UsageDisplayControlModule } from "@/controls/modules/UsageDisplayContro
 import { UsageDashboardModule } from "@/controls/modules/UsageDashboardModule";
 import { ReasoningControlModule } from "@/controls/modules/ReasoningControlModule";
 import { WebSearchControlModule } from "@/controls/modules/WebSearchControlModule";
+import { WorkflowWebSearchControlModule } from "@/controls/modules/WorkflowWebSearchControlModule";
+import { WebSearchToolsModule } from "@/controls/modules/WebSearchToolsModule";
 import { RulesControlModule } from "@/controls/modules/RulesControlModule";
 import { AutoTitleControlModule } from "@/controls/modules/AutoTitleControlModule";
 import { UrlParameterControlModule } from "@/controls/modules/UrlParameterControlModule";
@@ -102,6 +104,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   UsageDashboardModule,
   ReasoningControlModule,
   WebSearchControlModule,
+  WorkflowWebSearchControlModule,
   ImageGenerationControlModule,
   FileControlModule,
   VfsControlModule,
@@ -121,6 +124,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ManualSyncSidebarControlModule,
   VfsToolsModule,
   GitToolsModule,
+  WebSearchToolsModule,
   McpToolsModule,
   // Block Renderers (should be registered early)
   CodeBlockRendererModule,

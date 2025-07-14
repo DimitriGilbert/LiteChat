@@ -25,6 +25,7 @@ import { type BlockRendererEventPayloads } from "./events/block-renderer.events"
 import type { CanvasControl as CoreCanvasControlFromTypes, SelectionControl } from "./canvas/control";
 import type { BlockRenderer } from "./canvas/block-renderer";
 import { type WorkflowEventPayloads } from "./events/workflow.events";
+import { type WebSearchEventPayloads } from "./events/websearch.events";
 
 import {
   type ModMiddlewareHookName,
@@ -212,6 +213,7 @@ export type ModEventPayloadMap = AppEventPayloads &
   BlockRendererEventPayloads &
   McpEventPayloads &
   WorkflowEventPayloads &
+  WebSearchEventPayloads &
   Record<string, any>;
 
 // Re-export CanvasControlRenderContext from its correct location

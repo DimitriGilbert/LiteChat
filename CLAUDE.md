@@ -21,6 +21,8 @@ npm run serve              # Build and serve with http-server on LITECHAT_PORT (
 npm run update             # Git pull, npm install, and serve (respects LITECHAT_ORIGIN and LITECHAT_BRANCH)
 ```
 
+**⚠️ CRITICAL: NEVER run `npm run serve` or start any servers - user has their own dev environment running!**
+
 ### Docker
 ```bash
 # Manual build
