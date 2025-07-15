@@ -268,7 +268,7 @@ const DEFAULT_CONFIG_SYNC_INCLUDE_AGENTS = true;
 const DEFAULT_CONFIG_SYNC_INCLUDE_WORKFLOWS = true;
 const DEFAULT_CONFIG_SYNC_INCLUDE_MCP_SERVERS = true;
 const DEFAULT_CONFIG_SYNC_LAST_SYNCED_AT = null;
-const DEFAULT_CONFIG_SYNC_INTERVAL = 300000; // 5 minutes
+const DEFAULT_CONFIG_SYNC_INTERVAL = 3600000; // 1 hour
 
 // Add a static array of all SettingsState keys for robust, type-safe enumeration
 export const SETTINGS_KEYS: (keyof SettingsState)[] = [
