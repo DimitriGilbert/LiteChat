@@ -2,13 +2,14 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { ModMiddlewareHook } from "@/types/litechat/modding";
 import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
+import { textTriggerRegistry } from "@/services/text-trigger-registry.service";
 import { useSettingsStore } from "@/store/settings.store";
 import type { TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 export class TextTriggerControlModule implements ControlModule {
   readonly id = "core-text-triggers";
   private unregisterCallback: (() => void) | null = null;
-  private parserService: TextTriggerParserService | null = null;
+  public parserService: TextTriggerParserService | null = null;
 
   async initialize(): Promise<void> {
     const settings = useSettingsStore.getState();

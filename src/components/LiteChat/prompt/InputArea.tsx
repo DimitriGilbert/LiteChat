@@ -16,6 +16,10 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 import { useTranslation } from "react-i18next";
+import { useSettingsStore } from "@/store/settings.store";
+import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
+import type { TextTrigger, TriggerNamespace } from "@/types/litechat/text-triggers";
+import { useControlRegistryStore } from "@/store/control.store";
 
 interface InputAreaProps {
   initialValue?: string;
@@ -42,12 +46,42 @@ export const InputArea = memo(
       ref
     ) => {
       const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+      const highlightRef = useRef<HTMLDivElement>(null);
       const [internalValue, setInternalValue] = useState(initialValue);
+      const [triggers, setTriggers] = useState<TextTrigger[]>([]);
+      const [showAutocomplete, setShowAutocomplete] = useState(false);
+      const [cursorPosition, setCursorPosition] = useState(0);
       const setPromptInputValue = usePromptInputValueStore((state) => state.setValue);
+      const settings = useSettingsStore();
+      const controlRegistry = useControlRegistryStore();
       const { t } = useTranslation('prompt');
       if (!placeholder || placeholder === "") {
         placeholder = t('inputAreaPlaceholder');
       }
+
+      // Initialize parser service and get registered namespaces
+      const parserService = new TextTriggerParserService(
+        settings.textTriggerStartDelimiter,
+        settings.textTriggerEndDelimiter
+      );
+
+      // Get the text trigger control module to access registered namespaces
+      const getRegisteredNamespaces = (): TriggerNamespace[] => {
+        const textTriggerModule = controlRegistry.registeredModules.find(
+          m => m.id === "core-text-triggers"
+        );
+        
+        if (!textTriggerModule?.instance) {
+          return [];
+        }
+
+        // Access the parser service from the module to get registered namespaces
+        try {
+          return (textTriggerModule.instance as any)?.parserService?.getRegisteredNamespaces?.() || [];
+        } catch {
+          return [];
+        }
+      };
 
       useImperativeHandle(ref, () => ({
         
@@ -89,6 +123,12 @@ export const InputArea = memo(
       }));
 
       const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (showAutocomplete && e.key === "Escape") {
+          e.preventDefault();
+          setShowAutocomplete(false);
+          return;
+        }
+
         if (e.key === "Enter" && !e.shiftKey && !disabled) {
           e.preventDefault();
           const hasFiles =
@@ -101,16 +141,41 @@ export const InputArea = memo(
         }
       };
 
+      const parseTriggers = (text: string) => {
+        if (!settings.textTriggersEnabled) {
+          setTriggers([]);
+          return;
+        }
+
+        try {
+          const parseResult = parserService.parseText(text);
+          setTriggers(parseResult.triggers);
+        } catch (error) {
+          console.warn('Error parsing triggers:', error);
+          setTriggers([]);
+        }
+      };
+
       const handleTextareaChange = (
         e: React.ChangeEvent<HTMLTextAreaElement>
       ) => {
         const newValue = e.target.value;
+        const cursorPos = e.target.selectionStart;
+        
         setInternalValue(newValue);
         setPromptInputValue(newValue);
+        setCursorPosition(cursorPos);
+        parseTriggers(newValue);
+        
         if (onValueChange) {
           onValueChange(newValue);
         }
         emitter.emit(promptEvent.inputChanged, { value: newValue });
+
+        // Check for autocomplete - show when typing after @.
+        const textBeforeCursor = newValue.slice(0, cursorPos);
+        const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
+        setShowAutocomplete(!!triggerMatch && triggerMatch[1].length >= 0);
       };
 
       useEffect(() => {
@@ -134,6 +199,94 @@ export const InputArea = memo(
           }
         }
       }, [initialValue, onValueChange, setPromptInputValue]);
+
+      // Parse triggers when value changes
+      useEffect(() => {
+        parseTriggers(internalValue);
+      }, [internalValue, settings.textTriggersEnabled]);
+
+      const renderHighlightedText = () => {
+        if (!settings.textTriggersEnabled || triggers.length === 0) {
+          return null;
+        }
+
+        let lastIndex = 0;
+        const parts: React.ReactNode[] = [];
+
+        triggers.forEach((trigger, index) => {
+          // Add text before trigger
+          if (trigger.startIndex > lastIndex) {
+            parts.push(
+              <span key={`text-${index}`}>
+                {internalValue.slice(lastIndex, trigger.startIndex)}
+              </span>
+            );
+          }
+
+          // Add highlighted trigger
+          const triggerText = internalValue.slice(trigger.startIndex, trigger.endIndex);
+          parts.push(
+            <span
+              key={`trigger-${index}`}
+              className={cn(
+                "rounded px-1",
+                trigger.isValid 
+                  ? "bg-primary/20 text-primary border border-primary/30" 
+                  : "bg-destructive/20 text-destructive border border-destructive/30"
+              )}
+              title={trigger.errorMessage || `${trigger.namespace}.${trigger.method}`}
+            >
+              {triggerText}
+            </span>
+          );
+
+          lastIndex = trigger.endIndex;
+        });
+
+        // Add remaining text
+        if (lastIndex < internalValue.length) {
+          parts.push(
+            <span key="text-end">
+              {internalValue.slice(lastIndex)}
+            </span>
+          );
+        }
+
+        return parts;
+      };
+
+      const getAutocompleteSuggestions = () => {
+        const textBeforeCursor = internalValue.slice(0, cursorPosition);
+        const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
+        
+        if (!triggerMatch) return [];
+
+        const partial = triggerMatch[1].toLowerCase();
+        const namespaces = getRegisteredNamespaces();
+        
+        const suggestions: Array<{ namespace: string; method: string; description: string }> = [];
+        
+        // Build suggestions from registered namespaces
+        namespaces.forEach(namespace => {
+          Object.values(namespace.methods).forEach(method => {
+            suggestions.push({
+              namespace: namespace.id,
+              method: method.id,
+              description: method.description
+            });
+          });
+        });
+
+        if (partial === '') {
+          return suggestions; // Show all when just typed @.
+        }
+
+        return suggestions.filter(s => 
+          s.namespace.startsWith(partial) || 
+          s.method.startsWith(partial) ||
+          `${s.namespace}.${s.method}`.includes(partial)
+        );
+      };
 
       // Listen for setInputTextRequest events
       useEffect(() => {
@@ -162,23 +315,107 @@ export const InputArea = memo(
         };
       }, [onValueChange, setPromptInputValue]);
 
+      const handleAutocompleteSelect = (suggestion: { namespace: string; method: string }) => {
+        const textBeforeCursor = internalValue.slice(0, cursorPosition);
+        const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
+        
+        if (triggerMatch && triggerMatch.index !== undefined) {
+          const beforeTrigger = textBeforeCursor.slice(0, triggerMatch.index);
+          const afterCursor = internalValue.slice(cursorPosition);
+          const newValue = `${beforeTrigger}@.${suggestion.namespace}.${suggestion.method} ${afterCursor}`;
+          
+          setInternalValue(newValue);
+          setPromptInputValue(newValue);
+          parseTriggers(newValue);
+          if (onValueChange) {
+            onValueChange(newValue);
+          }
+          setShowAutocomplete(false);
+          
+          // Focus and set cursor position
+          setTimeout(() => {
+            const textarea = internalTextareaRef.current;
+            if (textarea) {
+              const newCursorPos = beforeTrigger.length + `@.${suggestion.namespace}.${suggestion.method} `.length;
+              textarea.setSelectionRange(newCursorPos, newCursorPos);
+              textarea.focus();
+            }
+          }, 0);
+        }
+      };
+
       return (
-        <Textarea
-          ref={internalTextareaRef}
-          value={internalValue}
-          onChange={handleTextareaChange}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          placeholder={placeholder}
-          rows={1}
-          className={cn(
-            "w-full p-3 border rounded bg-input text-foreground resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto",
-            "min-h-[40px] max-h-[250px]",
-            className
+        <div className="relative">
+          {/* Highlighting overlay */}
+          {settings.textTriggersEnabled && triggers.length > 0 && (
+            <div
+              ref={highlightRef}
+              className={cn(
+                "absolute inset-0 p-3 pointer-events-none whitespace-pre-wrap break-words z-0",
+                "min-h-[40px] max-h-[250px] overflow-y-auto",
+                "text-transparent bg-transparent border border-transparent rounded"
+              )}
+              style={{
+                font: "inherit",
+                lineHeight: "inherit",
+                letterSpacing: "inherit",
+                wordSpacing: "inherit",
+              }}
+            >
+              {renderHighlightedText()}
+            </div>
           )}
-          aria-label={t('chatInputAriaLabel')}
-          {...rest}
-        />
+          
+          {/* Main textarea */}
+          <Textarea
+            ref={internalTextareaRef}
+            value={internalValue}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+            placeholder={placeholder}
+            rows={1}
+            className={cn(
+              "w-full p-3 border rounded resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto relative z-10",
+              "min-h-[40px] max-h-[250px]",
+              settings.textTriggersEnabled && triggers.length > 0 
+                ? "bg-transparent text-foreground" 
+                : "bg-input text-foreground",
+              className
+            )}
+            aria-label={t('chatInputAriaLabel')}
+            onSelect={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              setCursorPosition(target.selectionStart);
+            }}
+            {...rest}
+          />
+
+          {/* Autocomplete dropdown */}
+          {showAutocomplete && settings.textTriggersEnabled && (
+            <div className="absolute bottom-full left-0 w-full max-w-md mb-1 bg-popover border border-border rounded-md shadow-lg z-20 max-h-48 overflow-y-auto">
+              {getAutocompleteSuggestions().map((suggestion) => (
+                <div
+                  key={`${suggestion.namespace}.${suggestion.method}`}
+                  className="p-2 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
+                  onClick={() => handleAutocompleteSelect(suggestion)}
+                >
+                  <div className="font-medium text-sm">
+                    @.{suggestion.namespace}.{suggestion.method}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {suggestion.description}
+                  </div>
+                </div>
+              ))}
+              {getAutocompleteSuggestions().length === 0 && (
+                <div className="p-2 text-sm text-muted-foreground">
+                  No suggestions found
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       );
     }
   )
