@@ -171,7 +171,17 @@
     "editTemplate": "Modifier : {{name}}",
     "deleteConfirmation": "Êtes-vous sûr de vouloir supprimer ce modèle ?"
   },
+  "dataManagement": {
+    "tabs": {
+      "importExport": "Importer/Exporter",
+      "configSync": "Sync Config"
+    }
+  },
   "configSync": {
+    "tabs": {
+      "settings": "Paramètres",
+      "sync": "Synchronisation"
+    },
     "title": "Synchronisation de Configuration",
     "description": "Synchronisez automatiquement votre configuration LiteChat avec des dépôts Git",
     "enabled": {

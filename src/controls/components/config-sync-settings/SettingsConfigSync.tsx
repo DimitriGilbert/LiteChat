@@ -11,8 +11,6 @@ import {
 } from "@/components/ui/card";
 import {
   Loader2,
-  DownloadIcon,
-  UploadIcon,
   RefreshCwIcon,
   CheckCircle2Icon,
   AlertCircleIcon,
@@ -34,8 +32,6 @@ const SettingsConfigSyncComponent: React.FC = () => {
   
   const [configSyncStatus, setConfigSyncStatus] = useState<SyncStatus>("idle");
   const [configSyncError, setConfigSyncError] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
 
   // Get sync repos from conversation store
   const { syncRepos } = useConversationStore(
@@ -141,7 +137,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
     });
   }, [configSyncEnabled, configSyncRepoId, configSyncAutoSync, configSyncInterval, form]);
 
-  const selectedRepo = syncRepos.find(repo => repo.id === configSyncRepoId);
+  const selectedRepo = syncRepos.find(repo => repo.id === configSyncRepoId || repo.name === configSyncRepoId);
 
   const handleManualSync = useCallback(async () => {
     if (!selectedRepo) {
@@ -167,61 +163,6 @@ const SettingsConfigSyncComponent: React.FC = () => {
     }
   }, [selectedRepo, t]);
 
-  const handleExportConfig = useCallback(async () => {
-    setIsExporting(true);
-    try {
-      const configData = await configSyncService.exportConfigToFile();
-      
-      // Create and download file
-      const blob = new Blob([JSON.stringify(configData, null, 2)], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `litechat-config-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast.success(t('configSync.exportSuccess'));
-    } catch (error) {
-      console.error('Config export failed:', error);
-      toast.error(t('configSync.errors.exportFailed', { 
-        error: error instanceof Error ? error.message : String(error) 
-      }));
-    } finally {
-      setIsExporting(false);
-    }
-  }, [t]);
-
-  const handleImportConfig = useCallback(async () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      setIsImporting(true);
-      try {
-        const text = await file.text();
-        const configData = JSON.parse(text);
-        
-        await configSyncService.importConfigFromFile(configData);
-        toast.success(t('configSync.importSuccess'));
-      } catch (error) {
-        console.error('Config import failed:', error);
-        toast.error(t('configSync.errors.importFailed', { 
-          error: error instanceof Error ? error.message : String(error) 
-        }));
-      } finally {
-        setIsImporting(false);
-      }
-    };
-    input.click();
-  }, [t]);
 
 
   return (
@@ -292,7 +233,8 @@ const SettingsConfigSyncComponent: React.FC = () => {
           <Button
             onClick={handleManualSync}
             disabled={!selectedRepo || configSyncStatus === "syncing"}
-            className="w-full"
+            variant="outline"
+            size="sm"
           >
             {configSyncStatus === "syncing" ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -304,46 +246,6 @@ const SettingsConfigSyncComponent: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Separator />
-
-      {/* Import/Export Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('configSync.importExport.title')}</CardTitle>
-          <CardDescription>
-            {t('configSync.importExport.description')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              onClick={handleExportConfig}
-              disabled={isExporting}
-              variant="outline"
-            >
-              {isExporting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <DownloadIcon className="mr-2 h-4 w-4" />
-              )}
-              {t('configSync.export.button')}
-            </Button>
-
-            <Button
-              onClick={handleImportConfig}
-              disabled={isImporting}
-              variant="outline"
-            >
-              {isImporting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <UploadIcon className="mr-2 h-4 w-4" />
-              )}
-              {t('configSync.import.button')}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

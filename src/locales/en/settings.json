@@ -133,6 +133,10 @@
     "deleteConfirmation": "Are you sure you want to delete this template?"
   },
   "dataManagement": {
+    "tabs": {
+      "importExport": "Import/Export",
+      "configSync": "Config Sync"
+    },
     "title": "Data Management",
     "description": "Import, export, or clear your application data. Use full import/export for backups or migrations.",
     "importConversationsTitle": "Import Conversations (Legacy)",
@@ -172,6 +176,10 @@
     }
   },
   "configSync": {
+    "tabs": {
+      "settings": "Settings",
+      "sync": "Sync"
+    },
     "title": "Configuration Sync",
     "description": "Automatically sync your LiteChat configuration with Git repositories",
     "enabled": {
