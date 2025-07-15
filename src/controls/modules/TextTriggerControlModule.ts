@@ -1,11 +1,10 @@
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
-import { ModMiddlewareHook } from "@/types/litechat/modding";
 import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
-import { textTriggerRegistry } from "@/services/text-trigger-registry.service";
 import { useSettingsStore } from "@/store/settings.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
+import { promptEvent } from "@/types/litechat/events/prompt.events";
 
 export class TextTriggerControlModule implements ControlModule {
   readonly id = "core-text-triggers";
@@ -39,43 +38,34 @@ export class TextTriggerControlModule implements ControlModule {
     // Re-register built-in namespaces in case they were registered during the registration phase
     this.registerBuiltInNamespaces();
 
-    // Register middleware to process text triggers during prompt finalization
-    const unregisterMiddleware = modApi.addMiddleware(
-      ModMiddlewareHook.PROMPT_TURN_FINALIZE,
-      async (payload) => {
-        const { turnData } = payload;
-        
-        if (!turnData.content || typeof turnData.content !== 'string' || !this.parserService) {
-          return payload;
-        }
-
-        const settings = useSettingsStore.getState();
-        if (!settings.textTriggersEnabled) {
-          return payload;
-        }
-
-        try {
-          // Parse and execute triggers, get cleaned text
-          const cleanedContent = await this.parserService.executeTriggersAndCleanText(
-            turnData.content,
-            { turnData, promptText: turnData.content }
-          );
-
-          // Return modified turnData with cleaned content
-          return {
-            turnData: {
-              ...turnData,
-              content: cleanedContent
-            }
-          };
-        } catch (error) {
-          console.error('[TextTriggerControlModule] Error processing triggers:', error);
-          return payload; // Return original on error
-        }
+    // Listen for prompt submission events to process text triggers BEFORE middleware
+    const unregisterPromptListener = modApi.on(promptEvent.submitted, async (payload) => {
+      const { turnData } = payload;
+      
+      if (!turnData.content || typeof turnData.content !== 'string' || !this.parserService) {
+        return;
       }
-    );
 
-    this.unregisterCallback = unregisterMiddleware;
+      const settings = useSettingsStore.getState();
+      if (!settings.textTriggersEnabled) {
+        return;
+      }
+
+      try {
+        // Parse and execute triggers, get cleaned text
+        const cleanedContent = await this.parserService.executeTriggersAndCleanText(
+          turnData.content,
+          { turnData, promptText: turnData.content }
+        );
+
+        // Update the turnData content directly (this happens before middleware)
+        turnData.content = cleanedContent;
+      } catch (error) {
+        console.error('[TextTriggerControlModule] Error processing triggers:', error);
+      }
+    });
+
+    this.unregisterCallback = unregisterPromptListener;
   }
 
   private registerBuiltInNamespaces(): void {
@@ -86,11 +76,9 @@ export class TextTriggerControlModule implements ControlModule {
     
     console.log('[TextTriggerControlModule] DEBUG: Registered namespaces:', Object.keys(registeredNamespaces));
     
-    Object.values(registeredNamespaces).forEach((namespace) => {
-      console.log('[TextTriggerControlModule] DEBUG: Registering namespace:', namespace.id, 'with methods:', Object.keys(namespace.methods));
-      this.parserService!.registerNamespace(namespace);
-      textTriggerRegistry.registerNamespace(namespace);
-    });
+    // Namespaces are now managed directly by the control registry store
+    // The parser service will fetch them directly when needed
+    console.log('[TextTriggerControlModule] DEBUG: Found registered namespaces:', Object.keys(registeredNamespaces));
   }
 
 

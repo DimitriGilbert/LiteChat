@@ -5,10 +5,10 @@ import type {
   TriggerExecutionContext, 
   TriggerNamespace 
 } from '@/types/litechat/text-triggers';
+import { useControlRegistryStore } from '@/store/control.store';
 
 export class TextTriggerParserService {
   private triggerPattern!: RegExp;
-  private registeredNamespaces: Map<string, TriggerNamespace> = new Map();
 
   constructor(
     private startDelimiter = "@.",
@@ -96,13 +96,14 @@ export class TextTriggerParserService {
   }
 
   private validateTrigger(trigger: TextTrigger): { isValid: boolean; errorMessage?: string } {
+    const registeredNamespaces = useControlRegistryStore.getState().getTextTriggerNamespaces();
     console.log(`[TextTriggerParser] DEBUG: Validating trigger: ${trigger.namespace}.${trigger.method}`, {
       args: trigger.args,
       argsLength: trigger.args.length,
-      registeredNamespaces: Array.from(this.registeredNamespaces.keys())
+      registeredNamespaces: Object.keys(registeredNamespaces)
     });
 
-    const namespace = this.registeredNamespaces.get(trigger.namespace);
+    const namespace = registeredNamespaces[trigger.namespace];
     
     if (!namespace) {
       console.log(`[TextTriggerParser] DEBUG: Unknown namespace: ${trigger.namespace}`);
@@ -151,13 +152,7 @@ export class TextTriggerParserService {
     return { isValid: true };
   }
 
-  registerNamespace(namespace: TriggerNamespace): void {
-    this.registeredNamespaces.set(namespace.id, namespace);
-  }
 
-  unregisterNamespace(namespaceId: string): void {
-    this.registeredNamespaces.delete(namespaceId);
-  }
 
   async executeTriggersAndCleanText(text: string, context: TriggerExecutionContext): Promise<string> {
     console.log(`[TextTriggerParser] DEBUG: executeTriggersAndCleanText called with text: "${text}"`);
@@ -190,7 +185,8 @@ export class TextTriggerParserService {
   }
 
   private async executeTrigger(trigger: TextTrigger, context: TriggerExecutionContext): Promise<void> {
-    const namespace = this.registeredNamespaces.get(trigger.namespace);
+    const registeredNamespaces = useControlRegistryStore.getState().getTextTriggerNamespaces();
+    const namespace = registeredNamespaces[trigger.namespace];
     if (!namespace) {
       throw new Error(`Namespace ${trigger.namespace} not found`);
     }
@@ -210,6 +206,7 @@ export class TextTriggerParserService {
   }
 
   getRegisteredNamespaces(): TriggerNamespace[] {
-    return Array.from(this.registeredNamespaces.values());
+    const registeredNamespaces = useControlRegistryStore.getState().getTextTriggerNamespaces();
+    return Object.values(registeredNamespaces);
   }
 }

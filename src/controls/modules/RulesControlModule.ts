@@ -498,17 +498,30 @@ export class RulesControlModule implements ControlModule {
     }];
   }
 
-  private handleRulesSelect = async (args: string[], _context: TriggerExecutionContext) => {
-    // Add the specified rules to the active rules set (like pressing the UI buttons)
+  private handleRulesSelect = async (args: string[], context: TriggerExecutionContext) => {
+    // Add the specified rules directly to the turnData metadata
+    if (!context.turnData.metadata.activeRuleIds) {
+      context.turnData.metadata.activeRuleIds = [];
+    }
     args.forEach(ruleId => {
-      this.transientActiveRuleIds.add(ruleId);
+      if (!context.turnData.metadata.activeRuleIds!.includes(ruleId)) {
+        context.turnData.metadata.activeRuleIds!.push(ruleId);
+      }
     });
-    this.notifyComponentUpdate?.();
   };
 
   private handleRulesAuto = async (_args: string[], context: TriggerExecutionContext) => {
-    // Perform auto-selection and set the active rules (like pressing the auto button)
+    // Auto-select rules and add them directly to turnData metadata
     await this.autoSelectRules(context.promptText);
+    // The autoSelectRules method updates transientActiveRuleIds, so copy those to turnData
+    if (!context.turnData.metadata.activeRuleIds) {
+      context.turnData.metadata.activeRuleIds = [];
+    }
+    Array.from(this.transientActiveRuleIds).forEach((ruleId: string) => {
+      if (!context.turnData.metadata.activeRuleIds!.includes(ruleId)) {
+        context.turnData.metadata.activeRuleIds!.push(ruleId);
+      }
+    });
   };
 
   // Helper method to check if a rule is a control rule

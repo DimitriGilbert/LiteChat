@@ -117,7 +117,7 @@ export class PromptLibraryControlModule implements ControlModule {
     }];
   }
 
-  private handleTemplateUse = async (args: string[], _context: TriggerExecutionContext) => {
+  private handleTemplateUse = async (args: string[], context: TriggerExecutionContext) => {
     const templateId = args[0];
     const { promptTemplates } = usePromptTemplateStore.getState();
     const template = promptTemplates.find(t => t.id === templateId || t.name === templateId);
@@ -130,7 +130,10 @@ export class PromptLibraryControlModule implements ControlModule {
           formData[key] = rest.join("=");
         }
       }
-      await this.applyTemplate(template.id, formData);
+      
+      // Compile template and apply directly to turnData
+      const compiled = await this.compileTemplate(templateId, formData);
+      context.turnData.content = compiled.content;
     }
   };
 

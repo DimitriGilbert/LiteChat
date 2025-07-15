@@ -18,7 +18,7 @@ import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/store/settings.store";
 import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
-import { textTriggerRegistry } from "@/services/text-trigger-registry.service";
+
 import type { TextTrigger, MethodSuggestion, AutocompleteSuggestion } from '@/types/litechat/text-triggers';
 import { useControlRegistryStore } from "@/store/control.store";
 
@@ -65,12 +65,8 @@ export const InputArea = memo(
         settings.textTriggerEndDelimiter
       );
       
-      // Register all namespaces from the control registry
+      // Parser service now gets namespaces directly from the control registry
       const controlRegistry = useControlRegistryStore();
-      const registeredNamespaces = controlRegistry.getTextTriggerNamespaces();
-      Object.values(registeredNamespaces).forEach(namespace => {
-        parserService.registerNamespace(namespace);
-      });
 
       useImperativeHandle(ref, () => ({
         
@@ -129,18 +125,29 @@ export const InputArea = memo(
           const namespaceId = argMatch[1];
           const methodId = argMatch[2];
           const argsStr = argMatch[3] || '';
-          const namespaces = textTriggerRegistry.getRegisteredNamespaces();
-          const namespace = namespaces.find(ns => ns.id === namespaceId);
+          const registeredNamespaces = controlRegistry.getTextTriggerNamespaces();
+          const namespace = Object.values(registeredNamespaces).find(ns => ns.id === namespaceId);
           if (!namespace) return [];
           const method = namespace.methods[methodId];
           if (!method) return [];
           const args = argsStr.trim().length > 0 ? argsStr.split(/\s+/) : [];
           if (method.argSchema && method.argSchema.suggestions) {
-            return method.argSchema.suggestions(
+            const suggestions = method.argSchema.suggestions(
               { turnData: { id: '', content: internalValue, parameters: {}, metadata: {} }, promptText: internalValue },
               args.length,
               args
-            ).map(s => ({
+            );
+            
+            // Filter suggestions based on the current partial argument being typed
+            let filteredSuggestions = suggestions;
+            if (args.length > 0) {
+              const currentArg = args[args.length - 1].toLowerCase();
+              filteredSuggestions = suggestions.filter(s => 
+                s.toLowerCase().startsWith(currentArg)
+              );
+            }
+            
+            return filteredSuggestions.map(s => ({
               type: 'arg' as const,
               value: s,
               description: '',
@@ -151,7 +158,8 @@ export const InputArea = memo(
         const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
         if (!triggerMatch) return [];
         const partial = triggerMatch[1].toLowerCase();
-        const namespaces = textTriggerRegistry.getRegisteredNamespaces();
+        const registeredNamespaces = controlRegistry.getTextTriggerNamespaces();
+        const namespaces = Object.values(registeredNamespaces);
         const suggestions: Array<MethodSuggestion> = [];
         namespaces.forEach(namespace => {
           Object.values(namespace.methods).forEach(method => {
@@ -287,10 +295,11 @@ export const InputArea = memo(
         }
         emitter.emit(promptEvent.inputChanged, { value: newValue });
 
-        // Check for autocomplete - show when typing after @.
+        // Check for autocomplete - show when typing after @. OR when typing arguments
         const textBeforeCursor = newValue.slice(0, cursorPos);
         const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
-        setShowAutocomplete(!!triggerMatch && triggerMatch[1].length >= 0);
+        const argMatch = textBeforeCursor.match(/@\.([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s+([^;]*)$/);
+        setShowAutocomplete((!!triggerMatch && triggerMatch[1].length >= 0) || !!argMatch);
       };
 
       useEffect(() => {

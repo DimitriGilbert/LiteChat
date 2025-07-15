@@ -350,13 +350,21 @@ export class ToolSelectorControlModule implements ControlModule {
     }];
   }
 
-  private handleToolsActivate = async (args: string[], _context: TriggerExecutionContext) => {
-    // Add the specified tools to the enabled tools set (like pressing the UI checkboxes)
-    this.setEnabledTools(prev => {
-      const newSet = new Set(prev);
-      args.forEach(toolId => newSet.add(toolId));
-      return newSet;
+  private handleToolsActivate = async (args: string[], context: TriggerExecutionContext) => {
+    // Add the specified tools directly to the turnData metadata
+    const { turnData } = context;
+    if (!turnData.metadata.enabledTools) {
+      turnData.metadata.enabledTools = [];
+    }
+    
+    // Add the tools to the metadata
+    args.forEach(toolId => {
+      if (!turnData.metadata.enabledTools!.includes(toolId)) {
+        turnData.metadata.enabledTools!.push(toolId);
+      }
     });
+    
+    console.log('[ToolSelectorControlModule] Added tools to turnData:', args, 'Total enabled:', turnData.metadata.enabledTools);
   };
 
   private handleToolsAuto = async (_args: string[], _context: TriggerExecutionContext) => {

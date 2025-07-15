@@ -112,14 +112,15 @@ export class WorkflowControlModule implements ControlModule {
     }];
   }
 
-  private handleWorkflowRun = async (args: string[], _context: TriggerExecutionContext) => {
+  private handleWorkflowRun = async (args: string[], context: TriggerExecutionContext) => {
     const workflowId = args[0];
     const workflow = this.workflows.find(w => w.id === workflowId || w.name === workflowId);
     
     if (workflow) {
-      this.notifyComponentUpdate?.();
-      // UI should react to this change and show the workflow as selected for the next prompt
-      toast.info(`Workflow "${workflow.name}" selected for prompt.`);
+      // Start the workflow with the current prompt content
+      this.startWorkflow(workflow, context.turnData.content);
+      // Clear the content since the workflow will handle the prompt
+      context.turnData.content = '';
     }
   };
 

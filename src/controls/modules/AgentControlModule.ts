@@ -324,7 +324,7 @@ export class AgentControlModule implements ControlModule {
     }];
   }
 
-  private handleAgentUse = async (args: string[], _context: TriggerExecutionContext) => {
+  private handleAgentUse = async (args: string[], context: TriggerExecutionContext) => {
     const agentId = args[0];
     const agent = this.allTemplates.find(t => t.id === agentId || t.name === agentId);
     if (agent) {
@@ -336,7 +336,36 @@ export class AgentControlModule implements ControlModule {
           formData[key] = rest.join("=");
         }
       }
-      await this.applyAgent(agent.id, formData);
+      
+      // Compile the agent template and apply directly to turnData
+      const compiled = await this.compileTemplate(agent.id, formData);
+      
+      // Apply system prompt to turnData
+      context.turnData.metadata.turnSystemPrompt = compiled.content;
+      
+      // Apply tools if available
+      if (compiled.selectedTools && compiled.selectedTools.length > 0) {
+        if (!context.turnData.metadata.enabledTools) {
+          context.turnData.metadata.enabledTools = [];
+        }
+        compiled.selectedTools.forEach(toolId => {
+          if (!context.turnData.metadata.enabledTools!.includes(toolId)) {
+            context.turnData.metadata.enabledTools!.push(toolId);
+          }
+        });
+      }
+      
+      // Apply rules if available
+      if (compiled.selectedRules && compiled.selectedRules.length > 0) {
+        if (!context.turnData.metadata.activeRuleIds) {
+          context.turnData.metadata.activeRuleIds = [];
+        }
+        compiled.selectedRules.forEach(ruleId => {
+          if (!context.turnData.metadata.activeRuleIds!.includes(ruleId)) {
+            context.turnData.metadata.activeRuleIds!.push(ruleId);
+          }
+        });
+      }
     }
   };
 

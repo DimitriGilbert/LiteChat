@@ -14,6 +14,7 @@ import { useProviderStore } from "@/store/provider.store";
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import { toast } from "sonner";
 import type { AttachedFileMetadata } from "@/store/input.store";
+import { nanoid } from "nanoid";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
@@ -152,47 +153,54 @@ export class FileControlModule implements ControlModule {
     }];
   }
 
-  private handleFileAttach = async (_args: string[], _context: TriggerExecutionContext) => {
-    // Trigger file picker (simulate clicking the attach button)
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.multiple = true;
-    fileInput.accept = '*/*';
-    fileInput.onchange = async (event) => {
-      const files = (event.target as HTMLInputElement).files;
-      if (files) {
-        for (const file of Array.from(files)) {
-          let fileData: {
-            contentText?: string;
-            contentBase64?: string;
-          } = {};
-          const isText = this.isLikelyTextFile(file.name, file.type);
-          const isImage = file.type.startsWith("image/");
-          if (isText) {
-            fileData.contentText = await file.text();
-          } else if (isImage && this.modelSupportsNonText) {
-            const reader = new FileReader();
-            const promise = new Promise<string>((resolve, reject) => {
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = (error) => reject(error);
-            });
-            reader.readAsDataURL(file);
-            const dataUrl = await promise;
-            if (dataUrl && dataUrl.includes(",")) {
-              fileData.contentBase64 = dataUrl.split(",")[1];
-            }
-          }
-          this.modApiRef?.emit(inputEvent.addAttachedFileRequest, {
-            source: "direct",
-            name: file.name,
-            type: file.type || "application/octet-stream",
-            size: file.size,
-            ...fileData,
-          });
+  private handleFileAttach = async (args: string[], context: TriggerExecutionContext) => {
+    // Attach files by file paths directly to turnData
+    if (!context.turnData.metadata.attachedFiles) {
+      context.turnData.metadata.attachedFiles = [];
+    }
+    
+    for (const filePath of args) {
+      try {
+        // Read file from filesystem
+        const response = await fetch(`file://${filePath}`);
+        if (!response.ok) {
+          console.warn(`[FileControlModule] Could not read file: ${filePath}`);
+          continue;
         }
+        
+        const fileName = filePath.split('/').pop() || filePath;
+        const fileSize = parseInt(response.headers.get('content-length') || '0');
+        const mimeType = response.headers.get('content-type') || 'application/octet-stream';
+        
+        let fileData: {
+          contentText?: string;
+          contentBase64?: string;
+        } = {};
+        
+        const isText = this.isLikelyTextFile(fileName, mimeType);
+        const isImage = mimeType.startsWith("image/");
+        
+        if (isText) {
+          fileData.contentText = await response.text();
+        } else if (isImage && this.modelSupportsNonText) {
+          const arrayBuffer = await response.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          fileData.contentBase64 = base64;
+        }
+        
+        context.turnData.metadata.attachedFiles!.push({
+          id: nanoid(),
+          source: "direct",
+          name: fileName,
+          type: mimeType,
+          size: fileSize,
+          ...fileData,
+        });
+        
+      } catch (error) {
+        console.error(`[FileControlModule] Error reading file ${filePath}:`, error);
       }
-    };
-    fileInput.click();
+    }
   };
 
   destroy(): void {

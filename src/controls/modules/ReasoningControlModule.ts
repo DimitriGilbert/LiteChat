@@ -162,11 +162,11 @@ export class ReasoningControlModule implements ControlModule {
     }];
   }
 
-  private handleReasoningOn = async (_args: string[], _context: TriggerExecutionContext) => {
-    this.setReasoningEnabled(true);
+  private handleReasoningOn = async (_args: string[], context: TriggerExecutionContext) => {
+    context.turnData.parameters.internal_reasoning = true;
   };
 
-  private handleReasoningOff = async (_args: string[], _context: TriggerExecutionContext) => {
-    this.setReasoningEnabled(false);
+  private handleReasoningOff = async (_args: string[], context: TriggerExecutionContext) => {
+    context.turnData.parameters.internal_reasoning = false;
   };
 }

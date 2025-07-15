@@ -11,7 +11,7 @@ import { useVfsStore } from "@/store/vfs.store";
 import { useConversationStore } from "@/store/conversation.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
-import { inputEvent } from "@/types/litechat/events/input.events";
+import { nanoid } from "nanoid";
 
 export class VfsControlModule implements ControlModule {
   readonly id = "core-vfs";
@@ -182,35 +182,41 @@ export class VfsControlModule implements ControlModule {
     }];
   }
 
-  private handleVfsAdd = async (args: string[], _context: TriggerExecutionContext) => {
-    // Add VFS files to the current prompt by their paths
+  private handleVfsAdd = async (args: string[], context: TriggerExecutionContext) => {
+    // Add VFS files directly to turnData metadata
     const vfsState = useVfsStore.getState();
     const filePaths = args;
-    // Find the nodes by path and add them to input
+    
+    if (!context.turnData.metadata.attachedFiles) {
+      context.turnData.metadata.attachedFiles = [];
+    }
+    
+    // Find the nodes by path and add them to turnData
     const filesToAdd = filePaths.map(path => {
       const node = Object.values(vfsState.nodes).find(n => n.path === path);
       return node;
     }).filter(Boolean);
+    
     function isVfsFile(node: any): node is { type: 'file', name: string, mimeType?: string, size: number, path: string } {
       return node && node.type === 'file' && typeof node.name === 'string' && typeof node.size === 'number' && typeof node.path === 'string';
     }
-    if (filesToAdd.length > 0) {
-      for (const node of filesToAdd) {
-        if (isVfsFile(node)) {
-          this.modApiRef?.emit(inputEvent.addAttachedFileRequest, {
-            source: "vfs",
-            name: node.name,
-            type: node.mimeType || "application/octet-stream",
-            size: node.size,
-            path: node.path,
-          });
-        }
+    
+    for (const node of filesToAdd) {
+      if (isVfsFile(node)) {
+        context.turnData.metadata.attachedFiles!.push({
+          id: nanoid(),
+          source: "vfs",
+          name: node.name,
+          type: node.mimeType || "application/octet-stream",
+          size: node.size,
+          path: node.path,
+        });
       }
     }
   };
 
   private handleVfsOpen = async (_args: string[], _context: TriggerExecutionContext) => {
-    // Open the VFS modal
+    // Open the VFS modal - this is a UI action, no turnData modification needed
     this.modApiRef?.emit(uiEvent.openModalRequest, { 
       modalId: this.modalId 
     });

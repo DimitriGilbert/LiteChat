@@ -345,24 +345,24 @@ export class ParameterControlModule implements ControlModule {
     }];
   }
 
-  private handleParamsTemp = async (args: string[], _context: TriggerExecutionContext) => {
+  private handleParamsTemp = async (args: string[], context: TriggerExecutionContext) => {
     const temp = parseFloat(args[0]);
     if (!isNaN(temp) && temp >= 0 && temp <= 2) {
-      this.setTemperature(temp);
+      context.turnData.parameters.temperature = temp;
     }
   };
 
-  private handleParamsTokens = async (args: string[], _context: TriggerExecutionContext) => {
+  private handleParamsTokens = async (args: string[], context: TriggerExecutionContext) => {
     const tokens = parseInt(args[0]);
     if (!isNaN(tokens) && tokens > 0) {
-      this.setMaxTokens(tokens);
+      context.turnData.parameters.maxTokens = tokens;
     }
   };
 
-  private handleParamsTopP = async (args: string[], _context: TriggerExecutionContext) => {
+  private handleParamsTopP = async (args: string[], context: TriggerExecutionContext) => {
     const topP = parseFloat(args[0]);
     if (!isNaN(topP) && topP >= 0 && topP <= 1) {
-      this.setTopP(topP);
+      context.turnData.parameters.topP = topP;
     }
   };
 }
