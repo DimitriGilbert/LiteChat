@@ -121,14 +121,32 @@ export const InputArea = memo(
       // Keyboard navigation state for autocomplete
       const [autocompleteIndex, setAutocompleteIndex] = useState(0);
 
-      // Simple function to get line height and current line
+      // Function to get cursor position - Y from line calculation, X from text width
       const getCursorLineInfo = (textarea: HTMLTextAreaElement) => {
         const style = window.getComputedStyle(textarea);
         const lineHeight = parseInt(style.lineHeight) || 20;
         const textBeforeCursor = textarea.value.substring(0, textarea.selectionStart);
-        const currentLine = textBeforeCursor.split('\n').length - 1;
+        const lines = textBeforeCursor.split('\n');
+        const currentLine = lines.length - 1;
+        const currentLineText = lines[currentLine] || '';
+        
+        // Calculate Y position from line number
         const y = currentLine * lineHeight + 12; // 12px for padding
-        return { x: 12, y }; // Simple left padding for x
+        
+        // Calculate X position from text width on current line
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.font = `${style.fontSize} ${style.fontFamily}`;
+          const textWidth = ctx.measureText(currentLineText).width;
+          const x = 12 + textWidth; // 12px padding + text width
+          return { x, y };
+        }
+        
+        // Fallback if canvas fails
+        const fontSize = parseInt(style.fontSize) || 14;
+        const x = 12 + (currentLineText.length * fontSize * 0.6);
+        return { x, y };
       };
 
       const getAutocompleteSuggestions = (): AutocompleteSuggestion[] => {
@@ -565,7 +583,7 @@ export const InputArea = memo(
                 position: 'absolute',
                 left: `${cursorCoords.x}px`,
                 top: `${cursorCoords.y}px`,
-                transform: 'translateY(-100%) translateY(-5px)', // Above current line with small gap
+                transform: 'translateY(-100%) translateY(-1rem)', // 1rem above cursor
                 zIndex: 20,
                 maxWidth: '300px',
                 minWidth: '200px',
@@ -579,7 +597,7 @@ export const InputArea = memo(
                   key={suggestion.type === 'method' ? `${suggestion.namespace}.${suggestion.method}` : suggestion.value || idx}
                   className={cn(
                     "flex flex-col gap-0.5 p-2 cursor-pointer border-b border-border last:border-b-0 transition-colors",
-                    idx === autocompleteIndex ? "bg-accent/80 text-primary" : "hover:bg-accent/60",
+                    idx === autocompleteIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/60",
                     suggestion.type === 'arg' ? "pl-6" : ""
                   )}
                   role="option"
