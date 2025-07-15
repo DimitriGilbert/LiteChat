@@ -84,32 +84,32 @@ export class ConfigSyncService {
         if (isNaN(remoteTimestamp ?? NaN)) remoteTimestamp = null;
       } catch (e: any) {
         if (e.code === "ENOENT" || e.message?.includes("No such file")) {
-          console.log(`Config file ${configFilePath} not found in repo. This is the first sync - will push local version.`);
+          // console.log(`Config file ${configFilePath} not found in repo. This is the first sync - will push local version.`);
         } else {
           console.error(`Failed to read or parse remote config file: ${e.message}`);
           toast.warning(`Could not read remote config: ${e.message}`);
         }
       }
 
-      console.log("About to get local config...");
+      // console.log("About to get local config...");
       // Get current local config
       const localConfigData = await this.exportCurrentConfig();
-      console.log("Got local config, getting timestamps...");
+      // console.log("Got local config, getting timestamps...");
       const localTimestamp = new Date(localConfigData.exportedAt).getTime();
 
       // Get last sync timestamp from settings
       const lastSyncTimestamp = this.getLastConfigSyncTimestamp();
 
       // Determine sync direction
-      console.log("Sync decision:", {
-        hasRemoteConfig: !!remoteConfigData,
-        localTimestamp,
-        remoteTimestamp,
-        lastSyncTimestamp,
-        willPush: !remoteConfigData ||
-          localTimestamp > (remoteTimestamp ?? 0) ||
-          (localTimestamp > lastSyncTimestamp && localTimestamp >= (remoteTimestamp ?? 0))
-      });
+      // console.log("Sync decision:", {
+      //   hasRemoteConfig: !!remoteConfigData,
+      //   localTimestamp,
+      //   remoteTimestamp,
+      //   lastSyncTimestamp,
+      //   willPush: !remoteConfigData ||
+      //     localTimestamp > (remoteTimestamp ?? 0) ||
+      //     (localTimestamp > lastSyncTimestamp && localTimestamp >= (remoteTimestamp ?? 0))
+      // });
       
       if (
         !remoteConfigData ||
@@ -117,7 +117,7 @@ export class ConfigSyncService {
         (localTimestamp > lastSyncTimestamp && localTimestamp >= (remoteTimestamp ?? 0))
       ) {
         // Push local config to remote
-        console.log("Pushing local config to remote...");
+        // console.log("Pushing local config to remote...");
         if (!silent) toast.info("Local config changes detected. Pushing to remote...");
         
         await this.pushConfigToRemote(
@@ -131,7 +131,7 @@ export class ConfigSyncService {
 
         this.updateLastConfigSyncTimestamp();
         setConfigStatus("idle");
-        console.log("Config push completed successfully");
+        // console.log("Config push completed successfully");
         if (!silent) toast.success("Configuration synced successfully (pushed).");
 
       } else if (remoteTimestamp && remoteTimestamp > localTimestamp) {

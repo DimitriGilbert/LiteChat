@@ -56,7 +56,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
       configSyncEnabled: state.configSyncEnabled ?? false,
       configSyncRepoId: state.configSyncRepoId ?? "",
       configSyncAutoSync: state.configSyncAutoSync ?? false,
-      configSyncInterval: state.configSyncInterval ?? 300000, // 5 minutes default
+      configSyncInterval: state.configSyncInterval ?? 3600000, // 1 hour default
       setConfigSyncEnabled: state.setConfigSyncEnabled,
       setConfigSyncRepoId: state.setConfigSyncRepoId,
       setConfigSyncAutoSync: state.setConfigSyncAutoSync,
@@ -68,7 +68,13 @@ const SettingsConfigSyncComponent: React.FC = () => {
     configSyncEnabled: z.boolean(),
     configSyncRepoId: z.string(),
     configSyncAutoSync: z.boolean(),
-    configSyncInterval: z.number().min(60000).max(86400000), // 1 minute to 24 hours
+    // configSyncInterval: z.number().min(60000).max(86400000), // 1 minute to 24 hours
+    configSyncInterval: z.string().refine(val => {
+      const num = parseInt(val);
+      return !isNaN(num) && num >= 60000 && num <= 86400000;
+    }, {
+      message: "Interval must be between 1 minute and 24 hours"
+    })
   });
 
   const { Form, form } = useFormedible({
@@ -111,7 +117,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
         configSyncEnabled,
         configSyncRepoId,
         configSyncAutoSync,
-        configSyncInterval,
+        configSyncInterval: configSyncInterval.toString(),
       },
       onSubmit: async ({ value }) => {
         setConfigSyncEnabled(value.configSyncEnabled);
@@ -129,7 +135,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
       configSyncEnabled,
       configSyncRepoId,
       configSyncAutoSync,
-      configSyncInterval,
+      configSyncInterval: configSyncInterval.toString(),
     });
   }, [configSyncEnabled, configSyncRepoId, configSyncAutoSync, configSyncInterval, form]);
 
