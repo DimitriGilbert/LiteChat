@@ -23,6 +23,7 @@ import { inputEvent } from "@/types/litechat/events/input.events";
 // Removed unused vfsEvent import
 import { useProviderStore } from "@/store/provider.store";
 import { useInputStore } from "@/store/input.store";
+import { TextTriggerControlModule } from "./TextTriggerControlModule";
 
 export class UrlParameterControlModule implements ControlModule {
   readonly id = "core-url-parameters";
@@ -219,32 +220,24 @@ export class UrlParameterControlModule implements ControlModule {
       }
 
       if (urlParams.query) {
+        // Get the text trigger parser from the TextTriggerControlModule (if registered)
+        const textTriggerModule = (window as any).litechatControlModules?.find?.(
+          (mod: any) => mod instanceof TextTriggerControlModule
+        ) as TextTriggerControlModule | undefined;
+        const parserService = textTriggerModule?.parserService;
         if (urlParams.submit === "0") {
-          // Check for text triggers and parse them
-          if (urlParams.query.includes("@.")) {
-            // TODO: Implement text trigger parsing
-            // modApi.emit(textTriggerEvent.parseAndExecuteRequest, {
-            //   text: urlParams.query,
-            //   source: 'url-parameter'
-            // });
-            
-            // Listen for cleaned text to set in input
-            // const unsubscribe = modApi.on(textTriggerEvent.textCleaned, (payload) => {
-            //   if (payload.source === 'url-parameter') {
-                modApi.emit(promptEvent.inputChanged, {
-                  value: urlParams.query,
-                });
-                // unsubscribe(); // One-time listener
-              // }
-            
+          let cleanedText = urlParams.query;
+          if (urlParams.query.includes("@.") && parserService) {
+            cleanedText = await parserService.executeTriggersAndCleanText(
+              urlParams.query,
+              { turnData: { id: '', content: urlParams.query, parameters: {}, metadata: {} }, promptText: urlParams.query }
+            );
+            modApi.emit(promptEvent.inputChanged, { value: cleanedText });
             toast.info("Query with text triggers loaded from URL.");
           } else {
-            modApi.emit(promptEvent.inputChanged, {
-              value: urlParams.query,
-            });
+            modApi.emit(promptEvent.inputChanged, { value: urlParams.query });
             toast.info("Query from URL loaded into input area.");
           }
-          
           window.history.replaceState(
             {},
             document.title,
@@ -253,54 +246,39 @@ export class UrlParameterControlModule implements ControlModule {
         } else {
           let parameters: Record<string, any> = {};
           let metadata: Record<string, any> = {};
-
           const currentAttachedFiles =
             useInputStore.getState().attachedFilesMetadata;
           if (currentAttachedFiles.length > 0) {
             metadata.attachedFiles = [...currentAttachedFiles];
           }
-
-          // Handle text triggers in the query before submission
           let finalQueryContent = urlParams.query;
-          
-          if (urlParams.query.includes("@.")) {
-            // TODO: Parse and execute text triggers, then use cleaned text
-            // modApi.emit(textTriggerEvent.parseAndExecuteRequest, {
-            //   text: urlParams.query,
-            //   source: 'url-parameter-submit'
-            // });
-            
-            // Wait for cleaned text (this is a simplified approach)
-            // In a real implementation, this would be handled asynchronously
-            console.log("Text triggers detected in URL query, executing...");
+          if (urlParams.query.includes("@.") && parserService) {
+            finalQueryContent = await parserService.executeTriggersAndCleanText(
+              urlParams.query,
+              { turnData: { id: '', content: urlParams.query, parameters: {}, metadata: {} }, promptText: urlParams.query }
+            );
           }
-
           let turnData: PromptTurnObject = {
             id: nanoid(),
             content: finalQueryContent,
             parameters,
             metadata,
           };
-
           modApi.emit(promptEvent.submitted, { turnData });
-
           const middlewareResult = await runMiddleware(
             ModMiddlewareHook.PROMPT_TURN_FINALIZE,
             { turnData }
           );
-
           if (middlewareResult === false) {
             toast.warning(
               "Prompt submission from URL cancelled by middleware."
             );
             return;
           }
-
           const finalTurnData =
             middlewareResult && typeof middlewareResult === "object"
               ? (middlewareResult as { turnData: PromptTurnObject }).turnData
               : turnData;
-
           await ConversationService.submitPrompt(finalTurnData);
           window.history.replaceState(
             {},
