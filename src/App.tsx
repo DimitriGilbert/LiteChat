@@ -51,7 +51,7 @@ import { AssistantSettingsModule } from "@/controls/modules/AssistantSettingsMod
 import { RunnableBlocksSettingsModule } from "@/controls/modules/RunnableBlocksSettingsModule";
 import { DataSettingsModule } from "@/controls/modules/DataSettingsModule";
 import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
-import { MarketplaceSettingsModule } from "@/controls/modules/MarketplaceSettingsModule";
+// import { MarketplaceSettingsModule } from "@/controls/modules/MarketplaceSettingsModule";
 
 // Import canvas action control modules
 import { CopyActionControlModule } from "@/controls/modules/canvas/CopyActionControlModule";
@@ -96,7 +96,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   RunnableBlocksSettingsModule,
   DataSettingsModule,
   ModSettingsModule,
-  MarketplaceSettingsModule,
+  // MarketplaceSettingsModule,
   ConversationListControlModule,
   SidebarToggleControlModule,
   SettingsControlModule,
