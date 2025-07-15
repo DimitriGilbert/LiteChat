@@ -66,13 +66,13 @@ export class MarketplaceService {
       // Cache the index in database
       await PersistenceService.saveMarketplaceIndex(source.id!, marketplaceIndex);
 
-      emitter.emit('marketplace:index-refreshed', { sourceId: source.id!, index: marketplaceIndex });
+      emitter.emit('marketplace.refreshed', { sourceId: source.id!, itemCount: marketplaceIndex.items.length });
       
       return marketplaceIndex;
 
     } catch (error) {
       console.error(`Failed to fetch marketplace index from ${source.url}:`, error);
-      emitter.emit('marketplace:refresh-failed', { 
+      emitter.emit('marketplace.refresh.failed', { 
         sourceId: source.id!, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
@@ -141,7 +141,7 @@ export class MarketplaceService {
     item: MarketplaceItem
   ): Promise<void> {
     try {
-      emitter.emit('marketplace:install-started', { sourceId, item });
+      emitter.emit('marketplace.install.started', { sourceId, item });
 
       // Fetch the package
       const packageData = await this.fetchMarketplacePackage(item.downloadUrl);
@@ -184,13 +184,13 @@ export class MarketplaceService {
         installedMcpServers: []
       }, packageData);
 
-      emitter.emit('marketplace:install-completed', { sourceId, item });
+      emitter.emit('marketplace.item.installed', { packageId: item.id, item, installedItem: { packageId: item.id, sourceId, installedAt: new Date(), enabled: true, version: item.version, installedRules: [], installedTemplates: [], installedMcpServers: [] } });
 
     } catch (error) {
       console.error(`Failed to install marketplace item ${item.id}:`, error);
-      emitter.emit('marketplace:install-failed', { 
+      emitter.emit('marketplace.item.install.failed', { 
         sourceId, 
-        item, 
+        itemId: item.id, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
       throw error;
@@ -205,7 +205,7 @@ export class MarketplaceService {
     item: MarketplaceItem
   ): Promise<void> {
     try {
-      emitter.emit('marketplace:uninstall-started', { sourceId, item });
+      emitter.emit('marketplace.uninstall.started', { sourceId, item });
 
       // Remove from installed items
       const installedItems = await PersistenceService.loadInstalledMarketplaceItems();
@@ -220,11 +220,11 @@ export class MarketplaceService {
       // Note: We don't remove the actual imported content (rules, templates, etc.)
       // as it might be used independently. The user can manually remove if needed.
 
-      emitter.emit('marketplace:uninstall-completed', { sourceId, item });
+      emitter.emit('marketplace.item.uninstalled', { packageId: item.id });
 
     } catch (error) {
       console.error(`Failed to uninstall marketplace item ${item.id}:`, error);
-      emitter.emit('marketplace:uninstall-failed', { 
+      emitter.emit('marketplace.uninstall.failed', { 
         sourceId, 
         item, 
         error: error instanceof Error ? error.message : 'Unknown error' 

@@ -51,11 +51,13 @@ export const InputArea = memo(
       const [internalValue, setInternalValue] = useState(initialValue);
       const [triggers, setTriggers] = useState<TextTrigger[]>([]);
       const [showAutocomplete, setShowAutocomplete] = useState(false);
-      const [cursorPosition, setCursorPosition] = useState(0);
-      const setPromptInputValue = usePromptInputValueStore((state) => state.setValue);
-      const settings = useSettingsStore();
-      const { t } = useTranslation('prompt');
-      if (!placeholder || placeholder === "") {
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const [textareaHeight, setTextareaHeight] = useState(84); // Track textarea height
+  const [cursorCoords, setCursorCoords] = useState({ x: 0, y: 0 });
+  const [textareaStyles, setTextareaStyles] = useState<CSSStyleDeclaration | null>(null);
+  const setPromptInputValue = usePromptInputValueStore((state) => state.setValue);
+  const settings = useSettingsStore();
+  const { t } = useTranslation('prompt');      if (!placeholder || placeholder === "") {
         placeholder = t('inputAreaPlaceholder');
       }
 
@@ -86,9 +88,11 @@ export const InputArea = memo(
               
               textarea.style.height = "auto";
               const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
-              textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+              const finalHeight = Math.min(scrollHeight, maxHeight);
+              textarea.style.height = `${finalHeight}px`;
               textarea.style.overflowY =
                 scrollHeight > maxHeight ? "auto" : "hidden";
+              setTextareaHeight(finalHeight);
             }
           });
         },
@@ -108,6 +112,7 @@ export const InputArea = memo(
               textarea.style.height = "auto";
               textarea.style.height = `${minHeight}px`;
               textarea.style.overflowY = "hidden";
+              setTextareaHeight(minHeight);
             }
           });
         },
@@ -116,10 +121,28 @@ export const InputArea = memo(
       // Keyboard navigation state for autocomplete
       const [autocompleteIndex, setAutocompleteIndex] = useState(0);
 
+      // Simple function to get line height and current line
+      const getCursorLineInfo = (textarea: HTMLTextAreaElement) => {
+        const style = window.getComputedStyle(textarea);
+        const lineHeight = parseInt(style.lineHeight) || 20;
+        const textBeforeCursor = textarea.value.substring(0, textarea.selectionStart);
+        const currentLine = textBeforeCursor.split('\n').length - 1;
+        const y = currentLine * lineHeight + 12; // 12px for padding
+        return { x: 12, y }; // Simple left padding for x
+      };
+
       const getAutocompleteSuggestions = (): AutocompleteSuggestion[] => {
         const textBeforeCursor = internalValue.slice(0, cursorPosition);
-        // Pattern for argument completion: @.namespace.method arg1 arg2 ...
-        const argPattern = /@\.([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s+([^;]*)$/;
+        const startDelim = settings.textTriggerStartDelimiter;
+        const endDelim = settings.textTriggerEndDelimiter;
+        
+        // Escape special regex characters in delimiters
+        const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedStart = escapeRegex(startDelim);
+        const escapedEnd = escapeRegex(endDelim);
+        
+        // Pattern for argument completion: {startDelim}namespace.method arg1 arg2 ...
+        const argPattern = new RegExp(`${escapedStart}([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\s+([^${escapedEnd}]*)$`);
         const argMatch = textBeforeCursor.match(argPattern);
         if (argMatch) {
           const namespaceId = argMatch[1];
@@ -155,7 +178,8 @@ export const InputArea = memo(
           }
         }
         // Fallback: method/namespace completion
-        const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
+        const triggerPattern = new RegExp(`${escapedStart}([a-zA-Z]*)$`);
+        const triggerMatch = textBeforeCursor.match(triggerPattern);
         if (!triggerMatch) return [];
         const partial = triggerMatch[1].toLowerCase();
         const registeredNamespaces = controlRegistry.getTextTriggerNamespaces();
@@ -170,7 +194,7 @@ export const InputArea = memo(
               type: 'method',
               namespace: namespace.id,
               method: method.id,
-              description: `${method.description}${argExample ? ` | Example: @.${namespace.id}.${method.id}${argExample};` : ` | Example: @.${namespace.id}.${method.id};`}`
+              description: `${method.description}${argExample ? ` | Example: ${startDelim}${namespace.id}.${method.id}${argExample}${endDelim}` : ` | Example: ${startDelim}${namespace.id}.${method.id}${endDelim}`}`
             });
           });
         });
@@ -210,7 +234,12 @@ export const InputArea = memo(
               } else if (suggestion.type === 'arg') {
                 // Insert argument suggestion at cursor (same as keyboard handler)
                 const textBeforeCursor = internalValue.slice(0, cursorPosition);
-                const argPattern = /@\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\s+([^;]*)$/;
+                const startDelim = settings.textTriggerStartDelimiter;
+                const endDelim = settings.textTriggerEndDelimiter;
+                const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escapedStart = escapeRegex(startDelim);
+                const escapedEnd = escapeRegex(endDelim);
+                const argPattern = new RegExp(`${escapedStart}[a-zA-Z0-9_]+\\.[a-zA-Z0-9_]+\\s+([^${escapedEnd}]*)$`);
                 const argMatch = textBeforeCursor.match(argPattern);
                 let insertPos = cursorPosition;
                 if (argMatch) {
@@ -290,15 +319,26 @@ export const InputArea = memo(
         setCursorPosition(cursorPos);
         parseTriggers(newValue);
         
+        // Update cursor coordinates
+        const coords = getCursorLineInfo(e.target);
+        setCursorCoords(coords);
+        
         if (onValueChange) {
           onValueChange(newValue);
         }
         emitter.emit(promptEvent.inputChanged, { value: newValue });
 
-        // Check for autocomplete - show when typing after @. OR when typing arguments
+        // Check for autocomplete - show when typing after start delimiter OR when typing arguments
         const textBeforeCursor = newValue.slice(0, cursorPos);
-        const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
-        const argMatch = textBeforeCursor.match(/@\.([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s+([^;]*)$/);
+        const startDelim = settings.textTriggerStartDelimiter;
+        const endDelim = settings.textTriggerEndDelimiter;
+        const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedStart = escapeRegex(startDelim);
+        const escapedEnd = escapeRegex(endDelim);
+        const triggerPattern = new RegExp(`${escapedStart}([a-zA-Z]*)$`);
+        const argPattern = new RegExp(`${escapedStart}([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\s+([^${escapedEnd}]*)$`);
+        const triggerMatch = textBeforeCursor.match(triggerPattern);
+        const argMatch = textBeforeCursor.match(argPattern);
         setShowAutocomplete((!!triggerMatch && triggerMatch[1].length >= 0) || !!argMatch);
       };
 
@@ -310,9 +350,15 @@ export const InputArea = memo(
           
           textarea.style.height = "auto";
           const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
-          textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+          const finalHeight = Math.min(scrollHeight, maxHeight);
+          textarea.style.height = `${finalHeight}px`;
           textarea.style.overflowY =
             scrollHeight > maxHeight ? "auto" : "hidden";
+          setTextareaHeight(finalHeight);
+          
+          // Capture textarea styles for highlighting overlay
+          const computedStyles = window.getComputedStyle(textarea);
+          setTextareaStyles(computedStyles);
         }
       }, [internalValue]);
 
@@ -331,6 +377,8 @@ export const InputArea = memo(
         parseTriggers(internalValue);
       }, [internalValue, settings.textTriggersEnabled]);
 
+
+
       // Listen for setInputTextRequest events (restore main branch pattern)
       useEffect(() => {
         const handleSetInputText = (payload: { text: string }) => {
@@ -340,19 +388,20 @@ export const InputArea = memo(
             onValueChange(payload.text);
           }
           emitter.emit(promptEvent.inputChanged, { value: payload.text });
-          requestAnimationFrame(() => {
-            const textarea = internalTextareaRef.current;
-            if (textarea) {
-              const minHeight = 84; // 3 lines
-              const maxHeight = 250;
-              textarea.style.height = "auto";
-              const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
-              textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
-              textarea.style.overflowY =
-                scrollHeight > maxHeight ? "auto" : "hidden";
-            }
-          });
-        };
+            requestAnimationFrame(() => {
+              const textarea = internalTextareaRef.current;
+              if (textarea) {
+                const minHeight = 84; // 3 lines
+                const maxHeight = 250;
+                textarea.style.height = "auto";
+                const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
+                const finalHeight = Math.min(scrollHeight, maxHeight);
+                textarea.style.height = `${finalHeight}px`;
+                textarea.style.overflowY =
+                  scrollHeight > maxHeight ? "auto" : "hidden";
+                setTextareaHeight(finalHeight);
+              }
+            });        };
         emitter.on(promptEvent.setInputTextRequest, handleSetInputText);
         return () => {
           emitter.off(promptEvent.setInputTextRequest, handleSetInputText);
@@ -411,12 +460,16 @@ export const InputArea = memo(
 
       const handleAutocompleteSelect = (suggestion: { namespace: string; method: string }) => {
         const textBeforeCursor = internalValue.slice(0, cursorPosition);
-        const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
+        const startDelim = settings.textTriggerStartDelimiter;
+        const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedStart = escapeRegex(startDelim);
+        const triggerPattern = new RegExp(`${escapedStart}([a-zA-Z]*)$`);
+        const triggerMatch = textBeforeCursor.match(triggerPattern);
         
         if (triggerMatch && triggerMatch.index !== undefined) {
           const beforeTrigger = textBeforeCursor.slice(0, triggerMatch.index);
           const afterCursor = internalValue.slice(cursorPosition);
-          const newValue = `${beforeTrigger}@.${suggestion.namespace}.${suggestion.method} ${afterCursor}`;
+          const newValue = `${beforeTrigger}${startDelim}${suggestion.namespace}.${suggestion.method} ${afterCursor}`;
           
           setInternalValue(newValue);
           setPromptInputValue(newValue);
@@ -430,7 +483,7 @@ export const InputArea = memo(
           setTimeout(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
-              const newCursorPos = beforeTrigger.length + `@.${suggestion.namespace}.${suggestion.method} `.length;
+              const newCursorPos = beforeTrigger.length + `${startDelim}${suggestion.namespace}.${suggestion.method} `.length;
               textarea.setSelectionRange(newCursorPos, newCursorPos);
               textarea.focus();
             }
@@ -445,21 +498,28 @@ export const InputArea = memo(
             <div
               ref={highlightRef}
               style={{
-                height: '84px',
+                height: `${textareaHeight}px`,
                 minHeight: '84px',
                 maxHeight: '250px',
-                fontSize: 'inherit',
-                fontFamily: 'inherit',
-                lineHeight: 'inherit',
-                letterSpacing: 'inherit',
-                wordSpacing: 'inherit',
-                padding: '12px',
+                fontSize: textareaStyles?.fontSize || '14px',
+                fontFamily: textareaStyles?.fontFamily || 'inherit',
+                lineHeight: textareaStyles?.lineHeight || '1.5',
+                letterSpacing: textareaStyles?.letterSpacing || 'normal',
+                wordSpacing: textareaStyles?.wordSpacing || 'normal',
+                fontWeight: textareaStyles?.fontWeight || 'normal',
+                textTransform: textareaStyles?.textTransform || 'none',
+                padding: textareaStyles?.padding || '12px',
                 margin: '0',
                 border: '1px solid transparent',
-                borderRadius: '6px',
+                borderRadius: textareaStyles?.borderRadius || '6px',
+                boxSizing: 'border-box',
+                textAlign: 'left',
+                textIndent: '0',
+                wordBreak: 'normal',
+                overflowWrap: 'break-word',
               }}
               className={cn(
-                "absolute inset-0 pointer-events-none whitespace-pre-wrap break-words z-0",
+                "absolute inset-0 pointer-events-none whitespace-pre-wrap z-0",
                 "overflow-y-auto overflow-x-hidden",
                 "bg-transparent"
               )}
@@ -492,6 +552,8 @@ export const InputArea = memo(
             onSelect={(e) => {
               const target = e.target as HTMLTextAreaElement;
               setCursorPosition(target.selectionStart);
+              const coords = getCursorLineInfo(target);
+              setCursorCoords(coords);
             }}
             {...rest}
           />
@@ -499,7 +561,16 @@ export const InputArea = memo(
           {/* Autocomplete dropdown */}
           {showAutocomplete && settings.textTriggersEnabled && (
             <div
-              className="absolute bottom-full left-0 w-full max-w-md mb-1 bg-popover border border-border rounded-md shadow-lg z-20 max-h-64 overflow-y-auto"
+              style={{
+                position: 'absolute',
+                left: `${cursorCoords.x}px`,
+                top: `${cursorCoords.y}px`,
+                transform: 'translateY(-100%) translateY(-5px)', // Above current line with small gap
+                zIndex: 20,
+                maxWidth: '300px',
+                minWidth: '200px',
+              }}
+              className="bg-popover border border-border rounded-md shadow-lg max-h-64 overflow-y-auto"
               role="listbox"
               aria-label="Text trigger suggestions"
             >
@@ -521,7 +592,12 @@ export const InputArea = memo(
                     } else if (suggestion.type === 'arg') {
                       // Insert argument suggestion at cursor (same as keyboard handler)
                       const textBeforeCursor = internalValue.slice(0, cursorPosition);
-                      const argPattern = /@\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\s+([^;]*)$/;
+                      const startDelim = settings.textTriggerStartDelimiter;
+                      const endDelim = settings.textTriggerEndDelimiter;
+                      const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                      const escapedStart = escapeRegex(startDelim);
+                      const escapedEnd = escapeRegex(endDelim);
+                      const argPattern = new RegExp(`${escapedStart}[a-zA-Z0-9_]+\\.[a-zA-Z0-9_]+\\s+([^${escapedEnd}]*)$`);
                       const argMatch = textBeforeCursor.match(argPattern);
                       let insertPos = cursorPosition;
                       if (argMatch) {
