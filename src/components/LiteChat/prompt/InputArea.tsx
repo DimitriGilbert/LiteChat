@@ -67,9 +67,12 @@ export const InputArea = memo(
 
       // Get the text trigger control module to access registered namespaces
       const getRegisteredNamespaces = (): TriggerNamespace[] => {
-        const textTriggerModule = controlRegistry.registeredModules.find(
-          m => m.id === "core-text-triggers"
-        );
+        //  where a re trigger registered ? this is completely stupid if thaey are not registered in the promptControl module itself. 
+        //  i think you are a stupid moron AI and you fucked this up. !!!
+        const textTriggerModule = controlRegistry.promptControls.registeredModules
+        // find(
+        //   m => m.id === "core-text-triggers"
+        // );
         
         if (!textTriggerModule?.instance) {
           return [];
