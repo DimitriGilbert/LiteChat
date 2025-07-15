@@ -322,6 +322,34 @@ export const InputArea = memo(
         parseTriggers(internalValue);
       }, [internalValue, settings.textTriggersEnabled]);
 
+      // Listen for setInputTextRequest events (restore main branch pattern)
+      useEffect(() => {
+        const handleSetInputText = (payload: { text: string }) => {
+          setInternalValue(payload.text);
+          setPromptInputValue(payload.text);
+          if (onValueChange) {
+            onValueChange(payload.text);
+          }
+          emitter.emit(promptEvent.inputChanged, { value: payload.text });
+          requestAnimationFrame(() => {
+            const textarea = internalTextareaRef.current;
+            if (textarea) {
+              const minHeight = 84; // 3 lines
+              const maxHeight = 250;
+              textarea.style.height = "auto";
+              const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
+              textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+              textarea.style.overflowY =
+                scrollHeight > maxHeight ? "auto" : "hidden";
+            }
+          });
+        };
+        emitter.on(promptEvent.setInputTextRequest, handleSetInputText);
+        return () => {
+          emitter.off(promptEvent.setInputTextRequest, handleSetInputText);
+        };
+      }, [onValueChange, setPromptInputValue]);
+
       const renderHighlightedText = () => {
         if (!settings.textTriggersEnabled || triggers.length === 0) {
           return null;

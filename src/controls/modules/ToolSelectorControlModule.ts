@@ -385,7 +385,8 @@ export class ToolSelectorControlModule implements ControlModule {
 
   // Add this method to provide the list of all tools for suggestions
   public getAllTools(): { id: string }[] {
-    // Replace with actual tool list retrieval logic if needed
-    return this.transientEnabledTools ? Array.from(this.transientEnabledTools).map(id => ({ id })) : [];
+    // Return all tool IDs from the control registry, not just enabled tools
+    const allTools = useControlRegistryStore.getState().tools;
+    return Object.keys(allTools).map(id => ({ id }));
   }
 }
