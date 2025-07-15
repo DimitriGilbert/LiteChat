@@ -14,6 +14,8 @@ import { useProviderStore } from "@/store/provider.store";
 import { isLikelyTextFile } from "@/lib/litechat/file-extensions";
 import { toast } from "sonner";
 import type { AttachedFileMetadata } from "@/store/input.store";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 const MAX_FILE_SIZE_MB = 20;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -115,6 +117,12 @@ export class FileControlModule implements ControlModule {
       return;
     }
 
+    // Register text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
+
     this.unregisterCallback = modApi.registerPromptControl({
       id: this.id,
       triggerRenderer: () =>
@@ -123,6 +131,70 @@ export class FileControlModule implements ControlModule {
     });
   }
 
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'file',
+      name: 'File',
+      methods: {
+        attach: {
+          id: 'attach',
+          name: 'Attach File',
+          description: 'Attach a file from local system',
+          argSchema: {
+            minArgs: 0,
+            maxArgs: 0,
+            argTypes: [] as const
+          },
+          handler: this.handleFileAttach
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleFileAttach = async (_args: string[], _context: TriggerExecutionContext) => {
+    // Trigger file picker (simulate clicking the attach button)
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.accept = '*/*';
+    fileInput.onchange = async (event) => {
+      const files = (event.target as HTMLInputElement).files;
+      if (files) {
+        for (const file of Array.from(files)) {
+          let fileData: {
+            contentText?: string;
+            contentBase64?: string;
+          } = {};
+          const isText = this.isLikelyTextFile(file.name, file.type);
+          const isImage = file.type.startsWith("image/");
+          if (isText) {
+            fileData.contentText = await file.text();
+          } else if (isImage && this.modelSupportsNonText) {
+            const reader = new FileReader();
+            const promise = new Promise<string>((resolve, reject) => {
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = (error) => reject(error);
+            });
+            reader.readAsDataURL(file);
+            const dataUrl = await promise;
+            if (dataUrl && dataUrl.includes(",")) {
+              fileData.contentBase64 = dataUrl.split(",")[1];
+            }
+          }
+          this.modApiRef?.emit(inputEvent.addAttachedFileRequest, {
+            source: "direct",
+            name: file.name,
+            type: file.type || "application/octet-stream",
+            size: file.size,
+            ...fileData,
+          });
+        }
+      }
+    };
+    fileInput.click();
+  };
+
   destroy(): void {
     this.eventUnsubscribers.forEach((unsub) => unsub());
     this.eventUnsubscribers = [];
@@ -130,6 +202,13 @@ export class FileControlModule implements ControlModule {
       this.unregisterCallback();
       this.unregisterCallback = null;
     }
+
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
+
     this.notifyComponentUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);

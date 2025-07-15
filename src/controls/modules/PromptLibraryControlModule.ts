@@ -7,6 +7,8 @@ import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { useInteractionStore } from "@/store/interaction.store";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 import type { PromptFormData, CompiledPrompt } from "@/types/litechat/prompt-template";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 export class PromptLibraryControlModule implements ControlModule {
   readonly id = "core-prompt-library";
@@ -61,12 +63,51 @@ export class PromptLibraryControlModule implements ControlModule {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
     }
+
+    // Register text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
+
     this.unregisterCallback = modApi.registerPromptControl({
       id: this.id,
       status: () => "ready",
       triggerRenderer: () => React.createElement(PromptLibraryControl, { module: this }),
     });
   }
+
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'template',
+      name: 'Template',
+      methods: {
+        use: {
+          id: 'use',
+          name: 'Use Template',
+          description: 'Load and use a specific template',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 1,
+            argTypes: ['string' as const]
+          },
+          handler: this.handleTemplateUse
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleTemplateUse = async (args: string[], _context: TriggerExecutionContext) => {
+    const templateId = args[0];
+    const { promptTemplates } = usePromptTemplateStore.getState();
+    const template = promptTemplates.find(t => t.id === templateId || t.name === templateId);
+    
+    if (template) {
+      // Use the correct method to set the template for the turn (transient, not direct execution)
+      await this.applyTemplate(template.id, {});
+    }
+  };
 
   destroy(): void {
     this.eventUnsubscribers.forEach((unsub) => unsub());
@@ -75,6 +116,12 @@ export class PromptLibraryControlModule implements ControlModule {
       this.unregisterCallback();
       this.unregisterCallback = null;
     }
+
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
 
     console.log(`[${this.id}] Destroyed.`);
   }

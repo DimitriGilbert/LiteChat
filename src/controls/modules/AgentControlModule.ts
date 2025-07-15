@@ -10,6 +10,8 @@ import type {
 } from "@/types/litechat/prompt-template";
 import { AgentControl } from "@/controls/components/prompt/AgentControl";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 export class AgentControlModule implements ControlModule {
   readonly id = "agent-control";
@@ -248,6 +250,12 @@ export class AgentControlModule implements ControlModule {
   register(modApi: LiteChatModApi): void {
     this.modApiRef = modApi;
 
+    // Register text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
+
     // Register prompt control if not already registered
     if (!this.unregisterPromptControlCallback) {
       this.unregisterPromptControlCallback = modApi.registerPromptControl({
@@ -277,6 +285,37 @@ export class AgentControlModule implements ControlModule {
     // No longer registering as a separate main settings tab
   }
 
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'agent',
+      name: 'Agent',
+      methods: {
+        use: {
+          id: 'use',
+          name: 'Use Agent',
+          description: 'Select and use a specific agent',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 1,
+            argTypes: ['string' as const]
+          },
+          handler: this.handleAgentUse
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleAgentUse = async (args: string[], _context: TriggerExecutionContext) => {
+    const agentId = args[0];
+    const agent = this.allTemplates.find(t => t.id === agentId || t.name === agentId);
+    
+    if (agent) {
+      // Use the correct method to set the agent for the turn (transient, not direct execution)
+      await this.applyAgent(agent.id, {});
+    }
+  };
+
   destroy(_modApi: LiteChatModApi): void {
     // Clean up event listeners
     this.eventUnsubscribers.forEach((unsubscribe) => unsubscribe());
@@ -287,6 +326,12 @@ export class AgentControlModule implements ControlModule {
       this.unregisterPromptControlCallback();
       this.unregisterPromptControlCallback = null;
     }
+
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
 
     // Clean up references
     this.modApiRef = null;

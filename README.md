@@ -30,6 +30,7 @@
 - **Workflow Automation**: Create, save, and execute multi-step AI workflows with automated sequences, variable mapping, and intelligent orchestration
 - **Agents**: Create, manage, and use powerful AI agents and their associated tasks.
 - **Tool System**: AI can read/write files, execute Git commands, and more, including tools from MCP servers.
+- **Text Triggers**: Powerful inline commands for prompt automation (e.g., `@.rules.auto;`, `@.tools.activate vfs_read_file;`, `@.params.temp 0.7;`)
 - **Race**: you can send the same prompt to multiple models at once and see the results
 - **Mermaid Diagrams**: Real-time diagram rendering with full Mermaid.js support
 - **Response editor**: edit the response after it has been generated to remove the fluff and save on tokens
@@ -82,6 +83,7 @@ For comprehensive documentation, see the [`docs/`](./docs/) directory:
 - **[Canvas Features](./docs/canvas-features.md)** - Code blocks, diagrams, and interaction controls
 - **[Block Renderer System](./docs/block-renderer-system.md)** - Universal block rendering architecture
 - **[Workflow System](./docs/workflow-system.md)** - Multi-step AI automation and workflow orchestration
+- **[Text Triggers](./better_input_trigger.md)** - Inline command system for prompt automation with autocomplete
 - **[Modding System](./docs/modding.md)** - Extension API and custom functionality
 - **[Build & Deployment](./docs/build-deployment.md)** - Development, configuration, and deployment
 - **[Control Module System](./docs/control-modules.md)** - Modular UI architecture

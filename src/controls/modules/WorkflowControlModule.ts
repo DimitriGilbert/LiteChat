@@ -15,6 +15,8 @@ import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { PersistenceService } from "@/services/persistence.service";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 export class WorkflowControlModule implements ControlModule {
   readonly id = "core-workflow-control";
@@ -89,9 +91,48 @@ export class WorkflowControlModule implements ControlModule {
     await this.loadWorkflows();
   }
 
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'workflow',
+      name: 'Workflow',
+      methods: {
+        run: {
+          id: 'run',
+          name: 'Run Workflow',
+          description: 'Execute a specific workflow',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 1,
+            argTypes: ['string' as const]
+          },
+          handler: this.handleWorkflowRun
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleWorkflowRun = async (args: string[], _context: TriggerExecutionContext) => {
+    const workflowId = args[0];
+    const workflow = this.workflows.find(w => w.id === workflowId || w.name === workflowId);
+    
+    if (workflow) {
+      this.notifyComponentUpdate?.();
+      // UI should react to this change and show the workflow as selected for the next prompt
+      toast.info(`Workflow "${workflow.name}" selected for prompt.`);
+    }
+  };
+
   destroy(): void {
     this.eventUnsubscribers.forEach((unsub) => unsub());
     this.eventUnsubscribers = [];
+
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
+
     this.notifyComponentUpdate = null;
     this.modApi = null;
   }
@@ -362,6 +403,13 @@ export class WorkflowControlModule implements ControlModule {
 
   register(modApi: LiteChatModApi): void {
     this.modApi = modApi;
+
+    // Register text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
+
     modApi.registerPromptControl({
       id: this.id,
       status: () => "ready",

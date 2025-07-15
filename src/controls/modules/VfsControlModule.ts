@@ -9,6 +9,9 @@ import { VfsTriggerButton } from "@/controls/components/vfs/VfsTriggerButton";
 import { VfsModalPanel } from "@/controls/components/vfs/VfsModalPanel";
 import { useVfsStore } from "@/store/vfs.store";
 import { useConversationStore } from "@/store/conversation.store";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
+import { inputEvent } from "@/types/litechat/events/input.events";
 
 export class VfsControlModule implements ControlModule {
   readonly id = "core-vfs";
@@ -127,6 +130,12 @@ export class VfsControlModule implements ControlModule {
       return;
     }
 
+    // Register text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
+
     const unregisterTrigger = modApi.registerPromptControl({
       id: "core-vfs-prompt-trigger",
       triggerRenderer: () =>
@@ -141,11 +150,84 @@ export class VfsControlModule implements ControlModule {
     this.unregisterCallbacks.push(unregisterModalProvider);
   }
 
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'vfs',
+      name: 'VFS',
+      methods: {
+        add: {
+          id: 'add',
+          name: 'Add VFS Files',
+          description: 'Add files from VFS to the current prompt',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 10,
+            argTypes: ['string' as const]
+          },
+          handler: this.handleVfsAdd
+        },
+        open: {
+          id: 'open',
+          name: 'Open VFS',
+          description: 'Open the VFS file explorer',
+          argSchema: {
+            minArgs: 0,
+            maxArgs: 0,
+            argTypes: [] as const
+          },
+          handler: this.handleVfsOpen
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleVfsAdd = async (args: string[], _context: TriggerExecutionContext) => {
+    // Add VFS files to the current prompt by their paths
+    const vfsState = useVfsStore.getState();
+    const filePaths = args;
+    // Find the nodes by path and add them to input
+    const filesToAdd = filePaths.map(path => {
+      const node = Object.values(vfsState.nodes).find(n => n.path === path);
+      return node;
+    }).filter(Boolean);
+    function isVfsFile(node: any): node is { type: 'file', name: string, mimeType?: string, size: number, path: string } {
+      return node && node.type === 'file' && typeof node.name === 'string' && typeof node.size === 'number' && typeof node.path === 'string';
+    }
+    if (filesToAdd.length > 0) {
+      for (const node of filesToAdd) {
+        if (isVfsFile(node)) {
+          this.modApiRef?.emit(inputEvent.addAttachedFileRequest, {
+            source: "vfs",
+            name: node.name,
+            type: node.mimeType || "application/octet-stream",
+            size: node.size,
+            path: node.path,
+          });
+        }
+      }
+    }
+  };
+
+  private handleVfsOpen = async (_args: string[], _context: TriggerExecutionContext) => {
+    // Open the VFS modal
+    this.modApiRef?.emit(uiEvent.openModalRequest, { 
+      modalId: this.modalId 
+    });
+  };
+
   destroy(): void {
     this.eventUnsubscribers.forEach((unsub) => unsub());
     this.eventUnsubscribers = [];
     this.unregisterCallbacks.forEach((unsub) => unsub());
     this.unregisterCallbacks = [];
+
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
+
     this.notifyTriggerUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
