@@ -102,10 +102,16 @@ export class PromptLibraryControlModule implements ControlModule {
     const templateId = args[0];
     const { promptTemplates } = usePromptTemplateStore.getState();
     const template = promptTemplates.find(t => t.id === templateId || t.name === templateId);
-    
     if (template) {
-      // Use the correct method to set the template for the turn (transient, not direct execution)
-      await this.applyTemplate(template.id, {});
+      // Parse key=value pairs from the rest of the args
+      const formData: Record<string, any> = {};
+      for (let i = 1; i < args.length; i++) {
+        const [key, ...rest] = args[i].split("=");
+        if (key && rest.length > 0) {
+          formData[key] = rest.join("=");
+        }
+      }
+      await this.applyTemplate(template.id, formData);
     }
   };
 

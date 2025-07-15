@@ -309,10 +309,16 @@ export class AgentControlModule implements ControlModule {
   private handleAgentUse = async (args: string[], _context: TriggerExecutionContext) => {
     const agentId = args[0];
     const agent = this.allTemplates.find(t => t.id === agentId || t.name === agentId);
-    
     if (agent) {
-      // Use the correct method to set the agent for the turn (transient, not direct execution)
-      await this.applyAgent(agent.id, {});
+      // Parse key=value pairs from the rest of the args
+      const formData: Record<string, any> = {};
+      for (let i = 1; i < args.length; i++) {
+        const [key, ...rest] = args[i].split("=");
+        if (key && rest.length > 0) {
+          formData[key] = rest.join("=");
+        }
+      }
+      await this.applyAgent(agent.id, formData);
     }
   };
 
