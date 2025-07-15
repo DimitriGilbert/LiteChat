@@ -115,7 +115,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
         setConfigSyncEnabled(value.configSyncEnabled);
         setConfigSyncRepoId(value.configSyncRepoId);
         setConfigSyncAutoSync(value.configSyncAutoSync);
-        setConfigSyncInterval(value.configSyncInterval);
+        setConfigSyncInterval(typeof value.configSyncInterval === 'string' ? parseInt(value.configSyncInterval) : value.configSyncInterval);
         toast.success(t('configSync.settingsSaved'));
       },
     }
