@@ -8,7 +8,9 @@ export type WorkflowStepType =
   | "tool-call"
   | "custom-prompt"
   | "function"
-  | "human-in-the-loop";
+  | "human-in-the-loop"
+  | "parallel"
+  | "sub-workflow";
 
 export interface WorkflowStep {
   id: string; // nanoid
@@ -37,6 +39,15 @@ export interface WorkflowStep {
   functionLanguage?: 'js' | 'py'; // Language of the function
   functionCode?: string; // The function code
   functionVariables?: PromptVariable[]; // Input variables the function expects
+
+  // For 'parallel' type
+  parallelOn?: string; // Variable name containing array to iterate over
+  parallelStep?: WorkflowStep; // The step configuration to run for each array item
+  parallelModelVar?: string; // Optional: if set, use array item as modelId (race behavior)
+
+  // For 'sub-workflow' type
+  subWorkflowTemplateId?: string; // ID of workflow template to execute
+  subWorkflowInputMapping?: Record<string, string>; // Map parent context to sub-workflow variables
 
   // Defines how to map output from the *previous* step to the input variables of *this* step.
   // The keys are the variable names in this step's template (e.g., 'customer_email').

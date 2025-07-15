@@ -67,5 +67,14 @@ export interface Interaction {
     timeToFirstToken?: number;
     generationTime?: number;
     isTitleGeneration?: boolean;
+    // Parallel execution metadata
+    isParallelBranch?: boolean;
+    parallelBranchIndex?: number;
+    parallelParentStepId?: string;
+    parallelArrayItem?: any;
+    // Sub-workflow metadata
+    isSubWorkflowMain?: boolean;
+    subWorkflowTemplateId?: string;
+    subWorkflowParentStepId?: string;
   };
 }

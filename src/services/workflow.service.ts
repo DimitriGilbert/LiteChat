@@ -7,7 +7,7 @@ import {
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import type { Interaction } from "@/types/litechat/interaction";
 import { useWorkflowStore } from "@/store/workflow.store";
-import type { WorkflowRun, WorkflowStep } from "@/types/litechat/workflow";
+import type { WorkflowRun, WorkflowStep, WorkflowTemplate } from "@/types/litechat/workflow";
 import { WorkflowError } from "@/types/litechat/workflow";
 import { nanoid } from "nanoid";
 import { compilePromptTemplate } from "@/lib/litechat/prompt-util";
@@ -168,20 +168,20 @@ export const WorkflowService = {
     try {
       return path.split(".").reduce((acc, part) => {
         if (acc === null || acc === undefined) return undefined;
-        
+
         // Handle array indices (including multi-dimensional arrays)
         if (part.includes("[") && part.includes("]")) {
           // Split property name from array indices
           const propMatch = part.match(/^([^[]*)/);
           const prop = propMatch ? propMatch[1] : "";
-          
+
           // Extract all array indices
           const indexMatches = part.match(/\[(\d+)\]/g);
           if (!indexMatches) return undefined;
-          
+
           // Start with the property (if it exists)
           let current = prop ? acc[prop] : acc;
-          
+
           // Apply each array index in sequence
           for (const indexMatch of indexMatches) {
             const indexStr = indexMatch.slice(1, -1); // Remove [ and ]
@@ -191,10 +191,10 @@ export const WorkflowService = {
             }
             current = current[index];
           }
-          
+
           return current;
         }
-        
+
         return acc[part];
       }, obj);
     } catch (error) {
@@ -252,9 +252,8 @@ export const WorkflowService = {
     } catch (error) {
       return {
         isValid: false,
-        error: `Query execution failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+        error: `Query execution failed: ${error instanceof Error ? error.message : "Unknown error"
+          }`,
       };
     }
   },
@@ -313,9 +312,9 @@ export const WorkflowService = {
       outputs: outputs,
     };
 
-      // console.log(
-      //   `[WorkflowService] Built context with ${outputs.length} outputs`
-      // );
+    // console.log(
+    //   `[WorkflowService] Built context with ${outputs.length} outputs`
+    // );
     return context;
   },
 
@@ -345,7 +344,7 @@ export const WorkflowService = {
 
     // Some step types don't require templateId (e.g., human-in-the-loop, transform)
     const requiresTemplate = nextStep.type === "prompt" || nextStep.type === "agent-task";
-    
+
     if (requiresTemplate && !nextStep.templateId) {
       throw new WorkflowError(
         `Transform step "${step.name}" has following step "${nextStep.name}" (type: ${nextStep.type}) that requires a template but has no templateId`,
@@ -370,16 +369,16 @@ export const WorkflowService = {
       console.warn(
         `[WorkflowService] Transform step "${step.name}": Next step "${nextStep.name}" (type: ${nextStep.type}) has no template variables. Passing raw output from previous step.`
       );
-      
+
       // For steps without template variables, pass through the most recent output
       const context = WorkflowService._buildTransformContext(run, stepIndex);
       const previousOutput = context.outputs[context.outputs.length - 1] || context.initial_step;
-      
+
       // console.log(
       //   `[WorkflowService] Transform step "${step.name}" passing through previous output:`,
       //   previousOutput
       // );
-      
+
       return previousOutput;
     }
 
@@ -479,10 +478,587 @@ export const WorkflowService = {
     return transformedData;
   },
 
+  /**
+   * Execute parallel step - run a configured step for each item in an array
+   */
+  _executeParallelStep: async (
+    run: WorkflowRun,
+    step: WorkflowStep,
+    stepIndex: number
+  ): Promise<any> => {
+    console.log(`[WorkflowService] Executing parallel step "${step.name}" at index ${stepIndex}`);
+
+    // Validate parallel configuration
+    if (!step.parallelOn) {
+      throw new WorkflowError(
+        `Parallel step "${step.name}" missing parallelOn configuration`,
+        "STEP_CREATION_FAILED",
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: "parallel" }
+      );
+    }
+
+    if (!step.parallelStep) {
+      throw new WorkflowError(
+        `Parallel step "${step.name}" missing parallelStep configuration`,
+        "STEP_CREATION_FAILED",
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: "parallel" }
+      );
+    }
+
+    // Build context to access previous step outputs
+    const context = WorkflowService._buildTransformContext(run, stepIndex);
+
+    // Resolve the array to iterate over using JSONPath
+    const arrayData = WorkflowService._resolveJsonPath(context, step.parallelOn);
+
+    if (!Array.isArray(arrayData)) {
+      throw new WorkflowError(
+        `Parallel step "${step.name}": Variable "${step.parallelOn}" does not contain an array. Got: ${typeof arrayData}`,
+        "TRANSFORM_STEP_FAILED",
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: "parallel", query: step.parallelOn }
+      );
+    }
+
+    if (arrayData.length === 0) {
+      console.warn(`[WorkflowService] Parallel step "${step.name}": Array is empty, returning empty result`);
+      return [];
+    }
+
+    const interactionStore = useInteractionStore.getState();
+
+    // Update flow content to show parallel execution starting
+    const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+    const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+      stepId: step.id,
+      status: "running",
+    });
+
+    if (updatedContent !== currentContent) {
+      interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
+    } else {
+      interactionStore.appendStreamBuffer(
+        run.mainInteractionId,
+        `\n\n---\n▶️ **Executing: ${step.name}** (${arrayData.length} parallel branches)`
+      );
+    }
+
+    // Create parallel child interactions
+    const parallelPromises = arrayData.map((arrayItem, index) =>
+      WorkflowService._createParallelBranch(run, step, stepIndex, arrayItem, index)
+    );
+
+    // Wait for all parallel branches to complete
+    const parallelResults = await Promise.all(parallelPromises);
+
+    // Filter out failed branches and extract results
+    const successfulResults = parallelResults
+      .filter(result => result.success)
+      .map(result => result.output);
+
+    const failedCount = parallelResults.length - successfulResults.length;
+
+    if (failedCount > 0) {
+      console.warn(`[WorkflowService] Parallel step "${step.name}": ${failedCount} branches failed`);
+
+      // Update flow to show partial completion
+      const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+      const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+        stepId: step.id,
+        status: "success", // Still success if some completed
+      });
+
+      if (updatedContent !== currentContent) {
+        interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
+      } else {
+        interactionStore.appendStreamBuffer(
+          run.mainInteractionId,
+          `\n⚠️ **Completed: ${step.name}** - ${successfulResults.length}/${arrayData.length} branches succeeded`
+        );
+      }
+    } else {
+      // All branches succeeded
+      const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+      const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+        stepId: step.id,
+        status: "success",
+      });
+
+      if (updatedContent !== currentContent) {
+        interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
+      } else {
+        interactionStore.appendStreamBuffer(
+          run.mainInteractionId,
+          `\n✔️ **Completed: ${step.name}** - All ${arrayData.length} branches succeeded`
+        );
+      }
+    }
+
+    console.log(`[WorkflowService] Parallel step "${step.name}" completed with ${successfulResults.length} results`);
+
+    // Emit step completion after all branches are done (NOT synchronous like transform)
+    emitter.emit(workflowEvent.stepCompleted, {
+      runId: run.runId,
+      stepId: step.id,
+      output: successfulResults,
+      metadata: createWorkflowEventMetadata(run.runId, "normal", stepIndex + 50),
+    });
+
+    return successfulResults;
+  },
+
+  /**
+   * Create and execute a single parallel branch
+   */
+  _createParallelBranch: async (
+    run: WorkflowRun,
+    parentStep: WorkflowStep,
+    stepIndex: number,
+    arrayItem: any,
+    branchIndex: number
+  ): Promise<{ success: boolean; output?: any; error?: string }> => {
+    try {
+      const branchStep = { ...parentStep.parallelStep! };
+      branchStep.id = `${parentStep.id}_branch_${branchIndex}`;
+      branchStep.name = `${branchStep.name} (${branchIndex + 1})`;
+
+      // Determine model ID for this branch
+      let modelId = branchStep.modelId;
+      if (parentStep.parallelModelVar) {
+        // Use array item as model ID (race behavior)
+        modelId = arrayItem;
+      }
+
+      if (!modelId) {
+        modelId = usePromptStateStore.getState().modelId || "";
+      }
+
+      // Compile step prompt with array item as context
+      const arrayItemContext = {
+        [parentStep.parallelOn!.split('.').pop()!]: arrayItem,
+        branchIndex,
+        totalBranches: Array.isArray(arrayItem) ? arrayItem.length : 1
+      };
+
+      const compiled = await WorkflowService._compileStepPrompt(branchStep, run, stepIndex, arrayItemContext);
+
+      // Create branch turn data
+      const branchTurnData: PromptTurnObject = {
+        id: nanoid(),
+        content: compiled.content,
+        parameters: {},
+        metadata: {
+          modelId,
+          isWorkflowStep: true,
+          workflowRunId: run.runId,
+          workflowStepId: branchStep.id,
+          workflowMainInteractionId: run.mainInteractionId,
+          workflowTab: true,
+          workflowStepIndex: stepIndex + 1,
+          isParallelBranch: true,
+          parallelBranchIndex: branchIndex,
+          parallelParentStepId: parentStep.id,
+          parallelArrayItem: arrayItem,
+        },
+      };
+
+      // Build prompt for this branch
+      const { promptObject: branchPrompt } = await PromptCompilationService.compilePromptWithControls(
+        run.conversationId,
+        compiled.content,
+        branchTurnData
+      );
+
+      const childPrompt: PromptObject = {
+        ...branchPrompt,
+        metadata: { ...branchPrompt.metadata, modelId },
+      };
+
+      // Create child interaction
+      const branchInteraction = await InteractionService.startInteraction(
+        childPrompt,
+        run.conversationId,
+        branchTurnData,
+        "message.assistant_regen"
+      );
+
+      if (!branchInteraction) {
+        throw new Error(`Failed to create parallel branch ${branchIndex}`);
+      }
+
+      // Set as child of main interaction
+      const interactionStore = useInteractionStore.getState();
+      const updates: Partial<Omit<Interaction, "id">> = {
+        parentId: run.mainInteractionId,
+        index: stepIndex * 1000 + branchIndex + 1, // Unique tab index for parallel branches
+      };
+
+      interactionStore._updateInteractionInState(branchInteraction.id, updates);
+      await PersistenceService.saveInteraction({
+        ...branchInteraction,
+        ...updates,
+      } as Interaction);
+
+      // Wait for this branch to complete
+      const branchOutput = await WorkflowService._waitForBranchCompletion(branchInteraction.id, 120);
+
+      return { success: true, output: branchOutput };
+
+    } catch (error) {
+      console.error(`[WorkflowService] Parallel branch ${branchIndex} failed:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  },
+
+  /**
+   * Wait for a parallel branch to complete
+   */
+  _waitForBranchCompletion: async (interactionId: string, timeoutSec: number = 120): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      let timeoutId: NodeJS.Timeout | null = null;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        emitter.off(interactionEvent.completed, handleInteractionCompleted);
+      };
+
+      const handleInteractionCompleted = (payload: { interactionId: string; status: string; interaction?: Interaction }) => {
+        if (payload.interactionId !== interactionId) {
+          return; // Not our branch
+        }
+
+        cleanup();
+
+        if (payload.status === "COMPLETED") {
+          const interaction = payload.interaction;
+          if (interaction) {
+            // Parse step output using existing method
+            const fakeStep = { structuredOutput: { jsonSchema: {} } } as WorkflowStep;
+            try {
+              const output = WorkflowService._parseStepOutput(interaction, fakeStep);
+              resolve(output);
+            } catch (error) {
+              // Fallback to raw response
+              resolve(interaction.response ?? "No output");
+            }
+          } else {
+            resolve("No output");
+          }
+        } else {
+          reject(new Error(`Parallel branch failed with status: ${payload.status}`));
+        }
+      };
+
+      emitter.on(interactionEvent.completed, handleInteractionCompleted);
+
+      timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Parallel branch timed out after ${timeoutSec} seconds`));
+      }, timeoutSec * 1000);
+    });
+  },
+
+  /**
+   * Execute sub-workflow step - run another workflow as a step
+   */
+  _executeSubWorkflowStep: async (
+    run: WorkflowRun,
+    step: WorkflowStep,
+    stepIndex: number
+  ): Promise<any> => {
+    console.log(`[WorkflowService] Executing sub-workflow step "${step.name}" at index ${stepIndex}`);
+
+    // Validate sub-workflow configuration
+    if (!step.subWorkflowTemplateId) {
+      throw new WorkflowError(
+        `Sub-workflow step "${step.name}" missing subWorkflowTemplateId`,
+        "TEMPLATE_NOT_FOUND",
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: "sub-workflow" }
+      );
+    }
+
+    // Load sub-workflow template
+    const subWorkflowTemplate = await PersistenceService.loadWorkflow(step.subWorkflowTemplateId);
+    if (!subWorkflowTemplate) {
+      throw new WorkflowError(
+        `Sub-workflow template "${step.subWorkflowTemplateId}" not found`,
+        "TEMPLATE_NOT_FOUND",
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: "sub-workflow", templateId: step.subWorkflowTemplateId }
+      );
+    }
+
+    // Build context from previous steps
+    const context = WorkflowService._buildTransformContext(run, stepIndex);
+
+    // Map input variables for sub-workflow
+    const subWorkflowInputs: Record<string, any> = {};
+    if (step.subWorkflowInputMapping) {
+      for (const [subVarName, query] of Object.entries(step.subWorkflowInputMapping)) {
+        try {
+          if (query.startsWith('"') && query.endsWith('"')) {
+            // Static value
+            subWorkflowInputs[subVarName] = query.slice(1, -1);
+          } else if (!isNaN(Number(query))) {
+            // Numeric value
+            subWorkflowInputs[subVarName] = Number(query);
+          } else if (query === "true" || query === "false") {
+            // Boolean value
+            subWorkflowInputs[subVarName] = query === "true";
+          } else if (query.startsWith("$.")) {
+            // JSONPath query
+            subWorkflowInputs[subVarName] = WorkflowService._resolveJsonPath(context, query);
+          } else {
+            throw new Error(`Invalid query format: "${query}"`);
+          }
+        } catch (error) {
+          throw new WorkflowError(
+            `Sub-workflow step "${step.name}": Failed to resolve input mapping for "${subVarName}": ${error}`,
+            "TRANSFORM_STEP_FAILED",
+            { runId: run.runId, stepId: step.id, stepIndex, stepType: "sub-workflow", query }
+          );
+        }
+      }
+    }
+
+    const interactionStore = useInteractionStore.getState();
+
+    // Update flow content to show sub-workflow starting
+    const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+    const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+      stepId: step.id,
+      status: "running",
+    });
+
+    if (updatedContent !== currentContent) {
+      interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
+    } else {
+      interactionStore.appendStreamBuffer(
+        run.mainInteractionId,
+        `\n\n---\n▶️ **Executing: ${step.name}** (Sub-workflow: "${subWorkflowTemplate.name}")`
+      );
+    }
+
+    // Prepare sub-workflow trigger prompt
+    let triggerPrompt = "";
+    if (subWorkflowTemplate.triggerType === "custom") {
+      triggerPrompt = subWorkflowTemplate.triggerPrompt || "";
+    } else if (subWorkflowTemplate.triggerType === "template" && subWorkflowTemplate.triggerRef) {
+      // Compile template with mapped inputs
+      const template = await PersistenceService.loadPromptTemplateById(subWorkflowTemplate.triggerRef);
+      if (template) {
+        const compiled = await compilePromptTemplate(template, subWorkflowInputs);
+        triggerPrompt = compiled.content;
+      }
+    } else if (subWorkflowTemplate.triggerType === "task" && subWorkflowTemplate.triggerRef) {
+      const task = await PersistenceService.loadPromptTemplateById(subWorkflowTemplate.triggerRef);
+      if (task) {
+        triggerPrompt = task.prompt || "";
+      }
+    }
+
+    if (!triggerPrompt) {
+      throw new WorkflowError(
+        `Sub-workflow step "${step.name}": Could not generate trigger prompt`,
+        "TEMPLATE_COMPILATION_FAILED",
+        { runId: run.runId, stepId: step.id, stepIndex, stepType: "sub-workflow" }
+      );
+    }
+
+    // Create a modified sub-workflow template with mapped inputs
+    const subWorkflowToRun: WorkflowTemplate = {
+      ...subWorkflowTemplate,
+      id: `${step.id}_subworkflow_${nanoid()}`,
+      triggerPrompt,
+      templateVariables: subWorkflowInputs,
+    };
+
+    // Launch sub-workflow and wait for completion
+    const subWorkflowOutput = await WorkflowService._executeSubWorkflowInternal(
+      run,
+      step,
+      subWorkflowToRun,
+      triggerPrompt
+    );
+
+    // Update flow content for completed sub-workflow
+    const completionContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+    const completionUpdated = WorkflowService._updateStepStatusInFlow(completionContent, {
+      stepId: step.id,
+      status: "success",
+    });
+
+    if (completionUpdated !== completionContent) {
+      interactionStore.setActiveStreamBuffer(run.mainInteractionId, completionUpdated);
+    } else {
+      interactionStore.appendStreamBuffer(
+        run.mainInteractionId,
+        `\n✔️ **Completed: ${step.name}** - Sub-workflow finished`
+      );
+    }
+
+    console.log(`[WorkflowService] Sub-workflow step "${step.name}" completed`);
+
+    // Emit step completion after sub-workflow is done (NOT synchronous like transform)
+    emitter.emit(workflowEvent.stepCompleted, {
+      runId: run.runId,
+      stepId: step.id,
+      output: subWorkflowOutput,
+      metadata: createWorkflowEventMetadata(run.runId, "normal", stepIndex + 60),
+    });
+
+    return subWorkflowOutput;
+  },
+
+  /**
+   * Internal sub-workflow execution
+   */
+  _executeSubWorkflowInternal: async (
+    parentRun: WorkflowRun,
+    parentStep: WorkflowStep,
+    subWorkflowTemplate: WorkflowTemplate,
+    triggerPrompt: string
+  ): Promise<any> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const interactionStore = useInteractionStore.getState();
+
+        // Create sub-workflow main interaction manually (following main workflow pattern)
+        const subMainInteractionId = nanoid();
+        const subRunId = nanoid();
+
+        const conversationInteractions = interactionStore.interactions.filter(
+          (i: Interaction) => i.conversationId === parentRun.conversationId
+        );
+        const newIndex = conversationInteractions.reduce(
+          (max: number, i: Interaction) => Math.max(max, i.index),
+          -1
+        ) + 1;
+
+        const subMainInteraction: Interaction = {
+          id: subMainInteractionId,
+          conversationId: parentRun.conversationId,
+          type: "message.user_assistant",
+          prompt: {
+            id: subMainInteractionId,
+            content: triggerPrompt,
+            parameters: {},
+            metadata: {
+              isSubWorkflowMain: true,
+              subWorkflowTemplateId: subWorkflowTemplate.id,
+              subWorkflowParentStepId: parentStep.id,
+            },
+          },
+          response: null,
+          status: "STREAMING",
+          startedAt: new Date(),
+          endedAt: null,
+          metadata: {
+            isSubWorkflowMain: true,
+            subWorkflowTemplateId: subWorkflowTemplate.id,
+            subWorkflowParentStepId: parentStep.id,
+            toolCalls: [],
+            toolResults: [],
+          },
+          index: newIndex,
+          parentId: parentRun.mainInteractionId, // Child of parent workflow main interaction
+        };
+
+        // Add to state without starting AI call
+        interactionStore._addInteractionToState(subMainInteraction);
+        interactionStore._addStreamingId(subMainInteraction.id);
+
+        // Set initial content
+        interactionStore.setActiveStreamBuffer(
+          subMainInteraction.id,
+          `# ${subWorkflowTemplate.name} (Sub-workflow)\n\nStarting with ${subWorkflowTemplate.steps.length} step${subWorkflowTemplate.steps.length > 1 ? "s" : ""}...`
+        );
+
+        await PersistenceService.saveInteraction(subMainInteraction);
+
+        // Emit events
+        emitter.emit(interactionEvent.added, { interaction: subMainInteraction });
+        emitter.emit(interactionEvent.started, {
+          interactionId: subMainInteraction.id,
+          conversationId: subMainInteraction.conversationId,
+          type: subMainInteraction.type,
+        });
+
+        // Create sub-workflow run
+        const subRun: WorkflowRun = {
+          runId: subRunId,
+          conversationId: parentRun.conversationId,
+          mainInteractionId: subMainInteraction.id,
+          template: subWorkflowTemplate,
+          status: "running",
+          currentStepIndex: -1,
+          stepOutputs: {},
+          startedAt: new Date().toISOString(),
+        };
+
+        // Listen for sub-workflow completion
+        const cleanup = () => {
+          emitter.off(workflowEvent.completed, handleSubWorkflowCompleted);
+        };
+
+        const handleSubWorkflowCompleted = (payload: { runId: string; finalOutput: Record<string, any> }) => {
+          if (payload.runId !== subRunId) {
+            return; // Not our sub-workflow
+          }
+
+          cleanup();
+
+          // Extract final output from sub-workflow
+          const finalOutput = payload.finalOutput;
+
+          // Get the last step's output as the sub-workflow result
+          const lastStepOutputs = Object.values(finalOutput);
+          const subWorkflowResult = lastStepOutputs.length > 0 ? lastStepOutputs[lastStepOutputs.length - 1] : {};
+
+          resolve(subWorkflowResult);
+        };
+
+        emitter.on(workflowEvent.completed, handleSubWorkflowCompleted);
+
+        // Set timeout for sub-workflow
+        setTimeout(() => {
+          cleanup();
+          reject(new Error(`Sub-workflow timed out after 300 seconds`));
+        }, 300000); // 5 minute timeout
+
+        // Start sub-workflow trigger step (following main workflow pattern)
+        const baseTurnData: PromptTurnObject = {
+          id: "",
+          content: triggerPrompt,
+          parameters: {},
+          metadata: {
+            modelId: usePromptStateStore.getState().modelId || "",
+          },
+        };
+
+        await WorkflowService.createTriggerStep(subMainInteraction, subRun, baseTurnData);
+
+        // Emit sub-workflow started event
+        emitter.emit(workflowEvent.started, {
+          run: subRun,
+          metadata: createWorkflowEventMetadata(subRun.runId, "high", 1),
+        });
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  },
+
   _compileStepPrompt: async (
     step: WorkflowStep,
     run: WorkflowRun,
-    stepIndex: number
+    stepIndex: number,
+    additionalContext?: Record<string, any>
   ): Promise<CompiledPrompt> => {
     if (!step.templateId) {
       throw new WorkflowError(
@@ -527,6 +1103,11 @@ export const WorkflowService = {
           `[WorkflowService] No output found for previous step at index ${previousStepIndex}`
         );
       }
+    }
+
+    // Merge additional context for parallel branches
+    if (additionalContext) {
+      formData = { ...formData, ...additionalContext };
     }
 
     try {
@@ -761,8 +1342,7 @@ export const WorkflowService = {
       // Set initial content in stream buffer (will be updated with flow content after run is created)
       interactionStore.setActiveStreamBuffer(
         mainInteraction.id,
-        `# ${template.name}\n\nWorkflow starting with ${
-          template.steps.length
+        `# ${template.name}\n\nWorkflow starting with ${template.steps.length
         } step${template.steps.length > 1 ? "s" : ""}...`
       );
 
@@ -798,11 +1378,9 @@ export const WorkflowService = {
           (initialFlowContent.length > 200 ? "..." : ""),
       });
 
-      const fullContent = `# ${template.name}\n\nWorkflow starting with ${
-        template.steps.length
-      } step${
-        template.steps.length > 1 ? "s" : ""
-      }...\n\n\`\`\`flow\n${initialFlowContent}\n\`\`\``;
+      const fullContent = `# ${template.name}\n\nWorkflow starting with ${template.steps.length
+        } step${template.steps.length > 1 ? "s" : ""
+        }...\n\n\`\`\`flow\n${initialFlowContent}\n\`\`\``;
       console.log(
         `[WorkflowService] Setting stream buffer with full content:`,
         {
@@ -1088,8 +1666,7 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
       if (step.type === "human-in-the-loop") {
         interactionStore.appendStreamBuffer(
           run.mainInteractionId,
-          `\n⏸️ **Paused:** ${
-            step.instructionsForHuman || "Requires human input."
+          `\n⏸️ **Paused:** ${step.instructionsForHuman || "Requires human input."
           }`
         );
         interactionStore._updateInteractionInState(run.mainInteractionId, {
@@ -1303,6 +1880,86 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
         return;
       }
 
+      if (step.type === "parallel") {
+        try {
+          // Execute parallel step ASYNCHRONOUSLY - wait for all branches to complete
+          // This will launch child interactions and wait for completion before emitting stepCompleted
+          await WorkflowService._executeParallelStep(run, step, stepIndex);
+          // NOTE: _executeParallelStep handles its own stepCompleted emission after all branches finish
+          return;
+        } catch (error) {
+          const workflowError = WorkflowError.fromError(error, "STEP_CREATION_FAILED", {
+            runId: run.runId,
+            stepId: step.id,
+            stepIndex,
+            stepType: "parallel",
+          });
+          console.error(`[WorkflowService] ${workflowError.message}:`, workflowError);
+
+          // Update flow content for failed parallel step
+          const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+          const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+            stepId: step.id,
+            status: "error",
+          });
+
+          if (updatedContent !== currentContent) {
+            interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
+          } else {
+            interactionStore.appendStreamBuffer(
+              run.mainInteractionId,
+              `\n❌ **Error in ${stepName}:** ${workflowError.getUserMessage()}`
+            );
+          }
+
+          emitter.emit(workflowEvent.error, {
+            runId: run.runId,
+            error: workflowError.getUserMessage(),
+          });
+          return;
+        }
+      }
+
+      if (step.type === "sub-workflow") {
+        try {
+          // Execute sub-workflow ASYNCHRONOUSLY - wait for sub-workflow to complete
+          // This will launch sub-workflow and wait for completion before emitting stepCompleted
+          await WorkflowService._executeSubWorkflowStep(run, step, stepIndex);
+          // NOTE: _executeSubWorkflowStep handles its own stepCompleted emission after sub-workflow finishes
+          return;
+        } catch (error) {
+          const workflowError = WorkflowError.fromError(error, "STEP_CREATION_FAILED", {
+            runId: run.runId,
+            stepId: step.id,
+            stepIndex,
+            stepType: "sub-workflow",
+          });
+          console.error(`[WorkflowService] ${workflowError.message}:`, workflowError);
+
+          // Update flow content for failed sub-workflow
+          const currentContent = interactionStore.activeStreamBuffers[run.mainInteractionId] || "";
+          const updatedContent = WorkflowService._updateStepStatusInFlow(currentContent, {
+            stepId: step.id,
+            status: "error",
+          });
+
+          if (updatedContent !== currentContent) {
+            interactionStore.setActiveStreamBuffer(run.mainInteractionId, updatedContent);
+          } else {
+            interactionStore.appendStreamBuffer(
+              run.mainInteractionId,
+              `\n❌ **Error in ${stepName}:** ${workflowError.getUserMessage()}`
+            );
+          }
+
+          emitter.emit(workflowEvent.error, {
+            runId: run.runId,
+            error: workflowError.getUserMessage(),
+          });
+          return;
+        }
+      }
+
       // Validate model availability if specified
       if (step.modelId) {
         const providerState = useProviderStore.getState();
@@ -1426,7 +2083,7 @@ ${JSON.stringify(triggerParameters.structured_output, null, 2)}`;
       // Each step uses its OWN template's system prompt + workflow output format for the NEXT step
       if (stepParameters.structured_output) {
         // Load fresh template from database instead of stale store
-        const currentStepTemplate = step.templateId ? 
+        const currentStepTemplate = step.templateId ?
           await PersistenceService.loadPromptTemplateById(step.templateId) : null;
 
         if (currentStepTemplate) {
@@ -1513,9 +2170,8 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
 
       // Update the main interaction response (like RacePromptControlModule does)
       const errorUpdates = {
-        response: `❌ **Workflow Error**\n\nFailed to create step ${
-          stepIndex + 1
-        }: ${errorMsg}`,
+        response: `❌ **Workflow Error**\n\nFailed to create step ${stepIndex + 1
+          }: ${errorMsg}`,
         status: "ERROR" as const,
         endedAt: new Date(),
       };
@@ -1568,9 +2224,8 @@ ${JSON.stringify(stepParameters.structured_output, null, 2)}`;
       }
 
       if (payload.status === "ERROR" || payload.status === "CANCELLED") {
-        const errorMsg = `Step failed with status ${payload.status}. ${
-          interaction.response || ""
-        }`;
+        const errorMsg = `Step failed with status ${payload.status}. ${interaction.response || ""
+          }`;
         console.error(
           `[WorkflowService] Step error for run ${activeRun.runId}:`,
           errorMsg
@@ -1931,8 +2586,8 @@ ${JSON.stringify(exampleOutput, null, 2)}
 
 Required fields: ${schema.required.join(", ")}
 ${variables
-  .map((v) => `- ${v.name}: ${v.description || `The ${v.name} value`}`)
-  .join("\n")}
+        .map((v) => `- ${v.name}: ${v.description || `The ${v.name} value`}`)
+        .join("\n")}
 
 IMPORTANT: Provide the actual values, not schema definitions with "type" and "description" fields.
 IMPORTANT: Keep your response as they would be in normal condition you can use all of LiteChat capabilities, do not shorten or simplify the response but make sure to provide a valid json output.`;
