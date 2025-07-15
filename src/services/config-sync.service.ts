@@ -6,6 +6,8 @@ import { normalizePath, joinPath } from "@/lib/litechat/file-manager-utils";
 import { toast } from "sonner";
 import { emitter } from "@/lib/litechat/event-emitter";
 import type { fs as FsType } from "@zenfs/core";
+import { useSettingsStore } from "@/store/settings.store";
+import { PersistenceService } from "@/services/persistence.service";
 
 const CONFIG_DIR = ".litechat/config";
 const SYNC_REPO_BASE_DIR = "/synced_repos";
@@ -73,7 +75,7 @@ export class ConfigSyncService {
       let remoteTimestamp: number | null = null;
       
       try {
-        const fileContent = await VfsOps.readFileOp(configFilePath, { fsInstance });
+        const fileContent = await VfsOps.readFileOp(configFilePath, { fsInstance, silent: true });
         const jsonString = new TextDecoder().decode(fileContent);
         remoteConfigData = JSON.parse(jsonString);
         remoteTimestamp = remoteConfigData?.exportedAt 
@@ -81,28 +83,41 @@ export class ConfigSyncService {
           : null;
         if (isNaN(remoteTimestamp ?? NaN)) remoteTimestamp = null;
       } catch (e: any) {
-        if (e.code === "ENOENT") {
-          console.log(`Config file ${configFilePath} not found in repo. Will push local version.`);
+        if (e.code === "ENOENT" || e.message?.includes("No such file")) {
+          console.log(`Config file ${configFilePath} not found in repo. This is the first sync - will push local version.`);
         } else {
           console.error(`Failed to read or parse remote config file: ${e.message}`);
           toast.warning(`Could not read remote config: ${e.message}`);
         }
       }
 
+      console.log("About to get local config...");
       // Get current local config
       const localConfigData = await this.exportCurrentConfig();
+      console.log("Got local config, getting timestamps...");
       const localTimestamp = new Date(localConfigData.exportedAt).getTime();
 
       // Get last sync timestamp from settings
-      const lastSyncTimestamp = await this.getLastConfigSyncTimestamp();
+      const lastSyncTimestamp = this.getLastConfigSyncTimestamp();
 
       // Determine sync direction
+      console.log("Sync decision:", {
+        hasRemoteConfig: !!remoteConfigData,
+        localTimestamp,
+        remoteTimestamp,
+        lastSyncTimestamp,
+        willPush: !remoteConfigData ||
+          localTimestamp > (remoteTimestamp ?? 0) ||
+          (localTimestamp > lastSyncTimestamp && localTimestamp >= (remoteTimestamp ?? 0))
+      });
+      
       if (
         !remoteConfigData ||
         localTimestamp > (remoteTimestamp ?? 0) ||
         (localTimestamp > lastSyncTimestamp && localTimestamp >= (remoteTimestamp ?? 0))
       ) {
         // Push local config to remote
+        console.log("Pushing local config to remote...");
         if (!silent) toast.info("Local config changes detected. Pushing to remote...");
         
         await this.pushConfigToRemote(
@@ -114,8 +129,9 @@ export class ConfigSyncService {
           credentials
         );
 
-        await this.updateLastConfigSyncTimestamp();
+        this.updateLastConfigSyncTimestamp();
         setConfigStatus("idle");
+        console.log("Config push completed successfully");
         if (!silent) toast.success("Configuration synced successfully (pushed).");
 
       } else if (remoteTimestamp && remoteTimestamp > localTimestamp) {
@@ -123,14 +139,14 @@ export class ConfigSyncService {
         if (!silent) toast.info("Remote config changes detected. Updating local configuration...");
         
         await this.importRemoteConfig(remoteConfigData!);
-        await this.updateLastConfigSyncTimestamp();
+        this.updateLastConfigSyncTimestamp();
         setConfigStatus("idle");
         if (!silent) toast.success("Configuration synced successfully (pulled).");
 
       } else {
         // Already up-to-date
         if (!silent) toast.info("Configuration already up-to-date.");
-        await this.updateLastConfigSyncTimestamp();
+        this.updateLastConfigSyncTimestamp();
         setConfigStatus("idle");
       }
 
@@ -145,25 +161,33 @@ export class ConfigSyncService {
    * Export current configuration to ConfigData format
    */
   private async exportCurrentConfig(): Promise<ConfigData> {
-    // Emit events to gather current config from stores
-    const configData: ConfigData = {
-      settings: {},
-      rules: [],
-      promptTemplates: [],
-      agents: [],
-      workflows: [],
-      mcpServers: [],
-      exportedAt: new Date().toISOString(),
-      version: "1.0.0"
-    };
+    // Use existing export functionality
+    const exportData = await PersistenceService.getAllDataForExport({
+      importSettings: true,
+      importRulesAndTags: true,
+      importPromptTemplates: true,
+      importAgents: true,
+      importWorkflows: true,
+      importMcpServers: true,
+      importApiKeys: false, // Don't sync API keys for security
+      importProviderConfigs: false, // Don't sync provider configs
+      importProjects: false, // Don't sync projects
+      importConversations: false, // Don't sync conversations
+      importSyncRepos: false, // Don't sync repo configs
+      importMods: false, // Don't sync mods
+    });
 
-    // Request export data from all stores
-    emitter.emit('config-sync:export-settings', configData);
-    emitter.emit('config-sync:export-rules', configData);
-    emitter.emit('config-sync:export-prompt-templates', configData);
-    emitter.emit('config-sync:export-agents', configData);
-    emitter.emit('config-sync:export-workflows', configData);
-    emitter.emit('config-sync:export-mcp-servers', configData);
+    // Convert to ConfigData format
+    const configData: ConfigData = {
+      settings: exportData.settings || {},
+      rules: exportData.rules || [],
+      promptTemplates: exportData.promptTemplates || [],
+      agents: exportData.agents || [],
+      workflows: exportData.workflows || [],
+      mcpServers: exportData.mcpServers || [],
+      exportedAt: exportData.exportedAt,
+      version: exportData.version.toString()
+    };
 
     return configData;
   }
@@ -244,21 +268,15 @@ export class ConfigSyncService {
   /**
    * Get last config sync timestamp from settings
    */
-  private async getLastConfigSyncTimestamp(): Promise<number> {
-    return new Promise((resolve) => {
-      emitter.emit('config-sync:get-last-sync-timestamp', { 
-        callback: (timestamp: number) => resolve(timestamp) 
-      });
-    });
+  private getLastConfigSyncTimestamp(): number {
+    return useSettingsStore.getState().configSyncLastSyncedAt ?? 0;
   }
 
   /**
    * Update last config sync timestamp in settings
    */
-  private async updateLastConfigSyncTimestamp(): Promise<void> {
-    emitter.emit('config-sync:update-last-sync-timestamp', { 
-      timestamp: new Date().toISOString() 
-    });
+  private updateLastConfigSyncTimestamp(): void {
+    useSettingsStore.getState().setConfigSyncLastSyncedAt(Date.now());
   }
 
   /**

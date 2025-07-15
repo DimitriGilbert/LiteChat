@@ -133,9 +133,10 @@ export const listFilesOp = async (
 
 export const readFileOp = async (
   path: string,
-  options?: { fsInstance?: typeof fs }
+  options?: { fsInstance?: typeof fs; silent?: boolean }
 ): Promise<Uint8Array> => {
   const fsToUse = options?.fsInstance ?? fs;
+  const silent = options?.silent ?? false;
   const normalizedPath = normalizePath(path);
   try {
     const data = await fsToUse.promises.readFile(normalizedPath);
@@ -143,11 +144,13 @@ export const readFileOp = async (
     return data;
   } catch (err: unknown) {
     console.error(`[VFS Op] Failed to read file ${normalizedPath}:`, err);
-    toast.error(
-      `Error reading file "${basename(normalizedPath)}": ${
-        err instanceof Error ? err.message : String(err)
-      }`
-    );
+    if (!silent) {
+      toast.error(
+        `Error reading file "${basename(normalizedPath)}": ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
     throw err;
   }
 };
