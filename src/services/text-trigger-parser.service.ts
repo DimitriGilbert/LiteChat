@@ -105,13 +105,13 @@ export class TextTriggerParserService {
 
     const namespace = registeredNamespaces[trigger.namespace];
     
-    // if (!namespace) {
-    //   console.log(`[TextTriggerParser] DEBUG: Unknown namespace: ${trigger.namespace}`);
-    //   return { 
-    //     isValid: false, 
-    //     errorMessage: `Unknown namespace: ${trigger.namespace}` 
-    //   };
-    // }
+    if (!namespace) {
+      // console.log(`[TextTriggerParser] DEBUG: Unknown namespace: ${trigger.namespace}`);
+      return { 
+        isValid: false, 
+        errorMessage: `Unknown namespace: ${trigger.namespace}` 
+      };
+    }
 
     const method = namespace.methods[trigger.method];
     if (!method) {
