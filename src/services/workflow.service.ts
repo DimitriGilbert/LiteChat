@@ -634,8 +634,13 @@ export const WorkflowService = {
       }
 
       // Compile step prompt with array item as context
+      const parallelOnKey = parentStep.parallelOn?.split('.').pop();
+      if (!parallelOnKey) {
+        throw new Error(`Invalid parallelOn format: ${parentStep.parallelOn}`);
+      }
+      
       const arrayItemContext = {
-        [parentStep.parallelOn!.split('.').pop()!]: arrayItem,
+        [parallelOnKey]: arrayItem,
         branchIndex,
         totalBranches
       };

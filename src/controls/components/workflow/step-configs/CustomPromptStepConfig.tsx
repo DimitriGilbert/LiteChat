@@ -26,7 +26,7 @@ export const CustomPromptStepConfig: React.FC<BaseStepConfigProps> = ({
         <VariableManager
           variables={step.promptVariables || []}
           onVariablesChange={(variables) => onChange({ ...step, promptVariables: variables })}
-
+          templateId={step.id}
         />
       </div>
     </div>

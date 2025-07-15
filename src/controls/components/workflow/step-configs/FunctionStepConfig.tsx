@@ -34,8 +34,9 @@ export const FunctionStepConfig: React.FC<BaseStepConfigProps> = ({
         <CodeEditor
           value={step.functionCode || ''}
           onChange={(value) => onChange({ ...step, functionCode: value })}
-          language={step.functionLanguage || 'js'}
-
+          language={step.functionLanguage === 'py' ? 'python' : 'javascript'}
+          placeholder={`Enter your ${step.functionLanguage === 'py' ? 'Python' : 'JavaScript'} function code here...`}
+          minHeight="300px"
         />
       </div>
       
@@ -44,7 +45,7 @@ export const FunctionStepConfig: React.FC<BaseStepConfigProps> = ({
         <VariableManager
           variables={step.functionVariables || []}
           onVariablesChange={(variables) => onChange({ ...step, functionVariables: variables })}
-
+          templateId={step.id}
         />
       </div>
     </div>
