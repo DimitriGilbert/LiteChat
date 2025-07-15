@@ -54,6 +54,7 @@ export class MermaidBlockRendererModule implements ControlModule {
       id: `${this.id}-control-rule`,
       name: "Mermaid Diagram Control",
       content: MERMAID_CONTROL_PROMPT,
+      description: "Enables AI to generate Mermaid diagrams and flowcharts",
       type: "control",
       alwaysOn: true,
       moduleId: this.id,

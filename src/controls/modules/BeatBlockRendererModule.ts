@@ -632,6 +632,7 @@ export class BeatBlockRendererModule implements ControlModule {
       id: `${this.id}-control-rule`,
       name: "Beat Pattern Control",
       content: BEAT_STRUDEL_CONTROL_PROMPT,
+      description: "Enables AI to generate musical beat patterns using Strudel",
       type: "control",
       alwaysOn: false, // Disabled by default, user must opt-in via settings
       moduleId: this.id,

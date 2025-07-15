@@ -202,6 +202,7 @@ export class PythonRunnableBlockRendererModule implements ControlModule {
       id: `${this.id}-control-rule`,
       name: "Python Runnable Block Control",
       content: PYTHON_RUNNABLE_CONTROL_PROMPT,
+      description: "Enables AI to generate and execute Python code blocks",
       type: "control",
       alwaysOn: false, // Disabled by default, user must opt-in via settings
       moduleId: this.id,

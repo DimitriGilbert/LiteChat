@@ -326,6 +326,7 @@ export class JsRunnableBlockRendererModule implements ControlModule {
       id: `${this.id}-control-rule`,
       name: "JavaScript Runnable Block Control",
       content: JS_RUNNABLE_CONTROL_PROMPT,
+      description: "Enables AI to generate and execute JavaScript code blocks",
       type: "control",
       alwaysOn: false, // Disabled by default, user must opt-in via settings
       moduleId: this.id,

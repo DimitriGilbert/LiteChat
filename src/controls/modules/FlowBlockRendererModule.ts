@@ -395,6 +395,7 @@ export class FlowBlockRendererModule implements ControlModule {
       id: `${this.id}-control-rule`,
       name: "Flow Diagram Control",
       content: FLOW_CONTROL_PROMPT,
+      description: "Enables AI to generate flow diagrams and process visualizations",
       type: "control",
       alwaysOn: true,
       moduleId: this.id,

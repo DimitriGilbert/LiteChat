@@ -170,5 +170,66 @@
     "newTemplate": "Nouveau modèle",
     "editTemplate": "Modifier : {{name}}",
     "deleteConfirmation": "Êtes-vous sûr de vouloir supprimer ce modèle ?"
+  },
+  "configSync": {
+    "title": "Synchronisation de Configuration",
+    "description": "Synchronisez automatiquement votre configuration LiteChat avec des dépôts Git",
+    "enabled": {
+      "label": "Activer la Synchronisation de Configuration",
+      "description": "Activer la synchronisation automatique de vos paramètres et données avec des dépôts Git"
+    },
+    "repository": {
+      "label": "Dépôt de Synchronisation",
+      "description": "Sélectionnez le dépôt Git pour synchroniser votre configuration",
+      "placeholder": "Sélectionnez un dépôt..."
+    },
+    "autoSync": {
+      "label": "Synchronisation Automatique",
+      "description": "Synchroniser automatiquement les changements de configuration vers le dépôt"
+    },
+    "interval": {
+      "label": "Intervalle de Synchronisation",
+      "description": "Fréquence de vérification des changements de configuration"
+    },
+    "intervals": {
+      "1min": "1 minute",
+      "5min": "5 minutes",
+      "10min": "10 minutes",
+      "30min": "30 minutes",
+      "1hour": "1 heure"
+    },
+    "settingsSaved": "Paramètres de synchronisation de configuration sauvegardés avec succès",
+    "saveSettings": "Sauvegarder les Paramètres",
+    "selectedRepo": "Dépôt Sélectionné",
+    "manualSync": {
+      "title": "Synchronisation Manuelle",
+      "description": "Synchroniser manuellement votre configuration avec le dépôt sélectionné",
+      "button": "Synchroniser Maintenant"
+    },
+    "status": {
+      "syncing": "Synchronisation...",
+      "syncingDescription": "Synchronisation de la configuration avec le dépôt",
+      "error": "Erreur de Synchronisation",
+      "ready": "Prêt à Synchroniser",
+      "readyDescription": "La configuration est prête à être synchronisée"
+    },
+    "importExport": {
+      "title": "Importer/Exporter",
+      "description": "Importer ou exporter manuellement votre configuration"
+    },
+    "export": {
+      "button": "Exporter la Config"
+    },
+    "import": {
+      "button": "Importer la Config"
+    },
+    "exportSuccess": "Configuration exportée avec succès",
+    "importSuccess": "Configuration importée avec succès",
+    "errors": {
+      "noRepoSelected": "Veuillez d'abord sélectionner un dépôt",
+      "syncFailed": "Échec de la synchronisation : {{error}}",
+      "exportFailed": "Échec de l'exportation : {{error}}",
+      "importFailed": "Échec de l'importation : {{error}}"
+    }
   }
 }

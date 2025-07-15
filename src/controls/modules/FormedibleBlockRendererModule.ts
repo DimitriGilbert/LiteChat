@@ -127,6 +127,7 @@ export class FormedibleBlockRendererModule implements ControlModule {
       id: `${this.id}-control-rule`,
       name: "Formedible Code Block Control",
       content: FORMEDIBLE_CONTROL_PROMPT,
+      description: "Enables AI to generate interactive forms and UI components",
       type: "control",
       alwaysOn: true,
       moduleId: this.id,

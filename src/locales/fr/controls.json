@@ -3,7 +3,8 @@
     "tabs": {
       "assistant": "Assistant",
       "general": "Général",
-      "providers": "Fournisseurs et Modèles"
+      "providers": "Fournisseurs et Modèles",
+      "configSync": "Sync Config"
     }
   },
   "rulesAndTags": "Règles et Tags",

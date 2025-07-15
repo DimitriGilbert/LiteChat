@@ -169,6 +169,7 @@ export class RulesControlModule implements ControlModule {
       id: controlRule.id,
       name: controlRule.name,
       content: controlRule.content,
+      description: controlRule.description,
       type: controlRule.type,
       alwaysOn: this.getEffectiveControlRuleAlwaysOn(controlRule), // Use setting or fall back to rule's default
       createdAt: defaultDate,
@@ -205,6 +206,7 @@ export class RulesControlModule implements ControlModule {
         id: controlRule.id,
         name: controlRule.name,
         content: controlRule.content,
+        description: controlRule.description,
         type: controlRule.type,
         alwaysOn: this.getEffectiveControlRuleAlwaysOn(controlRule), // Use setting or fall back to rule's default
         createdAt: new Date(), // Default date for control rules
@@ -593,7 +595,7 @@ export class RulesControlModule implements ControlModule {
         .map(
           (r) =>
             `- ${r.name} (id: ${r.id})${
-              r.content ? `: ${r.content.substring(0, 200)}...` : ""
+              r.description ? `: ${r.description}` : ""
             }`,
         )
         .join("\n");

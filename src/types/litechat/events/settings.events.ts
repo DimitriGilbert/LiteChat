@@ -75,6 +75,7 @@ export const settingsEvent = {
   configSyncIncludeWorkflowsChanged: "settings.config.sync.include.workflows.changed",
   configSyncIncludeMcpServersChanged: "settings.config.sync.include.mcp.servers.changed",
   configSyncLastSyncedAtChanged: "settings.config.sync.last.synced.at.changed",
+  configSyncIntervalChanged: "settings.config.sync.interval.changed",
 
   // Action Request Events
   setThemeRequest: "settings.set.theme.request",
@@ -146,6 +147,7 @@ export const settingsEvent = {
   setConfigSyncEnabledRequest: "settings.set.config.sync.enabled.request",
   setConfigSyncRepoIdRequest: "settings.set.config.sync.repo.id.request",
   setConfigSyncAutoSyncRequest: "settings.set.config.sync.auto.sync.request",
+  setConfigSyncIntervalRequest: "settings.set.config.sync.interval.request",
   setConfigSyncIncludeSettingsRequest: "settings.set.config.sync.include.settings.request",
   setConfigSyncIncludeRulesRequest: "settings.set.config.sync.include.rules.request",
   setConfigSyncIncludePromptTemplatesRequest: "settings.set.config.sync.include.prompt.templates.request",
@@ -279,6 +281,7 @@ export interface SettingsEventPayloads {
   [settingsEvent.configSyncIncludeWorkflowsChanged]: { include: SettingsState["configSyncIncludeWorkflows"] };
   [settingsEvent.configSyncIncludeMcpServersChanged]: { include: SettingsState["configSyncIncludeMcpServers"] };
   [settingsEvent.configSyncLastSyncedAtChanged]: { timestamp: SettingsState["configSyncLastSyncedAt"] };
+  [settingsEvent.configSyncIntervalChanged]: { interval: SettingsState["configSyncInterval"] };
 
   [settingsEvent.setThemeRequest]: { theme: SettingsState["theme"] };
   [settingsEvent.setGlobalSystemPromptRequest]: {
@@ -399,6 +402,7 @@ export interface SettingsEventPayloads {
   [settingsEvent.setConfigSyncEnabledRequest]: { enabled: SettingsState["configSyncEnabled"] };
   [settingsEvent.setConfigSyncRepoIdRequest]: { repoId: SettingsState["configSyncRepoId"] };
   [settingsEvent.setConfigSyncAutoSyncRequest]: { enabled: SettingsState["configSyncAutoSync"] };
+  [settingsEvent.setConfigSyncIntervalRequest]: { interval: SettingsState["configSyncInterval"] };
   [settingsEvent.setConfigSyncIncludeSettingsRequest]: { include: SettingsState["configSyncIncludeSettings"] };
   [settingsEvent.setConfigSyncIncludeRulesRequest]: { include: SettingsState["configSyncIncludeRules"] };
   [settingsEvent.setConfigSyncIncludePromptTemplatesRequest]: { include: SettingsState["configSyncIncludePromptTemplates"] };

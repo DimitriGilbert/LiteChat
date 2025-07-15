@@ -4,7 +4,8 @@
       "assistant": "Assistant",
       "general": "General",
       "theme": "Theme",
-      "providers": "Providers & Models"
+      "providers": "Providers & Models",
+      "configSync": "Config Sync"
     }
   },
   "rulesAndTags": "Rules & Tags",

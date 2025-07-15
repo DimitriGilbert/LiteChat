@@ -118,6 +118,7 @@ export interface SettingsState {
   configSyncIncludeWorkflows: boolean;
   configSyncIncludeMcpServers: boolean;
   configSyncLastSyncedAt: string | null;
+  configSyncInterval: number;
 }
 
 interface SettingsActions {
@@ -189,6 +190,7 @@ interface SettingsActions {
   setConfigSyncIncludeWorkflows: (include: boolean) => void;
   setConfigSyncIncludeMcpServers: (include: boolean) => void;
   setConfigSyncLastSyncedAt: (timestamp: string | null) => void;
+  setConfigSyncInterval: (interval: number) => void;
   
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
@@ -266,6 +268,7 @@ const DEFAULT_CONFIG_SYNC_INCLUDE_AGENTS = true;
 const DEFAULT_CONFIG_SYNC_INCLUDE_WORKFLOWS = true;
 const DEFAULT_CONFIG_SYNC_INCLUDE_MCP_SERVERS = true;
 const DEFAULT_CONFIG_SYNC_LAST_SYNCED_AT = null;
+const DEFAULT_CONFIG_SYNC_INTERVAL = 300000; // 5 minutes
 
 // Add a static array of all SettingsState keys for robust, type-safe enumeration
 export const SETTINGS_KEYS: (keyof SettingsState)[] = [
@@ -328,6 +331,7 @@ export const SETTINGS_KEYS: (keyof SettingsState)[] = [
   "configSyncIncludeWorkflows",
   "configSyncIncludeMcpServers",
   "configSyncLastSyncedAt",
+  "configSyncInterval",
 ];
 
 const persistSetting = async <K extends keyof SettingsState>(
@@ -406,6 +410,7 @@ export const useSettingsStore = create(
     configSyncIncludeWorkflows: DEFAULT_CONFIG_SYNC_INCLUDE_WORKFLOWS,
     configSyncIncludeMcpServers: DEFAULT_CONFIG_SYNC_INCLUDE_MCP_SERVERS,
     configSyncLastSyncedAt: DEFAULT_CONFIG_SYNC_LAST_SYNCED_AT,
+    configSyncInterval: DEFAULT_CONFIG_SYNC_INTERVAL,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -743,6 +748,11 @@ export const useSettingsStore = create(
       set({ configSyncLastSyncedAt: timestamp });
       persistSetting("configSyncLastSyncedAt", timestamp);
       emitter.emit(settingsEvent.configSyncLastSyncedAtChanged, { timestamp });
+    },
+    setConfigSyncInterval: (interval: number) => {
+      set({ configSyncInterval: interval });
+      persistSetting("configSyncInterval", interval);
+      emitter.emit(settingsEvent.configSyncIntervalChanged, { interval });
     },
 
     loadSettings: async () => {
@@ -1135,6 +1145,30 @@ export const useSettingsStore = create(
         {
           eventName: settingsEvent.resetThemeSettingsRequest,
           handler: () => actions.resetThemeSettings(),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setConfigSyncEnabledRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setConfigSyncEnabledRequest]) =>
+            actions.setConfigSyncEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setConfigSyncRepoIdRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setConfigSyncRepoIdRequest]) =>
+            actions.setConfigSyncRepoId(p.repoId),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setConfigSyncAutoSyncRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setConfigSyncAutoSyncRequest]) =>
+            actions.setConfigSyncAutoSync(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setConfigSyncIntervalRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setConfigSyncIntervalRequest]) =>
+            actions.setConfigSyncInterval(p.interval),
           storeId,
         },
       ];

@@ -101,6 +101,7 @@ export interface ModControlRule {
   id: string;
   name: string;
   content: string;
+  description?: string;
   type: "control";
   alwaysOn: boolean;
   moduleId: string; // Source module that registered this rule

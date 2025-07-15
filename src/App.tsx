@@ -51,6 +51,7 @@ import { AssistantSettingsModule } from "@/controls/modules/AssistantSettingsMod
 import { RunnableBlocksSettingsModule } from "@/controls/modules/RunnableBlocksSettingsModule";
 import { DataSettingsModule } from "@/controls/modules/DataSettingsModule";
 import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
+import { ConfigSyncSettingsModule } from "@/controls/modules/ConfigSyncSettingsModule";
 // import { MarketplaceSettingsModule } from "@/controls/modules/MarketplaceSettingsModule";
 
 // Import canvas action control modules
@@ -96,6 +97,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   RunnableBlocksSettingsModule,
   DataSettingsModule,
   ModSettingsModule,
+  ConfigSyncSettingsModule,
   // MarketplaceSettingsModule,
   ConversationListControlModule,
   SidebarToggleControlModule,

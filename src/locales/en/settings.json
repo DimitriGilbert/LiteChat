@@ -170,5 +170,66 @@
       "agents": "Agents",
       "workflows": "Workflows"
     }
+  },
+  "configSync": {
+    "title": "Configuration Sync",
+    "description": "Automatically sync your LiteChat configuration with Git repositories",
+    "enabled": {
+      "label": "Enable Configuration Sync",
+      "description": "Enable automatic synchronization of your settings and data with Git repositories"
+    },
+    "repository": {
+      "label": "Sync Repository",
+      "description": "Select the Git repository to sync your configuration with",
+      "placeholder": "Select a repository..."
+    },
+    "autoSync": {
+      "label": "Auto Sync",
+      "description": "Automatically sync configuration changes to the repository"
+    },
+    "interval": {
+      "label": "Sync Interval",
+      "description": "How often to check for configuration changes"
+    },
+    "intervals": {
+      "1min": "1 minute",
+      "5min": "5 minutes",
+      "10min": "10 minutes",
+      "30min": "30 minutes",
+      "1hour": "1 hour"
+    },
+    "settingsSaved": "Configuration sync settings saved successfully",
+    "saveSettings": "Save Settings",
+    "selectedRepo": "Selected Repository",
+    "manualSync": {
+      "title": "Manual Sync",
+      "description": "Manually sync your configuration with the selected repository",
+      "button": "Sync Now"
+    },
+    "status": {
+      "syncing": "Syncing...",
+      "syncingDescription": "Synchronizing configuration with repository",
+      "error": "Sync Error",
+      "ready": "Ready to Sync",
+      "readyDescription": "Configuration is ready to be synchronized"
+    },
+    "importExport": {
+      "title": "Import/Export",
+      "description": "Manually import or export your configuration"
+    },
+    "export": {
+      "button": "Export Config"
+    },
+    "import": {
+      "button": "Import Config"
+    },
+    "exportSuccess": "Configuration exported successfully",
+    "importSuccess": "Configuration imported successfully",
+    "errors": {
+      "noRepoSelected": "Please select a repository first",
+      "syncFailed": "Sync failed: {{error}}",
+      "exportFailed": "Export failed: {{error}}",
+      "importFailed": "Import failed: {{error}}"
+    }
   }
 }

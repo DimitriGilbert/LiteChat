@@ -111,6 +111,7 @@ export class ChartBlockRendererModule implements ControlModule {
             id: `${this.id}-control-rule`,
             name: "Chart Generation",
             content: CHART_CONTROL_PROMPT,
+            description: "Enables AI to generate charts and visualizations using Chart.js",
             type: "control",
             alwaysOn: true,
             moduleId: this.id,

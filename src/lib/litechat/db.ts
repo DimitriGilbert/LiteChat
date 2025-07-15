@@ -50,7 +50,29 @@ export class LiteChatDatabase extends Dexie {
 
   constructor() {
     super("LiteChatDatabase_Rewrite_v1");
-    // Bump version for marketplace
+    // Bump version for rule descriptions
+    this.version(12).stores({
+      conversations:
+        "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
+      // Add rating index to interactions
+      interactions:
+        "++id, conversationId, index, type, status, startedAt, parentId, rating",
+      mods: "++id, &name, enabled, loadOrder",
+      appState: "&key",
+      providerConfigs: "++id, &name, type, isEnabled, apiKeyId",
+      apiKeys: "++id, &name",
+      syncRepos: "++id, &name, remoteUrl, username",
+      projects: "++id, &path, parentId, createdAt, updatedAt, name",
+      rules: "++id, &name, type, createdAt, updatedAt",
+      tags: "++id, &name, createdAt, updatedAt",
+      tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
+      promptTemplates: "++id, &name, createdAt, updatedAt, isPublic",
+      workflows: "++id, &name, createdAt, updatedAt",
+      marketplaceSources: "++id, &name, &url, enabled, createdAt, lastRefreshed",
+      marketplaceIndexes: "++id, sourceId, cachedAt, expiresAt",
+      installedMarketplaceItems: "++id, &packageId, sourceId, installedAt, enabled",
+    });
+    // Previous version for marketplace
     this.version(11).stores({
       conversations:
         "++id, title, createdAt, updatedAt, syncRepoId, lastSyncedAt, projectId",
