@@ -507,7 +507,7 @@ export const InputArea = memo(
                 letterSpacing: textareaStyles?.letterSpacing || 'normal',
                 wordSpacing: textareaStyles?.wordSpacing || 'normal',
                 fontWeight: textareaStyles?.fontWeight || 'normal',
-                textTransform: textareaStyles?.textTransform || 'none',
+                textTransform: (textareaStyles?.textTransform as React.CSSProperties['textTransform']) || 'none',
                 padding: textareaStyles?.padding || '12px',
                 margin: '0',
                 border: '1px solid transparent',
