@@ -594,8 +594,8 @@ export class RulesControlModule implements ControlModule {
       const rulesString = rules
         .map(
           (r) =>
-            `- ${r.name} (id: ${r.id})${
-              r.description ? `: ${r.description}` : ""
+            `- ${r.name} (id: ${r.id}): ${
+              r.description || (r.content.length > 1500 ? r.content.substring(0, 1500) + "..." : r.content)
             }`,
         )
         .join("\n");

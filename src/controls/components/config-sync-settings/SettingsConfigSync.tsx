@@ -86,7 +86,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
         description: t('configSync.repository.description'),
         placeholder: t('configSync.repository.placeholder'),
         conditional: (values) => !!values.configSyncEnabled,
-        options: syncRepos.map(repo => repo.name)
+        options: syncRepos.map(repo => repo.id)
       },
       {
         name: "configSyncAutoSync",
@@ -101,13 +101,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
         label: t('configSync.interval.label'),
         description: t('configSync.interval.description'),
         conditional: (values) => !!values.configSyncAutoSync,
-        options: [
-          t('configSync.intervals.1min'),
-          t('configSync.intervals.5min'),
-          t('configSync.intervals.10min'),
-          t('configSync.intervals.30min'),
-          t('configSync.intervals.1hour'),
-        ]
+        options: ["60000", "300000", "600000", "1800000", "3600000"]
       }
     ],
     formOptions: {
@@ -137,7 +131,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
     });
   }, [configSyncEnabled, configSyncRepoId, configSyncAutoSync, configSyncInterval, form]);
 
-  const selectedRepo = syncRepos.find(repo => repo.id === configSyncRepoId || repo.name === configSyncRepoId);
+  const selectedRepo = syncRepos.find(repo => repo.id === configSyncRepoId);
 
   const handleManualSync = useCallback(async () => {
     if (!selectedRepo) {

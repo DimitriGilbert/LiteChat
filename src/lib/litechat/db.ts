@@ -63,7 +63,7 @@ export class LiteChatDatabase extends Dexie {
       apiKeys: "++id, &name",
       syncRepos: "++id, &name, remoteUrl, username",
       projects: "++id, &path, parentId, createdAt, updatedAt, name",
-      rules: "++id, &name, type, createdAt, updatedAt",
+      rules: "++id, &name, type, createdAt, updatedAt, description",
       tags: "++id, &name, createdAt, updatedAt",
       tagRuleLinks: "++id, tagId, ruleId, &[tagId+ruleId]",
       promptTemplates: "++id, &name, createdAt, updatedAt, isPublic",
