@@ -41,9 +41,11 @@ Parallel execution allows you to run the same step configuration across multiple
 Each parallel branch has access to:
 
 - **Array Item**: The current array item as a template variable
-- **Branch Index**: `branchIndex` (0, 1, 2, ...)
-- **Total Branches**: `totalBranches` - Total number of parallel branches
+- **Branch Index**: `branchIndex` (0, 1, 2, ...) - Zero-based index of current branch
+- **Total Branches**: `totalBranches` - Total number of items in the original array being processed
 - **Previous Outputs**: All previous workflow step outputs
+
+**Example**: If processing an array of 5 documents, each branch will have `totalBranches = 5`, with `branchIndex` ranging from 0 to 4.
 
 ### Example Configuration
 

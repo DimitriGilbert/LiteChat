@@ -544,7 +544,7 @@ export const WorkflowService = {
 
     // Create parallel child interactions
     const parallelPromises = arrayData.map((arrayItem, index) =>
-      WorkflowService._createParallelBranch(run, step, stepIndex, arrayItem, index)
+      WorkflowService._createParallelBranch(run, step, stepIndex, arrayItem, index, arrayData.length)
     );
 
     // Wait for all parallel branches to complete
@@ -614,7 +614,8 @@ export const WorkflowService = {
     parentStep: WorkflowStep,
     stepIndex: number,
     arrayItem: any,
-    branchIndex: number
+    branchIndex: number,
+    totalBranches: number
   ): Promise<{ success: boolean; output?: any; error?: string }> => {
     try {
       const branchStep = { ...parentStep.parallelStep! };
@@ -636,7 +637,7 @@ export const WorkflowService = {
       const arrayItemContext = {
         [parentStep.parallelOn!.split('.').pop()!]: arrayItem,
         branchIndex,
-        totalBranches: Array.isArray(arrayItem) ? arrayItem.length : 1
+        totalBranches
       };
 
       const compiled = await WorkflowService._compileStepPrompt(branchStep, run, stepIndex, arrayItemContext);
