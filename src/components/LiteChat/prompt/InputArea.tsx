@@ -19,7 +19,7 @@ import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/store/settings.store";
 import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
 import { textTriggerRegistry } from "@/services/text-trigger-registry.service";
-import type { TextTrigger } from "@/types/litechat/text-triggers";
+import type { TextTrigger, MethodSuggestion, AutocompleteSuggestion } from '@/types/litechat/text-triggers';
 import { useControlRegistryStore } from "@/store/control.store";
 
 interface InputAreaProps {
@@ -117,11 +117,131 @@ export const InputArea = memo(
         },
       }));
 
+      // Keyboard navigation state for autocomplete
+      const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+
+      const getAutocompleteSuggestions = (): AutocompleteSuggestion[] => {
+        const textBeforeCursor = internalValue.slice(0, cursorPosition);
+        // Pattern for argument completion: @.namespace.method arg1 arg2 ...
+        const argPattern = /@\.([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s+([^;]*)$/;
+        const argMatch = textBeforeCursor.match(argPattern);
+        if (argMatch) {
+          const namespaceId = argMatch[1];
+          const methodId = argMatch[2];
+          const argsStr = argMatch[3] || '';
+          const namespaces = textTriggerRegistry.getRegisteredNamespaces();
+          const namespace = namespaces.find(ns => ns.id === namespaceId);
+          if (!namespace) return [];
+          const method = namespace.methods[methodId];
+          if (!method) return [];
+          const args = argsStr.trim().length > 0 ? argsStr.split(/\s+/) : [];
+          if (method.argSchema && method.argSchema.suggestions) {
+            return method.argSchema.suggestions(
+              { turnData: { id: '', content: internalValue, parameters: {}, metadata: {} }, promptText: internalValue },
+              args.length,
+              args
+            ).map(s => ({
+              type: 'arg' as const,
+              value: s,
+              description: '',
+            }));
+          }
+        }
+        // Fallback: method/namespace completion
+        const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
+        if (!triggerMatch) return [];
+        const partial = triggerMatch[1].toLowerCase();
+        const namespaces = textTriggerRegistry.getRegisteredNamespaces();
+        const suggestions: Array<MethodSuggestion> = [];
+        namespaces.forEach(namespace => {
+          Object.values(namespace.methods).forEach(method => {
+            const argExample = method.argSchema.minArgs > 0 
+              ? ` ${method.argSchema.argTypes.slice(0, method.argSchema.minArgs).join(' ')}`
+              : '';
+            suggestions.push({
+              type: 'method',
+              namespace: namespace.id,
+              method: method.id,
+              description: `${method.description}${argExample ? ` | Example: @.${namespace.id}.${method.id}${argExample};` : ` | Example: @.${namespace.id}.${method.id};`}`
+            });
+          });
+        });
+        if (partial === '') {
+          return suggestions;
+        }
+        return suggestions.filter(s => 
+          s.namespace.startsWith(partial) || 
+          s.method.startsWith(partial) ||
+          `${s.namespace}.${s.method}`.includes(partial)
+        );
+      };
+
+      const autocompleteSuggestions = getAutocompleteSuggestions();
+      useEffect(() => {
+        setAutocompleteIndex(0);
+      }, [showAutocomplete, internalValue, cursorPosition]);
+
       const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (showAutocomplete && e.key === "Escape") {
-          e.preventDefault();
-          setShowAutocomplete(false);
-          return;
+        if (showAutocomplete && autocompleteSuggestions.length > 0) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setAutocompleteIndex((prev) => (prev + 1) % autocompleteSuggestions.length);
+            return;
+          }
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setAutocompleteIndex((prev) => (prev - 1 + autocompleteSuggestions.length) % autocompleteSuggestions.length);
+            return;
+          }
+          if (e.key === "Enter" || e.key === "Tab") {
+            e.preventDefault();
+            const suggestion = autocompleteSuggestions[autocompleteIndex];
+            if (suggestion) {
+              if (suggestion.type === 'method') {
+                handleAutocompleteSelect(suggestion);
+              } else if (suggestion.type === 'arg') {
+                // Insert argument suggestion at cursor (same as keyboard handler)
+                const textBeforeCursor = internalValue.slice(0, cursorPosition);
+                const argPattern = /@\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\s+([^;]*)$/;
+                const argMatch = textBeforeCursor.match(argPattern);
+                let insertPos = cursorPosition;
+                if (argMatch) {
+                  const argsStr = argMatch[1] || '';
+                  const args = argsStr.split(/\s+/);
+                  const lastArg = args[args.length - 1];
+                  if (lastArg && !textBeforeCursor.endsWith(' ')) {
+                    insertPos = cursorPosition - lastArg.length;
+                  }
+                }
+                const newValue =
+                  internalValue.slice(0, insertPos) +
+                  suggestion.value +
+                  ' ' +
+                  internalValue.slice(cursorPosition);
+                setInternalValue(newValue);
+                setPromptInputValue(newValue);
+                parseTriggers(newValue);
+                if (onValueChange) {
+                  onValueChange(newValue);
+                }
+                setShowAutocomplete(false);
+                setTimeout(() => {
+                  const textarea = internalTextareaRef.current;
+                  if (textarea) {
+                    const newCursorPos = insertPos + suggestion.value.length + 1;
+                    textarea.setSelectionRange(newCursorPos, newCursorPos);
+                    textarea.focus();
+                  }
+                }, 0);
+              }
+            }
+            return;
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            setShowAutocomplete(false);
+            return;
+          }
         }
 
         if (e.key === "Enter" && !e.shiftKey && !disabled) {
@@ -252,74 +372,6 @@ export const InputArea = memo(
         return parts;
       };
 
-      const getAutocompleteSuggestions = () => {
-        const textBeforeCursor = internalValue.slice(0, cursorPosition);
-        const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
-        
-        if (!triggerMatch) return [];
-
-        const partial = triggerMatch[1].toLowerCase();
-        const namespaces = textTriggerRegistry.getRegisteredNamespaces();
-        
-        const suggestions: Array<{ namespace: string; method: string; description: string }> = [];
-        
-        // Build suggestions from registered namespaces
-        namespaces.forEach(namespace => {
-          Object.values(namespace.methods).forEach(method => {
-            const argExample = method.argSchema.minArgs > 0 
-              ? ` ${method.argSchema.argTypes.slice(0, method.argSchema.minArgs).join(' ')}`
-              : '';
-            
-            suggestions.push({
-              namespace: namespace.id,
-              method: method.id,
-              description: `${method.description}${argExample ? ` | Example: @.${namespace.id}.${method.id}${argExample};` : ` | Example: @.${namespace.id}.${method.id};`}`
-            });
-          });
-        });
-
-        if (partial === '') {
-          return suggestions; // Show all when just typed @.
-        }
-
-        return suggestions.filter(s => 
-          s.namespace.startsWith(partial) || 
-          s.method.startsWith(partial) ||
-          `${s.namespace}.${s.method}`.includes(partial)
-        );
-      };
-
-      // Listen for setInputTextRequest events
-      useEffect(() => {
-        const handleSetInputText = (payload: { text: string }) => {
-          setInternalValue(payload.text);
-          setPromptInputValue(payload.text);
-          if (onValueChange) {
-            onValueChange(payload.text);
-          }
-          emitter.emit(promptEvent.inputChanged, { value: payload.text });
-          requestAnimationFrame(() => {
-            const textarea = internalTextareaRef.current;
-            if (textarea) {
-              const minHeight = 84; // 3 lines
-              const maxHeight = 250;
-              
-              textarea.style.height = "auto";
-              const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
-              textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
-              textarea.style.overflowY =
-                scrollHeight > maxHeight ? "auto" : "hidden";
-            }
-          });
-        };
-
-        emitter.on(promptEvent.setInputTextRequest, handleSetInputText);
-        
-        return () => {
-          emitter.off(promptEvent.setInputTextRequest, handleSetInputText);
-        };
-      }, [onValueChange, setPromptInputValue]);
-
       const handleAutocompleteSelect = (suggestion: { namespace: string; method: string }) => {
         const textBeforeCursor = internalValue.slice(0, cursorPosition);
         const triggerMatch = textBeforeCursor.match(/@\.([a-zA-Z]*)$/);
@@ -409,24 +461,90 @@ export const InputArea = memo(
 
           {/* Autocomplete dropdown */}
           {showAutocomplete && settings.textTriggersEnabled && (
-            <div className="absolute bottom-full left-0 w-full max-w-md mb-1 bg-popover border border-border rounded-md shadow-lg z-20 max-h-48 overflow-y-auto">
-              {getAutocompleteSuggestions().map((suggestion) => (
+            <div
+              className="absolute bottom-full left-0 w-full max-w-md mb-1 bg-popover border border-border rounded-md shadow-lg z-20 max-h-64 overflow-y-auto"
+              role="listbox"
+              aria-label="Text trigger suggestions"
+            >
+              {autocompleteSuggestions.map((suggestion, idx) => (
                 <div
-                  key={`${suggestion.namespace}.${suggestion.method}`}
-                  className="p-2 hover:bg-accent cursor-pointer border-b border-border last:border-b-0"
-                  onClick={() => handleAutocompleteSelect(suggestion)}
+                  key={suggestion.type === 'method' ? `${suggestion.namespace}.${suggestion.method}` : suggestion.value || idx}
+                  className={cn(
+                    "flex flex-col gap-0.5 p-2 cursor-pointer border-b border-border last:border-b-0 transition-colors",
+                    idx === autocompleteIndex ? "bg-accent/80 text-primary" : "hover:bg-accent/60",
+                    suggestion.type === 'arg' ? "pl-6" : ""
+                  )}
+                  role="option"
+                  aria-selected={idx === autocompleteIndex}
+                  tabIndex={-1}
+                  onMouseEnter={() => setAutocompleteIndex(idx)}
+                  onClick={() => {
+                    if (suggestion.type === 'method') {
+                      handleAutocompleteSelect(suggestion);
+                    } else if (suggestion.type === 'arg') {
+                      // Insert argument suggestion at cursor (same as keyboard handler)
+                      const textBeforeCursor = internalValue.slice(0, cursorPosition);
+                      const argPattern = /@\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\s+([^;]*)$/;
+                      const argMatch = textBeforeCursor.match(argPattern);
+                      let insertPos = cursorPosition;
+                      if (argMatch) {
+                        const argsStr = argMatch[1] || '';
+                        const args = argsStr.split(/\s+/);
+                        const lastArg = args[args.length - 1];
+                        if (lastArg && !textBeforeCursor.endsWith(' ')) {
+                          insertPos = cursorPosition - lastArg.length;
+                        }
+                      }
+                      const newValue =
+                        internalValue.slice(0, insertPos) +
+                        suggestion.value +
+                        ' ' +
+                        internalValue.slice(cursorPosition);
+                      setInternalValue(newValue);
+                      setPromptInputValue(newValue);
+                      parseTriggers(newValue);
+                      if (onValueChange) {
+                        onValueChange(newValue);
+                      }
+                      setShowAutocomplete(false);
+                      setTimeout(() => {
+                        const textarea = internalTextareaRef.current;
+                        if (textarea) {
+                          const newCursorPos = insertPos + suggestion.value.length + 1;
+                          textarea.setSelectionRange(newCursorPos, newCursorPos);
+                          textarea.focus();
+                        }
+                      }, 0);
+                    }
+                  }}
                 >
-                  <div className="font-medium text-sm">
-                    @.{suggestion.namespace}.{suggestion.method}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {suggestion.description}
-                  </div>
+                  {suggestion.type === 'method' ? (
+                    <>
+                      <div className="font-medium text-sm">
+                        @.{suggestion.namespace}.{suggestion.method}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {suggestion.description}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-semibold text-sm truncate">{suggestion.value}</div>
+                      <div className="text-xs text-muted-foreground truncate">{suggestion.description}</div>
+                      {/* Optionally, add a preview or context here if available */}
+                    </>
+                  )}
                 </div>
               ))}
-              {getAutocompleteSuggestions().length === 0 && (
+              {autocompleteSuggestions.length === 0 && (
                 <div className="p-2 text-sm text-muted-foreground">
                   No suggestions found
+                </div>
+              )}
+              {/* Footer/help for argument suggestions */}
+              {autocompleteSuggestions.length > 0 && autocompleteSuggestions[0].type === 'arg' && (
+                <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border bg-popover/80 rounded-b-md">
+                  Tab/Enter to insert, Esc to close, ↑/↓ to navigate
                 </div>
               )}
             </div>

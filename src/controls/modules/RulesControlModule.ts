@@ -476,7 +476,13 @@ export class RulesControlModule implements ControlModule {
           argSchema: {
             minArgs: 1,
             maxArgs: 10,
-            argTypes: ['rule-id' as const]
+            argTypes: ['rule-id' as const],
+            suggestions: (_context, _argumentIndex, currentArgs) => {
+              // Suggest rule IDs not already in currentArgs
+              return this.getAllRules()
+                .map(r => r.id)
+                .filter(id => !currentArgs.includes(id));
+            }
           },
           handler: this.handleRulesSelect
         },

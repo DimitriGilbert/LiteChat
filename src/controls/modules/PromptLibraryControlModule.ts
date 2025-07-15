@@ -88,8 +88,27 @@ export class PromptLibraryControlModule implements ControlModule {
           description: 'Load and use a specific template',
           argSchema: {
             minArgs: 1,
-            maxArgs: 1,
-            argTypes: ['string' as const]
+            maxArgs: 10,
+            argTypes: ['string' as const],
+            suggestions: (_: any, argumentIndex: number, currentArgs: string[]) => {
+              const { promptTemplates } = usePromptTemplateStore.getState();
+              if (argumentIndex === 0) {
+                // Suggest template IDs and names
+                return promptTemplates
+                  .filter(t => t.type === 'prompt' || !t.type)
+                  .map(t => t.id).concat(
+                    promptTemplates.filter(t => t.type === 'prompt' || !t.type).map(t => t.name)
+                  );
+              } else {
+                // Suggest variable keys for the template (if available)
+                const templateId = currentArgs[0];
+                const template = promptTemplates.find(t => t.id === templateId || t.name === templateId);
+                if (template && template.variables) {
+                  return Object.keys(template.variables).map(k => `${k}=`);
+                }
+                return [];
+              }
+            }
           },
           handler: this.handleTemplateUse
         }

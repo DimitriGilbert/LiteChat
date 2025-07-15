@@ -35,7 +35,13 @@ export interface TriggerArgSchema {
   minArgs: number;
   maxArgs: number;
   argTypes: readonly ('string' | 'number' | 'boolean' | 'tool-id' | 'rule-id' | 'model-id')[];
-  suggestions?: (context: TriggerExecutionContext) => string[];
+  /**
+   * Provide suggestions for the current argument position.
+   * @param context - The trigger execution context (prompt, turn, etc.)
+   * @param argumentIndex - The index of the argument being completed (0-based)
+   * @param currentArgs - The arguments already typed so far
+   */
+  suggestions?: (context: TriggerExecutionContext, argumentIndex: number, currentArgs: string[]) => string[];
 }
 
 export interface TriggerNamespace {
@@ -44,3 +50,17 @@ export interface TriggerNamespace {
   methods: Record<string, TriggerMethod>;
   moduleId: string; // Which control module registered this
 }
+
+// Shared autocomplete suggestion types for text trigger argument completion
+export type MethodSuggestion = {
+  type: 'method';
+  namespace: string;
+  method: string;
+  description: string;
+};
+export type ArgSuggestion = {
+  type: 'arg';
+  value: string;
+  description: string;
+};
+export type AutocompleteSuggestion = MethodSuggestion | ArgSuggestion;

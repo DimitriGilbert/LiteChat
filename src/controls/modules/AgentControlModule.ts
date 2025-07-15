@@ -296,8 +296,26 @@ export class AgentControlModule implements ControlModule {
           description: 'Select and use a specific agent',
           argSchema: {
             minArgs: 1,
-            maxArgs: 1,
-            argTypes: ['string' as const]
+            maxArgs: 10,
+            argTypes: ['string' as const],
+            suggestions: (_: any, argumentIndex: number, currentArgs: string[]) => {
+              if (argumentIndex === 0) {
+                // Suggest agent IDs and names
+                return this.allTemplates
+                  .filter(t => (t.type || 'prompt') === 'agent')
+                  .map(t => t.id).concat(
+                    this.allTemplates.filter(t => (t.type || 'prompt') === 'agent').map(t => t.name)
+                  );
+              } else {
+                // Suggest parameter keys for the agent (if available)
+                const agentId = currentArgs[0];
+                const agent = this.allTemplates.find(t => t.id === agentId || t.name === agentId);
+                if (agent && agent.variables) {
+                  return Object.keys(agent.variables).map(k => `${k}=`);
+                }
+                return [];
+              }
+            }
           },
           handler: this.handleAgentUse
         }

@@ -296,7 +296,13 @@ export class ParameterControlModule implements ControlModule {
           argSchema: {
             minArgs: 1,
             maxArgs: 1,
-            argTypes: ['number' as const]
+            argTypes: ['number' as const],
+            suggestions: (_context, argumentIndex, currentArgs) => {
+              if (argumentIndex === 0 && (!currentArgs[0] || currentArgs[0] === '')) {
+                return ['0.7'];
+              }
+              return [];
+            }
           },
           handler: this.handleParamsTemp
         },
@@ -307,7 +313,13 @@ export class ParameterControlModule implements ControlModule {
           argSchema: {
             minArgs: 1,
             maxArgs: 1,
-            argTypes: ['number' as const]
+            argTypes: ['number' as const],
+            suggestions: (_context, argumentIndex, currentArgs) => {
+              if (argumentIndex === 0 && (!currentArgs[0] || currentArgs[0] === '')) {
+                return ['1000'];
+              }
+              return [];
+            }
           },
           handler: this.handleParamsTokens
         },
@@ -318,7 +330,13 @@ export class ParameterControlModule implements ControlModule {
           argSchema: {
             minArgs: 1,
             maxArgs: 1,
-            argTypes: ['number' as const]
+            argTypes: ['number' as const],
+            suggestions: (_context, argumentIndex, currentArgs) => {
+              if (argumentIndex === 0 && (!currentArgs[0] || currentArgs[0] === '')) {
+                return ['0.9'];
+              }
+              return [];
+            }
           },
           handler: this.handleParamsTopP
         }

@@ -24,6 +24,8 @@ import { inputEvent } from "@/types/litechat/events/input.events";
 import { useProviderStore } from "@/store/provider.store";
 import { useInputStore } from "@/store/input.store";
 import { TextTriggerControlModule } from "./TextTriggerControlModule";
+import { textTriggerRegistry } from "@/services/text-trigger-registry.service";
+import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
 
 export class UrlParameterControlModule implements ControlModule {
   readonly id = "core-url-parameters";
@@ -61,248 +63,65 @@ export class UrlParameterControlModule implements ControlModule {
       return;
     }
     const modApi = this.modApiRef;
-
     const urlParams = parseAppUrlParameters();
-    if (!urlParams.query && !urlParams.modelId && !urlParams.vfsFiles?.length) {
-      return;
-    }
-
-    toast.info("Processing parameters from URL...");
-
-    try {
-      const newConversationId = await new Promise<string>((resolve, reject) => {
-        // Removed unused tempId
-        const unsub = modApi.on(
-          conversationEvent.conversationAdded,
-          (payload) => {
-            if (payload.conversation.title.startsWith("From URL:")) {
-              unsub();
-              resolve(payload.conversation.id);
-            }
-          }
-        );
-        setTimeout(() => {
-          // Removed unused timeout variable
-          unsub();
-          reject(new Error("Timeout waiting for conversation creation event."));
-        }, 5000);
-
-        modApi.emit(conversationEvent.addConversationRequest, {
-          title: urlParams.query
-            ? `From URL: ${urlParams.query.substring(0, 30)}...`
-            : "From URL Parameters",
+    if (urlParams.modelId) {
+      const availableModels = useProviderStore.getState().getAvailableModelListItems();
+      let foundModelId: string | null = null;
+      const modelParamLower = urlParams.modelId.toLowerCase();
+      if (urlParams.modelId.includes(":")) {
+        const directMatch = availableModels.find((m) => m.id === urlParams.modelId);
+        if (directMatch) foundModelId = directMatch.id;
+      }
+      if (!foundModelId) {
+        const nameMatch = availableModels.find((m) => m.name.toLowerCase() === modelParamLower);
+        if (nameMatch) foundModelId = nameMatch.id;
+      }
+      if (!foundModelId) {
+        const startsWithNameMatch = availableModels.find((m) => m.name.toLowerCase().startsWith(modelParamLower));
+        if (startsWithNameMatch) foundModelId = startsWithNameMatch.id;
+      }
+      if (!foundModelId) {
+        const startsWithProviderMatch = availableModels.find((m) => {
+          const mtc = m.id.toLowerCase().split("/");
+          return mtc.length > 1 && mtc[1].startsWith(modelParamLower);
         });
-      });
-
-      modApi.emit(conversationEvent.selectItemRequest, {
-        id: newConversationId,
-        type: "conversation",
-      });
-
-      if (urlParams.modelId) {
-        const availableModels = useProviderStore
-          .getState()
-          .getAvailableModelListItems();
-        let foundModelId: string | null = null;
-        const modelParamLower = urlParams.modelId.toLowerCase();
-
-        if (urlParams.modelId.includes(":")) {
-          const directMatch = availableModels.find(
-            (m) => m.id === urlParams.modelId
-          );
-          if (directMatch) foundModelId = directMatch.id;
-        }
-        if (!foundModelId) {
-          const nameMatch = availableModels.find(
-            (m) => m.name.toLowerCase() === modelParamLower
-          );
-          if (nameMatch) foundModelId = nameMatch.id;
-        }
-        if (!foundModelId) {
-          const startsWithNameMatch = availableModels.find((m) =>
-            m.name.toLowerCase().startsWith(modelParamLower)
-          );
-          if (startsWithNameMatch) foundModelId = startsWithNameMatch.id;
-        }
-        if (!foundModelId) {
-          const startsWithProviderMatch = availableModels.find((m) => {
-            const mtc = m.id.toLowerCase().split("/");
-            return mtc.length > 1 && mtc[1].startsWith(modelParamLower);
-          });
-          if (startsWithProviderMatch)
-            foundModelId = startsWithProviderMatch.id;
-        }
-
-        if (foundModelId) {
-          modApi.emit(promptEvent.setModelIdRequest, { id: foundModelId });
-          modApi.emit(providerEvent.selectModelRequest, {
-            modelId: foundModelId,
-          });
-          const foundModelDetails = availableModels.find(
-            (m) => m.id === foundModelId
-          );
-          toast.success(
-            `Model set to: ${foundModelDetails?.name} (${foundModelDetails?.providerName})`
-          );
-        } else {
-          toast.warning(
-            `Model matching "${urlParams.modelId}" not found or not enabled. Using default.`
-          );
-        }
+        if (startsWithProviderMatch) foundModelId = startsWithProviderMatch.id;
       }
-
-      if (urlParams.vfsFiles && urlParams.vfsFiles.length > 0) {
-        const vfsKeyForUrl = "orphan";
-        let fsInstance;
-        try {
-          fsInstance = await modApi.getVfsInstance(vfsKeyForUrl);
-          if (!fsInstance)
-            throw new Error("Failed to get VFS instance via ModAPI.");
-        } catch (vfsError) {
-          toast.error(
-            `Failed to initialize VFS for URL files: ${
-              vfsError instanceof Error ? vfsError.message : String(vfsError)
-            }`
-          );
-        }
-
-        if (fsInstance) {
-          for (const filePath of urlParams.vfsFiles) {
-            try {
-              const contentBytes = await VfsOps.readFileOp(filePath, {
-                fsInstance,
-              });
-              const nodeStat = await fsInstance.promises.stat(filePath);
-              const fileName = basename(filePath);
-              const mimeType = "application/octet-stream";
-              const isText = isLikelyTextFile(fileName, mimeType);
-
-              let fileData: {
-                contentText?: string;
-                contentBase64?: string;
-              } = {};
-
-              if (isText) {
-                fileData.contentText = new TextDecoder().decode(contentBytes);
-              } else {
-                let binary = "";
-                const len = contentBytes.byteLength;
-                for (let i = 0; i < len; i++) {
-                  binary += String.fromCharCode(contentBytes[i]);
-                }
-                fileData.contentBase64 = window.btoa(binary);
-              }
-
-              modApi.emit(inputEvent.addAttachedFileRequest, {
-                source: "vfs",
-                name: fileName,
-                type: mimeType,
-                size: nodeStat.size,
-                path: filePath,
-                ...fileData,
-              });
-              toast.success(`Attached VFS file: ${fileName}`);
-            } catch (fileError: any) {
-              if (fileError.code === "ENOENT") {
-                toast.warning(`VFS file not found: ${filePath}`);
-              } else {
-                toast.warning(
-                  `Failed to attach VFS file "${filePath}": ${fileError.message}`
-                );
-              }
-              console.error(
-                `Error processing VFS file ${filePath}:`,
-                fileError
-              );
-            }
-          }
-        }
+      if (foundModelId) {
+        modApi.emit(promptEvent.setModelIdRequest, { id: foundModelId });
+        modApi.emit(providerEvent.selectModelRequest, { modelId: foundModelId });
+        const foundModelDetails = availableModels.find((m) => m.id === foundModelId);
+        toast.success(`Model set to: ${foundModelDetails?.name} (${foundModelDetails?.providerName})`);
+      } else {
+        toast.warning(`Model matching "${urlParams.modelId}" not found or not enabled. Using default.`);
       }
-
-      if (urlParams.query) {
-        // Get the text trigger parser from the TextTriggerControlModule (if registered)
-        const textTriggerModule = (window as any).litechatControlModules?.find?.(
-          (mod: any) => mod instanceof TextTriggerControlModule
-        ) as TextTriggerControlModule | undefined;
-        const parserService = textTriggerModule?.parserService;
-        if (urlParams.submit === "0") {
-          let cleanedText = urlParams.query;
-          if (urlParams.query.includes("@.") && parserService) {
-            cleanedText = await parserService.executeTriggersAndCleanText(
-              urlParams.query,
-              { turnData: { id: '', content: urlParams.query, parameters: {}, metadata: {} }, promptText: urlParams.query }
-            );
-            modApi.emit(promptEvent.inputChanged, { value: cleanedText });
-            toast.info("Query with text triggers loaded from URL.");
-          } else {
-            modApi.emit(promptEvent.inputChanged, { value: urlParams.query });
-            toast.info("Query from URL loaded into input area.");
-          }
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
-        } else {
-          let parameters: Record<string, any> = {};
-          let metadata: Record<string, any> = {};
-          const currentAttachedFiles =
-            useInputStore.getState().attachedFilesMetadata;
-          if (currentAttachedFiles.length > 0) {
-            metadata.attachedFiles = [...currentAttachedFiles];
-          }
-          let finalQueryContent = urlParams.query;
-          if (urlParams.query.includes("@.") && parserService) {
-            finalQueryContent = await parserService.executeTriggersAndCleanText(
-              urlParams.query,
-              { turnData: { id: '', content: urlParams.query, parameters: {}, metadata: {} }, promptText: urlParams.query }
-            );
-          }
-          let turnData: PromptTurnObject = {
-            id: nanoid(),
-            content: finalQueryContent,
-            parameters,
-            metadata,
-          };
-          modApi.emit(promptEvent.submitted, { turnData });
-          const middlewareResult = await runMiddleware(
-            ModMiddlewareHook.PROMPT_TURN_FINALIZE,
-            { turnData }
-          );
-          if (middlewareResult === false) {
-            toast.warning(
-              "Prompt submission from URL cancelled by middleware."
-            );
-            return;
-          }
-          const finalTurnData =
-            middlewareResult && typeof middlewareResult === "object"
-              ? (middlewareResult as { turnData: PromptTurnObject }).turnData
-              : turnData;
-          await ConversationService.submitPrompt(finalTurnData);
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
-        }
-      } else if (urlParams.modelId || urlParams.vfsFiles?.length) {
-        toast.info(
-          "Model and/or VFS files from URL applied. Type your message."
-        );
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
-        );
-      }
-    } catch (error) {
-      toast.error(
-        `Failed to process URL parameters: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-      console.error("Error processing URL parameters:", error);
     }
+    if (!urlParams.query) return;
+    // Create a new conversation for the loaded prompt
+    const safeQuery = urlParams.query || '';
+    const conversationTitle = `From URL: ${safeQuery.substring(0, 30)}...`;
+    modApi.emit(conversationEvent.addConversationRequest, { title: conversationTitle });
+    // Wait for the conversation to be added and select it
+    const unsub = modApi.on(conversationEvent.conversationAdded, (payload) => {
+      if (payload.conversation.title === conversationTitle) {
+        modApi.emit(conversationEvent.selectItemRequest, {
+          id: payload.conversation.id,
+          type: "conversation",
+        });
+        unsub();
+        // Set the prompt input
+        modApi.emit(promptEvent.inputChanged, { value: safeQuery });
+        // Submit the prompt automatically
+        const turnData = {
+          id: nanoid(),
+          content: safeQuery,
+          parameters: {},
+          metadata: {},
+        };
+        modApi.emit(promptEvent.submitted, { turnData });
+        toast.info("Loaded and submitted prompt from URL.");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    });
   }
 }

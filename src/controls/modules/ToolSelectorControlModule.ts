@@ -328,7 +328,13 @@ export class ToolSelectorControlModule implements ControlModule {
           argSchema: {
             minArgs: 1,
             maxArgs: 10,
-            argTypes: ['tool-id' as const]
+            argTypes: ['tool-id' as const],
+            suggestions: (_context: any, _argumentIndex: number, currentArgs: string[]) => {
+              // Suggest tool IDs not already in currentArgs
+              return this.getAllTools()
+                .map((t: { id: string }) => t.id)
+                .filter((id: string) => !currentArgs.includes(id));
+            }
           },
           handler: this.handleToolsActivate
         },
@@ -375,5 +381,11 @@ export class ToolSelectorControlModule implements ControlModule {
     this.notifyComponentUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
+  }
+
+  // Add this method to provide the list of all tools for suggestions
+  public getAllTools(): { id: string }[] {
+    // Replace with actual tool list retrieval logic if needed
+    return this.transientEnabledTools ? Array.from(this.transientEnabledTools).map(id => ({ id })) : [];
   }
 }
