@@ -107,7 +107,7 @@ export class UrlParameterControlModule implements ControlModule {
     if (urlParams.query) {
       try {
         conversationId = await new Promise<string>((resolve, reject) => {
-          const expectedTitle = `From URL: ${urlParams.query.substring(0, 30)}...`;
+          const expectedTitle = `From URL: ${urlParams.query?.substring(0, 30)}...`;
           const unsub = modApi.on(conversationEvent.conversationAdded, (payload) => {
             if (payload.conversation.title.startsWith("From URL:")) {
               unsub();
