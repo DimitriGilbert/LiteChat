@@ -36,6 +36,9 @@ export class TextTriggerControlModule implements ControlModule {
       return;
     }
 
+    // Re-register built-in namespaces in case they were registered during the registration phase
+    this.registerBuiltInNamespaces();
+
     // Register middleware to process text triggers during prompt finalization
     const unregisterMiddleware = modApi.addMiddleware(
       ModMiddlewareHook.PROMPT_TURN_FINALIZE,
@@ -81,7 +84,10 @@ export class TextTriggerControlModule implements ControlModule {
     // Get registered trigger namespaces from the control registry store
     const registeredNamespaces = useControlRegistryStore.getState().getTextTriggerNamespaces();
     
+    console.log('[TextTriggerControlModule] DEBUG: Registered namespaces:', Object.keys(registeredNamespaces));
+    
     Object.values(registeredNamespaces).forEach((namespace) => {
+      console.log('[TextTriggerControlModule] DEBUG: Registering namespace:', namespace.id, 'with methods:', Object.keys(namespace.methods));
       this.parserService!.registerNamespace(namespace);
       textTriggerRegistry.registerNamespace(namespace);
     });

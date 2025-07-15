@@ -22,11 +22,29 @@ export class TextTriggerParserService {
     const escapedStart = this.startDelimiter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedEnd = this.endDelimiter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-    // Pattern: @.namespace.method args;
+    // Pattern: @.namespace.method args; (args can be positional or named)
     this.triggerPattern = new RegExp(
       `${escapedStart}([a-zA-Z][a-zA-Z0-9_]*)\\.([a-zA-Z][a-zA-Z0-9_]*)(?:\\s+([^${escapedEnd}]*))?${escapedEnd}`,
       'g'
     );
+  }
+
+  private parseArguments(argsStr: string | undefined): string[] {
+    if (!argsStr) return [];
+    
+    const trimmed = argsStr.trim();
+    if (!trimmed) return [];
+    
+    // Check if this looks like named parameters (contains key=value)
+    const namedParamPattern = /\w+\s*=\s*(?:"[^"]*"|'[^']*'|\S+)/;
+    if (namedParamPattern.test(trimmed)) {
+      // Parse named parameters - for now, just return as positional for compatibility
+      // TODO: In the future, we can return an object for named parameters
+      return trimmed.split(/\s+/).filter(arg => arg.length > 0);
+    }
+    
+    // Parse positional parameters
+    return trimmed.split(/\s+/).filter(arg => arg.length > 0);
   }
 
   parseText(text: string): TriggerParseResult {
@@ -38,7 +56,7 @@ export class TextTriggerParserService {
 
     while ((match = this.triggerPattern.exec(text)) !== null) {
       const [fullMatch, namespace, method, argsStr] = match;
-      const args = argsStr ? argsStr.trim().split(/\s+/).filter(arg => arg.length > 0) : [];
+      const args = this.parseArguments(argsStr);
       
       const trigger: TextTrigger = {
         id: `${namespace}.${method}_${match.index}`,
@@ -78,9 +96,16 @@ export class TextTriggerParserService {
   }
 
   private validateTrigger(trigger: TextTrigger): { isValid: boolean; errorMessage?: string } {
+    console.log(`[TextTriggerParser] DEBUG: Validating trigger: ${trigger.namespace}.${trigger.method}`, {
+      args: trigger.args,
+      argsLength: trigger.args.length,
+      registeredNamespaces: Array.from(this.registeredNamespaces.keys())
+    });
+
     const namespace = this.registeredNamespaces.get(trigger.namespace);
     
     if (!namespace) {
+      console.log(`[TextTriggerParser] DEBUG: Unknown namespace: ${trigger.namespace}`);
       return { 
         isValid: false, 
         errorMessage: `Unknown namespace: ${trigger.namespace}` 
@@ -89,6 +114,9 @@ export class TextTriggerParserService {
 
     const method = namespace.methods[trigger.method];
     if (!method) {
+      console.log(`[TextTriggerParser] DEBUG: Unknown method: ${trigger.method} in namespace ${trigger.namespace}`, {
+        availableMethods: Object.keys(namespace.methods)
+      });
       return { 
         isValid: false, 
         errorMessage: `Unknown method: ${trigger.method} in namespace ${trigger.namespace}` 
@@ -96,7 +124,15 @@ export class TextTriggerParserService {
     }
 
     const { argSchema } = method;
+    console.log(`[TextTriggerParser] DEBUG: Method found:`, {
+      method: trigger.method,
+      minArgs: argSchema.minArgs,
+      maxArgs: argSchema.maxArgs,
+      actualArgs: trigger.args.length
+    });
+
     if (trigger.args.length < argSchema.minArgs) {
+      console.log(`[TextTriggerParser] DEBUG: Too few arguments`);
       return { 
         isValid: false, 
         errorMessage: `Too few arguments. Expected at least ${argSchema.minArgs}, got ${trigger.args.length}` 
@@ -104,12 +140,14 @@ export class TextTriggerParserService {
     }
 
     if (trigger.args.length > argSchema.maxArgs) {
+      console.log(`[TextTriggerParser] DEBUG: Too many arguments`);
       return { 
         isValid: false, 
         errorMessage: `Too many arguments. Expected at most ${argSchema.maxArgs}, got ${trigger.args.length}` 
       };
     }
 
+    console.log(`[TextTriggerParser] DEBUG: Validation passed for ${trigger.namespace}.${trigger.method}`);
     return { isValid: true };
   }
 
@@ -122,7 +160,10 @@ export class TextTriggerParserService {
   }
 
   async executeTriggersAndCleanText(text: string, context: TriggerExecutionContext): Promise<string> {
+    console.log(`[TextTriggerParser] DEBUG: executeTriggersAndCleanText called with text: "${text}"`);
     const parseResult = this.parseText(text);
+    
+    console.log(`[TextTriggerParser] DEBUG: Found ${parseResult.triggers.length} triggers`);
     
     if (parseResult.triggers.length === 0) {
       return text;
@@ -130,13 +171,16 @@ export class TextTriggerParserService {
 
     // Execute triggers
     for (const trigger of parseResult.triggers) {
+      console.log(`[TextTriggerParser] DEBUG: Processing trigger: ${trigger.namespace}.${trigger.method}, valid: ${trigger.isValid}`);
       if (!trigger.isValid) {
         console.warn(`[TextTriggerParser] Skipping invalid trigger: ${trigger.errorMessage}`);
         continue;
       }
 
       try {
+        console.log(`[TextTriggerParser] DEBUG: Executing trigger: ${trigger.namespace}.${trigger.method}`);
         await this.executeTrigger(trigger, context);
+        console.log(`[TextTriggerParser] DEBUG: Successfully executed trigger: ${trigger.namespace}.${trigger.method}`);
       } catch (error) {
         console.error(`[TextTriggerParser] Error executing trigger ${trigger.id}:`, error);
       }

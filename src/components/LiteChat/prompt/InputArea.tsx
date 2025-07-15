@@ -20,6 +20,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
 import { textTriggerRegistry } from "@/services/text-trigger-registry.service";
 import type { TextTrigger } from "@/types/litechat/text-triggers";
+import { useControlRegistryStore } from "@/store/control.store";
 
 interface InputAreaProps {
   initialValue?: string;
@@ -58,11 +59,18 @@ export const InputArea = memo(
         placeholder = t('inputAreaPlaceholder');
       }
 
-      // Initialize parser service
+      // Initialize parser service and register namespaces
       const parserService = new TextTriggerParserService(
         settings.textTriggerStartDelimiter,
         settings.textTriggerEndDelimiter
       );
+      
+      // Register all namespaces from the control registry
+      const controlRegistry = useControlRegistryStore();
+      const registeredNamespaces = controlRegistry.getTextTriggerNamespaces();
+      Object.values(registeredNamespaces).forEach(namespace => {
+        parserService.registerNamespace(namespace);
+      });
 
       useImperativeHandle(ref, () => ({
         
@@ -203,25 +211,25 @@ export const InputArea = memo(
         const parts: React.ReactNode[] = [];
 
         triggers.forEach((trigger, index) => {
-          // Add text before trigger
+          // Add text before trigger (transparent)
           if (trigger.startIndex > lastIndex) {
             parts.push(
-              <span key={`text-${index}`}>
+              <span key={`text-${index}`} className="text-transparent">
                 {internalValue.slice(lastIndex, trigger.startIndex)}
               </span>
             );
           }
 
-          // Add highlighted trigger
+          // Add highlighted trigger with underline styling
           const triggerText = internalValue.slice(trigger.startIndex, trigger.endIndex);
           parts.push(
             <span
               key={`trigger-${index}`}
               className={cn(
-                "rounded px-1",
+                "relative",
                 trigger.isValid 
-                  ? "bg-primary/20 text-primary border border-primary/30" 
-                  : "bg-destructive/20 text-destructive border border-destructive/30"
+                  ? "text-transparent underline decoration-primary decoration-2 underline-offset-2" 
+                  : "text-transparent underline decoration-destructive decoration-2 underline-offset-2"
               )}
               title={trigger.errorMessage || `${trigger.namespace}.${trigger.method}`}
             >
@@ -232,10 +240,10 @@ export const InputArea = memo(
           lastIndex = trigger.endIndex;
         });
 
-        // Add remaining text
+        // Add remaining text (transparent)
         if (lastIndex < internalValue.length) {
           parts.push(
-            <span key="text-end">
+            <span key="text-end" className="text-transparent">
               {internalValue.slice(lastIndex)}
             </span>
           );
@@ -258,10 +266,14 @@ export const InputArea = memo(
         // Build suggestions from registered namespaces
         namespaces.forEach(namespace => {
           Object.values(namespace.methods).forEach(method => {
+            const argExample = method.argSchema.minArgs > 0 
+              ? ` ${method.argSchema.argTypes.slice(0, method.argSchema.minArgs).join(' ')}`
+              : '';
+            
             suggestions.push({
               namespace: namespace.id,
               method: method.id,
-              description: method.description
+              description: `${method.description}${argExample ? ` | Example: @.${namespace.id}.${method.id}${argExample};` : ` | Example: @.${namespace.id}.${method.id};`}`
             });
           });
         });
@@ -347,15 +359,20 @@ export const InputArea = memo(
                 height: '84px',
                 minHeight: '84px',
                 maxHeight: '250px',
-                font: "inherit",
-                lineHeight: "inherit",
-                letterSpacing: "inherit",
-                wordSpacing: "inherit",
+                fontSize: 'inherit',
+                fontFamily: 'inherit',
+                lineHeight: 'inherit',
+                letterSpacing: 'inherit',
+                wordSpacing: 'inherit',
+                padding: '12px',
+                margin: '0',
+                border: '1px solid transparent',
+                borderRadius: '6px',
               }}
               className={cn(
-                "absolute inset-0 p-3 pointer-events-none whitespace-pre-wrap break-words z-0",
-                "overflow-y-auto",
-                "text-transparent bg-transparent border border-transparent rounded"
+                "absolute inset-0 pointer-events-none whitespace-pre-wrap break-words z-0",
+                "overflow-y-auto overflow-x-hidden",
+                "bg-transparent"
               )}
             >
               {renderHighlightedText()}
@@ -379,9 +396,7 @@ export const InputArea = memo(
             }}
             className={cn(
               "w-full p-3 border rounded resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto relative z-10",
-              settings.textTriggersEnabled && triggers.length > 0 
-                ? "bg-transparent text-foreground" 
-                : "bg-input text-foreground",
+              "bg-input text-foreground",
               className
             )}
             aria-label={t('chatInputAriaLabel')}

@@ -492,15 +492,17 @@ export class RulesControlModule implements ControlModule {
     }];
   }
 
-  private handleRulesSelect = async (args: string[], context: TriggerExecutionContext) => {
-    if (!context.turnData.metadata.activeRuleIds) {
-      context.turnData.metadata.activeRuleIds = [];
-    }
-    context.turnData.metadata.activeRuleIds.push(...args);
+  private handleRulesSelect = async (args: string[], _context: TriggerExecutionContext) => {
+    // Add the specified rules to the active rules set (like pressing the UI buttons)
+    args.forEach(ruleId => {
+      this.transientActiveRuleIds.add(ruleId);
+    });
+    this.notifyComponentUpdate?.();
   };
 
   private handleRulesAuto = async (_args: string[], context: TriggerExecutionContext) => {
-    context.turnData.metadata.autoSelectRules = true;
+    // Perform auto-selection and set the active rules (like pressing the auto button)
+    await this.autoSelectRules(context.promptText);
   };
 
   // Helper method to check if a rule is a control rule

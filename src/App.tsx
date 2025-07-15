@@ -115,7 +115,6 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   OpenRouterProviderControlModule,
   SystemPromptControlModule,
   ToolSelectorControlModule,
-  TextTriggerControlModule,
   ParameterControlModule,
   StructuredOutputControlModule,
   RacePromptControlModule,
@@ -161,6 +160,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   ToolCallStepControlModule,
   QuoteSelectionControlModule, // For text selection controls
   ExplainSelectionControlModule, // For text selection controls
+  TextTriggerControlModule,
 ];
 
 function App() {

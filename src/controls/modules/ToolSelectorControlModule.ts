@@ -344,15 +344,18 @@ export class ToolSelectorControlModule implements ControlModule {
     }];
   }
 
-  private handleToolsActivate = async (args: string[], context: TriggerExecutionContext) => {
-    if (!context.turnData.metadata.enabledTools) {
-      context.turnData.metadata.enabledTools = [];
-    }
-    context.turnData.metadata.enabledTools.push(...args);
+  private handleToolsActivate = async (args: string[], _context: TriggerExecutionContext) => {
+    // Add the specified tools to the enabled tools set (like pressing the UI checkboxes)
+    this.setEnabledTools(prev => {
+      const newSet = new Set(prev);
+      args.forEach(toolId => newSet.add(toolId));
+      return newSet;
+    });
   };
 
-  private handleToolsAuto = async (_args: string[], context: TriggerExecutionContext) => {
-    context.turnData.metadata.autoSelectTools = true;
+  private handleToolsAuto = async (_args: string[], _context: TriggerExecutionContext) => {
+    // Auto-select tools based on conversation context
+    await this.autoSelectTools();
   };
 
   destroy(): void {

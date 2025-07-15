@@ -10,6 +10,8 @@ import { ReasoningControlTrigger } from "@/controls/components/reasoning/Reasoni
 import { useProviderStore } from "@/store/provider.store";
 import { useInteractionStore } from "@/store/interaction.store";
 import { usePromptStateStore } from "@/store/prompt.store";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 export class ReasoningControlModule implements ControlModule {
   readonly id = "core-reasoning";
@@ -93,6 +95,12 @@ export class ReasoningControlModule implements ControlModule {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
     }
+
+    // Register text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
     this.unregisterCallback = modApi.registerPromptControl({
       id: this.id,
       status: () => "ready",
@@ -118,8 +126,47 @@ export class ReasoningControlModule implements ControlModule {
       this.unregisterCallback();
       this.unregisterCallback = null;
     }
+    
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
+    
     this.notifyComponentUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
+
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'reasoning',
+      name: 'Reasoning',
+      methods: {
+        on: {
+          id: 'on',
+          name: 'Enable Reasoning',
+          description: 'Enable reasoning mode for this prompt',
+          argSchema: { minArgs: 0, maxArgs: 0, argTypes: [] as const },
+          handler: this.handleReasoningOn
+        },
+        off: {
+          id: 'off',
+          name: 'Disable Reasoning',
+          description: 'Disable reasoning mode for this prompt',
+          argSchema: { minArgs: 0, maxArgs: 0, argTypes: [] as const },
+          handler: this.handleReasoningOff
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleReasoningOn = async (_args: string[], _context: TriggerExecutionContext) => {
+    this.setReasoningEnabled(true);
+  };
+
+  private handleReasoningOff = async (_args: string[], _context: TriggerExecutionContext) => {
+    this.setReasoningEnabled(false);
+  };
 }

@@ -17,6 +17,8 @@ import {
   createAiModelConfig,
   splitModelId,
 } from "@/lib/litechat/provider-helpers";
+import { useControlRegistryStore } from "@/store/control.store";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 export class ParameterControlModule implements ControlModule {
   readonly id = "core-parameters";
@@ -236,6 +238,12 @@ export class ParameterControlModule implements ControlModule {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
     }
+
+    // Register text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
     this.unregisterCallback = modApi.registerPromptControl({
       id: this.id,
       status: () => "ready",
@@ -264,8 +272,79 @@ export class ParameterControlModule implements ControlModule {
       this.unregisterCallback();
       this.unregisterCallback = null;
     }
+    
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
+    
     this.notifyComponentUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
+
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'params',
+      name: 'Parameters',
+      methods: {
+        temp: {
+          id: 'temp',
+          name: 'Set Temperature',
+          description: 'Set temperature parameter',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 1,
+            argTypes: ['number' as const]
+          },
+          handler: this.handleParamsTemp
+        },
+        tokens: {
+          id: 'tokens',
+          name: 'Set Max Tokens',
+          description: 'Set max tokens parameter',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 1,
+            argTypes: ['number' as const]
+          },
+          handler: this.handleParamsTokens
+        },
+        top_p: {
+          id: 'top_p',
+          name: 'Set Top P',
+          description: 'Set top-p parameter',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 1,
+            argTypes: ['number' as const]
+          },
+          handler: this.handleParamsTopP
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleParamsTemp = async (args: string[], _context: TriggerExecutionContext) => {
+    const temp = parseFloat(args[0]);
+    if (!isNaN(temp) && temp >= 0 && temp <= 2) {
+      this.setTemperature(temp);
+    }
+  };
+
+  private handleParamsTokens = async (args: string[], _context: TriggerExecutionContext) => {
+    const tokens = parseInt(args[0]);
+    if (!isNaN(tokens) && tokens > 0) {
+      this.setMaxTokens(tokens);
+    }
+  };
+
+  private handleParamsTopP = async (args: string[], _context: TriggerExecutionContext) => {
+    const topP = parseFloat(args[0]);
+    if (!isNaN(topP) && topP >= 0 && topP <= 1) {
+      this.setTopP(topP);
+    }
+  };
 }
