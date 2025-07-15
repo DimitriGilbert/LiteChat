@@ -67,7 +67,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
     configSyncEnabled: z.boolean(),
     configSyncRepoId: z.string(),
     configSyncAutoSync: z.boolean(),
-    configSyncInterval: z.number().min(60000).max(3600000), // 1 minute to 1 hour
+    configSyncInterval: z.number().min(60000).max(86400000), // 1 minute to 24 hours
   });
 
   const { Form, form } = useFormedible({

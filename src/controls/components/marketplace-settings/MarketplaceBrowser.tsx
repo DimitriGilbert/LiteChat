@@ -3,6 +3,8 @@
 import React from "react";
 import { useMarketplaceStore } from "@/store/marketplace.store";
 import { useShallow } from "zustand/react/shallow";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { marketplaceEvent } from "@/types/litechat/events/marketplace.events";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,10 +28,6 @@ export const MarketplaceBrowser: React.FC = () => {
     selectedType,
     isRefreshing,
     getFilteredItems,
-    setSearchQuery,
-    setSelectedCategory,
-    setSelectedType,
-    refreshAllMarketplaces,
   } = useMarketplaceStore(
     useShallow((state) => ({
       searchQuery: state.searchQuery,
@@ -37,29 +35,25 @@ export const MarketplaceBrowser: React.FC = () => {
       selectedType: state.selectedType,
       isRefreshing: state.isRefreshing,
       getFilteredItems: state.getFilteredItems,
-      setSearchQuery: state.setSearchQuery,
-      setSelectedCategory: state.setSelectedCategory,
-      setSelectedType: state.setSelectedType,
-      refreshAllMarketplaces: state.refreshAllMarketplaces,
     }))
   );
 
   const filteredItems = getFilteredItems();
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+    emitter.emit(marketplaceEvent.setSearchQueryRequest, { query: e.target.value });
   };
 
   const handleCategoryChange = (value: string) => {
-    setSelectedCategory(value === "all" ? null : value);
+    emitter.emit(marketplaceEvent.setSelectedCategoryRequest, { category: value === "all" ? null : value });
   };
 
   const handleTypeChange = (value: string) => {
-    setSelectedType(value === "all" ? null : (value as MarketplaceItemType));
+    emitter.emit(marketplaceEvent.setSelectedTypeRequest, { type: value === "all" ? null : (value as MarketplaceItemType) });
   };
 
-  const handleRefreshAll = async () => {
-    await refreshAllMarketplaces();
+  const handleRefreshAll = () => {
+    emitter.emit(marketplaceEvent.refreshAllMarketplacesRequest, {});
   };
 
   // Get unique categories from available items

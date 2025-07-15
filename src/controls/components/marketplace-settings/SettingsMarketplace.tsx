@@ -3,6 +3,8 @@
 import React, { useEffect } from "react";
 import { useMarketplaceStore } from "@/store/marketplace.store";
 import { useShallow } from "zustand/react/shallow";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { marketplaceEvent } from "@/types/litechat/events/marketplace.events";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -21,25 +23,21 @@ const SettingsMarketplaceComponent: React.FC = () => {
     marketplaceSources,
     installedItems,
     isRefreshing,
-    loadMarketplaceData,
-    refreshAllMarketplaces,
   } = useMarketplaceStore(
     useShallow((state) => ({
       marketplaceSources: state.marketplaceSources,
       installedItems: state.installedItems,
       isRefreshing: state.isRefreshing,
-      loadMarketplaceData: state.loadMarketplaceData,
-      refreshAllMarketplaces: state.refreshAllMarketplaces,
     }))
   );
 
   // Load marketplace data on mount
   useEffect(() => {
-    loadMarketplaceData();
-  }, [loadMarketplaceData]);
+    emitter.emit(marketplaceEvent.loadMarketplaceDataRequest, {});
+  }, []);
 
-  const handleRefreshAll = async () => {
-    await refreshAllMarketplaces();
+  const handleRefreshAll = () => {
+    emitter.emit(marketplaceEvent.refreshAllMarketplacesRequest, {});
   };
 
   const installedItemsCount = Object.keys(installedItems).length;

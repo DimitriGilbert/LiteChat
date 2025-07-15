@@ -269,14 +269,15 @@ export class ConfigSyncService {
    * Get last config sync timestamp from settings
    */
   private getLastConfigSyncTimestamp(): number {
-    return useSettingsStore.getState().configSyncLastSyncedAt ?? 0;
+    const timestamp = useSettingsStore.getState().configSyncLastSyncedAt;
+    return timestamp ? new Date(timestamp).getTime() : 0;
   }
 
   /**
    * Update last config sync timestamp in settings
    */
   private updateLastConfigSyncTimestamp(): void {
-    useSettingsStore.getState().setConfigSyncLastSyncedAt(Date.now());
+    useSettingsStore.getState().setConfigSyncLastSyncedAt(new Date().toISOString());
   }
 
   /**

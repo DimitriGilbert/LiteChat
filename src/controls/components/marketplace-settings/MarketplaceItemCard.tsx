@@ -3,6 +3,8 @@
 import React from "react";
 import { useMarketplaceStore } from "@/store/marketplace.store";
 import { useShallow } from "zustand/react/shallow";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { marketplaceEvent } from "@/types/litechat/events/marketplace.events";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,20 +60,21 @@ export const MarketplaceItemCard: React.FC<MarketplaceItemCardProps> = ({ item }
 
   const {
     installedItems,
-    installMarketplaceItem,
   } = useMarketplaceStore(
     useShallow((state) => ({
       installedItems: state.installedItems,
-      installMarketplaceItem: state.installMarketplaceItem,
     }))
   );
 
   const isInstalled = installedItems[item.id];
   const Icon = getItemIcon(item.type);
 
-  const handleInstall = async () => {
+  const handleInstall = () => {
     if (item.sourceId) {
-      await installMarketplaceItem(item.sourceId, item.id);
+      emitter.emit(marketplaceEvent.installMarketplaceItemRequest, { 
+        sourceId: item.sourceId, 
+        itemId: item.id 
+      });
     }
   };
 
