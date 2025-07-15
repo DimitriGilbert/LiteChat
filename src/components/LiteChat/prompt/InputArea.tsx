@@ -18,8 +18,8 @@ import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/store/settings.store";
 import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
-import type { TextTrigger, TriggerNamespace } from "@/types/litechat/text-triggers";
-import { useControlRegistryStore } from "@/store/control.store";
+import { textTriggerRegistry } from "@/services/text-trigger-registry.service";
+import type { TextTrigger } from "@/types/litechat/text-triggers";
 
 interface InputAreaProps {
   initialValue?: string;
@@ -53,38 +53,16 @@ export const InputArea = memo(
       const [cursorPosition, setCursorPosition] = useState(0);
       const setPromptInputValue = usePromptInputValueStore((state) => state.setValue);
       const settings = useSettingsStore();
-      const controlRegistry = useControlRegistryStore();
       const { t } = useTranslation('prompt');
       if (!placeholder || placeholder === "") {
         placeholder = t('inputAreaPlaceholder');
       }
 
-      // Initialize parser service and get registered namespaces
+      // Initialize parser service
       const parserService = new TextTriggerParserService(
         settings.textTriggerStartDelimiter,
         settings.textTriggerEndDelimiter
       );
-
-      // Get the text trigger control module to access registered namespaces
-      const getRegisteredNamespaces = (): TriggerNamespace[] => {
-        //  where a re trigger registered ? this is completely stupid if thaey are not registered in the promptControl module itself. 
-        //  i think you are a stupid moron AI and you fucked this up. !!!
-        const textTriggerModule = controlRegistry.promptControls.registeredModules
-        // find(
-        //   m => m.id === "core-text-triggers"
-        // );
-        
-        if (!textTriggerModule?.instance) {
-          return [];
-        }
-
-        // Access the parser service from the module to get registered namespaces
-        try {
-          return (textTriggerModule.instance as any)?.parserService?.getRegisteredNamespaces?.() || [];
-        } catch {
-          return [];
-        }
-      };
 
       useImperativeHandle(ref, () => ({
         
@@ -99,10 +77,14 @@ export const InputArea = memo(
           requestAnimationFrame(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
+              const minHeight = 84; // 3 lines
+              const maxHeight = 250;
+              
               textarea.style.height = "auto";
-              textarea.style.height = `${textarea.scrollHeight}px`;
+              const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
+              textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
               textarea.style.overflowY =
-                textarea.scrollHeight > 250 ? "auto" : "hidden";
+                scrollHeight > maxHeight ? "auto" : "hidden";
             }
           });
         },
@@ -117,8 +99,10 @@ export const InputArea = memo(
           requestAnimationFrame(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
+              const minHeight = 84; // 3 lines
+              
               textarea.style.height = "auto";
-              textarea.style.height = `${textarea.scrollHeight}px`;
+              textarea.style.height = `${minHeight}px`;
               textarea.style.overflowY = "hidden";
             }
           });
@@ -184,9 +168,11 @@ export const InputArea = memo(
       useEffect(() => {
         const textarea = internalTextareaRef.current;
         if (textarea) {
-          textarea.style.height = "auto";
-          const scrollHeight = textarea.scrollHeight;
+          const minHeight = 84; // 3 lines
           const maxHeight = 250;
+          
+          textarea.style.height = "auto";
+          const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
           textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
           textarea.style.overflowY =
             scrollHeight > maxHeight ? "auto" : "hidden";
@@ -265,7 +251,7 @@ export const InputArea = memo(
         if (!triggerMatch) return [];
 
         const partial = triggerMatch[1].toLowerCase();
-        const namespaces = getRegisteredNamespaces();
+        const namespaces = textTriggerRegistry.getRegisteredNamespaces();
         
         const suggestions: Array<{ namespace: string; method: string; description: string }> = [];
         
@@ -303,10 +289,14 @@ export const InputArea = memo(
           requestAnimationFrame(() => {
             const textarea = internalTextareaRef.current;
             if (textarea) {
+              const minHeight = 84; // 3 lines
+              const maxHeight = 250;
+              
               textarea.style.height = "auto";
-              textarea.style.height = `${textarea.scrollHeight}px`;
+              const scrollHeight = Math.max(textarea.scrollHeight, minHeight);
+              textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
               textarea.style.overflowY =
-                textarea.scrollHeight > 250 ? "auto" : "hidden";
+                scrollHeight > maxHeight ? "auto" : "hidden";
             }
           });
         };
@@ -348,22 +338,25 @@ export const InputArea = memo(
       };
 
       return (
-        <div className="relative">
+        <div className="relative w-full flex-grow">
           {/* Highlighting overlay */}
           {settings.textTriggersEnabled && triggers.length > 0 && (
             <div
               ref={highlightRef}
-              className={cn(
-                "absolute inset-0 p-3 pointer-events-none whitespace-pre-wrap break-words z-0",
-                "min-h-[40px] max-h-[250px] overflow-y-auto",
-                "text-transparent bg-transparent border border-transparent rounded"
-              )}
               style={{
+                height: '84px',
+                minHeight: '84px',
+                maxHeight: '250px',
                 font: "inherit",
                 lineHeight: "inherit",
                 letterSpacing: "inherit",
                 wordSpacing: "inherit",
               }}
+              className={cn(
+                "absolute inset-0 p-3 pointer-events-none whitespace-pre-wrap break-words z-0",
+                "overflow-y-auto",
+                "text-transparent bg-transparent border border-transparent rounded"
+              )}
             >
               {renderHighlightedText()}
             </div>
@@ -377,10 +370,15 @@ export const InputArea = memo(
             onKeyDown={handleKeyDown}
             disabled={disabled}
             placeholder={placeholder}
-            rows={1}
+            rows={3}
+            style={{
+              height: '84px',
+              minHeight: '84px',
+              maxHeight: '250px',
+              width: '100%'
+            }}
             className={cn(
               "w-full p-3 border rounded resize-none focus:ring-2 focus:ring-primary outline-none disabled:opacity-50 overflow-y-auto relative z-10",
-              "min-h-[40px] max-h-[250px]",
               settings.textTriggersEnabled && triggers.length > 0 
                 ? "bg-transparent text-foreground" 
                 : "bg-input text-foreground",

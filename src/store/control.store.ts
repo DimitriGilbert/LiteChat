@@ -24,6 +24,7 @@ import type {
   ToolImplementation,
 } from "@/types/litechat/modding";
 import type { Tool } from "ai";
+import type { TriggerNamespace } from "@/types/litechat/text-triggers";
 
 export const useControlRegistryStore = create(
   immer<ControlStateInterface & ControlActionsInterface>((set, get) => ({
@@ -37,6 +38,7 @@ export const useControlRegistryStore = create(
     tools: {},
     modalProviders: {},
     controlRules: {}, // Added for control rules
+    textTriggerNamespaces: {}, // Added for text trigger namespaces
 
     // Actions
     registerPromptControl: (control) => {
@@ -341,6 +343,40 @@ export const useControlRegistryStore = create(
       return Object.freeze({ ...get().controlRules });
     },
 
+    registerTextTriggerNamespace: (namespace: TriggerNamespace) => {
+      set((state) => {
+        if (state.textTriggerNamespaces[namespace.id]) {
+          console.warn(
+            `ControlRegistryStore: TextTriggerNamespace with ID "${namespace.id}" already registered. Overwriting.`
+          );
+        }
+        state.textTriggerNamespaces[namespace.id] = namespace as any;
+      });
+      emitter.emit(controlRegistryEvent.textTriggerNamespacesChanged, {
+        namespaces: get().textTriggerNamespaces,
+      });
+      return () => get().unregisterTextTriggerNamespace(namespace.id);
+    },
+
+    unregisterTextTriggerNamespace: (id: string) => {
+      set((state) => {
+        if (state.textTriggerNamespaces[id]) {
+          delete state.textTriggerNamespaces[id];
+        } else {
+          console.warn(
+            `ControlRegistryStore: TextTriggerNamespace with ID "${id}" not found for unregistration.`
+          );
+        }
+      });
+      emitter.emit(controlRegistryEvent.textTriggerNamespacesChanged, {
+        namespaces: get().textTriggerNamespaces,
+      });
+    },
+
+    getTextTriggerNamespaces: () => {
+      return Object.freeze({ ...get().textTriggerNamespaces });
+    },
+
     getRegisteredActionHandlers: (): RegisteredActionHandler[] => {
       const storeId = "controlRegistryStore";
       const actions = get();
@@ -525,6 +561,24 @@ export const useControlRegistryStore = create(
             payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterSelectionControlRequest]
           ) => {
             actions.unregisterSelectionControl(payload.id);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.registerTextTriggerNamespaceRequest,
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.registerTextTriggerNamespaceRequest]
+          ) => {
+            actions.registerTextTriggerNamespace(payload.namespace);
+          },
+          storeId,
+        },
+        {
+          eventName: controlRegistryEvent.unregisterTextTriggerNamespaceRequest,
+          handler: (
+            payload: ControlRegistryEventPayloads[typeof controlRegistryEvent.unregisterTextTriggerNamespaceRequest]
+          ) => {
+            actions.unregisterTextTriggerNamespace(payload.id);
           },
           storeId,
         },

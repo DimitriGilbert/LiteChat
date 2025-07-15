@@ -34,7 +34,7 @@ export interface TriggerMethod {
 export interface TriggerArgSchema {
   minArgs: number;
   maxArgs: number;
-  argTypes: ('string' | 'number' | 'boolean' | 'tool-id' | 'rule-id' | 'model-id')[];
+  argTypes: readonly ('string' | 'number' | 'boolean' | 'tool-id' | 'rule-id' | 'model-id')[];
   suggestions?: (context: TriggerExecutionContext) => string[];
 }
 

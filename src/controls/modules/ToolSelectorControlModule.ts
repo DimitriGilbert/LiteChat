@@ -17,6 +17,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import type { SidebarItemType } from "@/types/litechat/chat";
 import { AIService } from "@/services/ai.service";
 import { splitModelId, instantiateModelInstance } from "@/lib/litechat/provider-helpers";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 export class ToolSelectorControlModule implements ControlModule {
   readonly id = "core-tool-selector";
@@ -276,6 +277,12 @@ export class ToolSelectorControlModule implements ControlModule {
       console.warn(`[${this.id}] Already registered. Skipping.`);
       return;
     }
+
+    // Register text trigger namespaces with the control registry
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
     this.unregisterCallback = modApi.registerPromptControl({
       id: this.id,
       triggerRenderer: () =>
@@ -309,6 +316,45 @@ export class ToolSelectorControlModule implements ControlModule {
     });
   }
 
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'tools',
+      name: 'Tools',
+      methods: {
+        activate: {
+          id: 'activate',
+          name: 'Activate Tools',
+          description: 'Activate specific tools for this prompt',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 10,
+            argTypes: ['tool-id' as const]
+          },
+          handler: this.handleToolsActivate
+        },
+        auto: {
+          id: 'auto',
+          name: 'Auto Select Tools',
+          description: 'Automatically select relevant tools',
+          argSchema: { minArgs: 0, maxArgs: 0, argTypes: [] as const },
+          handler: this.handleToolsAuto
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleToolsActivate = async (args: string[], context: TriggerExecutionContext) => {
+    if (!context.turnData.metadata.enabledTools) {
+      context.turnData.metadata.enabledTools = [];
+    }
+    context.turnData.metadata.enabledTools.push(...args);
+  };
+
+  private handleToolsAuto = async (_args: string[], context: TriggerExecutionContext) => {
+    context.turnData.metadata.autoSelectTools = true;
+  };
+
   destroy(): void {
     this.eventUnsubscribers.forEach((unsub) => unsub());
     this.eventUnsubscribers = [];
@@ -316,6 +362,13 @@ export class ToolSelectorControlModule implements ControlModule {
       this.unregisterCallback();
       this.unregisterCallback = null;
     }
+    
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
+    
     this.notifyComponentUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);

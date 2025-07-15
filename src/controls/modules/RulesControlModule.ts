@@ -13,7 +13,7 @@ import type { DbRule, DbTag } from "@/types/litechat/rules";
 import type { ResolvedRuleContent } from "@/types/litechat/prompt";
 import type { ModControlRule } from "@/types/litechat/modding";
 import { useControlRegistryStore } from "@/store/control.store";
-import { useSettingsStore } from "../../store/settings.store";
+import { useSettingsStore } from "@/store/settings.store";
 import { emitter } from "@/lib/litechat/event-emitter";
 import { toast } from "sonner";
 import { AIService } from "@/services/ai.service";
@@ -28,6 +28,7 @@ import { nanoid } from "nanoid";
 import type { Interaction } from "@/types/litechat/interaction";
 import type { PromptTurnObject } from "@/types/litechat/prompt";
 import i18next from "i18next";
+import type { TriggerNamespace, TriggerExecutionContext } from "@/types/litechat/text-triggers";
 
 export class RulesControlModule implements ControlModule {
   readonly id = "core-rules-tags";
@@ -333,6 +334,12 @@ export class RulesControlModule implements ControlModule {
   register(modApi: LiteChatModApi): void {
     this.modApiRef = modApi;
 
+    // Register text trigger namespaces with the control registry
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().registerTextTriggerNamespace(namespace);
+    });
+
     if (!this.unregisterPromptControlCallback) {
       this.unregisterPromptControlCallback = modApi.registerPromptControl({
         id: this.id,
@@ -444,11 +451,57 @@ export class RulesControlModule implements ControlModule {
       this.unregisterSettingsTabCallback();
       this.unregisterSettingsTabCallback = null;
     }
+    
+    // Unregister text trigger namespaces
+    const triggerNamespaces = this.getTextTriggerNamespaces();
+    triggerNamespaces.forEach(namespace => {
+      useControlRegistryStore.getState().unregisterTextTriggerNamespace(namespace.id);
+    });
+    
     this.notifyComponentUpdate = null;
     this.notifySettingsComponentUpdate = null;
     this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
+
+  getTextTriggerNamespaces(): TriggerNamespace[] {
+    return [{
+      id: 'rules',
+      name: 'Rules',
+      methods: {
+        select: {
+          id: 'select',
+          name: 'Select Rules',
+          description: 'Activate specific rules for this prompt',
+          argSchema: {
+            minArgs: 1,
+            maxArgs: 10,
+            argTypes: ['rule-id' as const]
+          },
+          handler: this.handleRulesSelect
+        },
+        auto: {
+          id: 'auto',
+          name: 'Auto Select Rules',
+          description: 'Automatically select relevant rules',
+          argSchema: { minArgs: 0, maxArgs: 0, argTypes: [] as const },
+          handler: this.handleRulesAuto
+        }
+      },
+      moduleId: this.id
+    }];
+  }
+
+  private handleRulesSelect = async (args: string[], context: TriggerExecutionContext) => {
+    if (!context.turnData.metadata.activeRuleIds) {
+      context.turnData.metadata.activeRuleIds = [];
+    }
+    context.turnData.metadata.activeRuleIds.push(...args);
+  };
+
+  private handleRulesAuto = async (_args: string[], context: TriggerExecutionContext) => {
+    context.turnData.metadata.autoSelectRules = true;
+  };
 
   // Helper method to check if a rule is a control rule
   public isControlRule = (ruleId: string): boolean => {

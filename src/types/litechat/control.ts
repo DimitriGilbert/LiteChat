@@ -16,6 +16,7 @@ import type {
 } from "@/types/litechat/modding";
 import { Tool } from "ai";
 import type { z } from "zod";
+import type { TriggerNamespace } from "./text-triggers";
 
 interface RegisteredMiddleware<H extends ModMiddlewareHookName> {
   modId: string;
@@ -57,6 +58,7 @@ export interface ControlState {
   >;
   modalProviders: Record<string, ModalProvider>;
   controlRules: Record<string, ModControlRule>; // Added for control rules
+  textTriggerNamespaces: Record<string, TriggerNamespace>; // Added for text trigger namespaces
   // No need to store actionHandlers here, they are registered by stores directly with the coordinator
 }
 
@@ -101,6 +103,9 @@ export interface ControlActions {
   registerControlRule: (rule: ModControlRule) => () => void; // Added for control rules
   unregisterControlRule: (id: string) => void; // Added for control rules
   getControlRules: () => Readonly<ControlState["controlRules"]>; // Added for control rules
+  registerTextTriggerNamespace: (namespace: TriggerNamespace) => () => void; // Added for text trigger namespaces
+  unregisterTextTriggerNamespace: (id: string) => void; // Added for text trigger namespaces
+  getTextTriggerNamespaces: () => Readonly<ControlState["textTriggerNamespaces"]>; // Added for text trigger namespaces
 }
 
 export interface ControlModule {
@@ -109,6 +114,8 @@ export interface ControlModule {
   initialize(modApi: LiteChatModApi): Promise<void>;
   register(modApi: LiteChatModApi): void;
   destroy(modApi: LiteChatModApi): void;
+  // Optional: modules can declare text trigger namespaces
+  getTextTriggerNamespaces?(): import('./text-triggers').TriggerNamespace[];
 }
 
 export type { CorePromptControlFromTypes as PromptControl };

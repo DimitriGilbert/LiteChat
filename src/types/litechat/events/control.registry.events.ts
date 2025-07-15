@@ -14,6 +14,7 @@ import type {
 } from "@/types/litechat/modding";
 import type { ModMiddlewareHookName } from "@/types/litechat/middleware.types";
 import type { Tool } from "ai";
+import type { TriggerNamespace } from "@/types/litechat/text-triggers";
 
 export const controlRegistryEvent = {
   // State Change Events
@@ -25,6 +26,7 @@ export const controlRegistryEvent = {
   toolsChanged: "control.registry.tools.changed",
   modalProvidersChanged: "control.registry.modal.providers.changed",
   controlRulesChanged: "control.registry.control.rules.changed", // Added for control rules
+  textTriggerNamespacesChanged: "control.registry.text.trigger.namespaces.changed", // Added for text trigger namespaces
 
   // Action Request Events
   registerPromptControlRequest:
@@ -52,6 +54,8 @@ export const controlRegistryEvent = {
     "control.registry.unregister.modal.provider.request",
   registerControlRuleRequest: "control.registry.register.control.rule.request", // Added for control rules
   unregisterControlRuleRequest: "control.registry.unregister.control.rule.request", // Added for control rules
+  registerTextTriggerNamespaceRequest: "control.registry.register.text.trigger.namespace.request", // Added for text trigger namespaces
+  unregisterTextTriggerNamespaceRequest: "control.registry.unregister.text.trigger.namespace.request", // Added for text trigger namespaces
 } as const;
 
 export interface ControlRegistryEventPayloads {
@@ -77,6 +81,9 @@ export interface ControlRegistryEventPayloads {
   };
   [controlRegistryEvent.controlRulesChanged]: { // Added for control rules
     controlRules: Record<string, ModControlRule>;
+  };
+  [controlRegistryEvent.textTriggerNamespacesChanged]: { // Added for text trigger namespaces
+    namespaces: Record<string, TriggerNamespace>;
   };
   [controlRegistryEvent.registerPromptControlRequest]: {
     control: CorePromptControlAliased;
@@ -122,4 +129,8 @@ export interface ControlRegistryEventPayloads {
     rule: ModControlRule;
   };
   [controlRegistryEvent.unregisterControlRuleRequest]: { id: string }; // Added for control rules
+  [controlRegistryEvent.registerTextTriggerNamespaceRequest]: { // Added for text trigger namespaces
+    namespace: TriggerNamespace;
+  };
+  [controlRegistryEvent.unregisterTextTriggerNamespaceRequest]: { id: string }; // Added for text trigger namespaces
 }
