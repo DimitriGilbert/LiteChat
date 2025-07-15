@@ -1,3 +1,4 @@
+import React from "react";
 import { nanoid } from "nanoid";
 import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
@@ -5,7 +6,7 @@ import { emitter } from "@/lib/litechat/event-emitter";
 import { interactionEvent } from "@/types/litechat/events/interaction.events";
 import { workflowEvent } from "@/types/litechat/events/workflow.events";
 import { webSearchEvent } from "@/types/litechat/events/websearch.events";
-// import { WorkflowWebSearchControlTrigger } from "../components/workflow-websearch/WorkflowWebSearchControlTrigger";
+import { WorkflowWebSearchControlTrigger } from "../components/workflow-websearch/WorkflowWebSearchControlTrigger";
 import { useInteractionStore } from "@/store/interaction.store";
 import { PersistenceService } from "@/services/persistence.service";
 import { websearchPromptTemplates, WEBSEARCH_TEMPLATE_IDS } from "@/lib/litechat/websearch-prompt-templates";
@@ -380,7 +381,7 @@ export class WorkflowWebSearchControlModule implements ControlModule {
     this.unregisterCallback = modApi.registerPromptControl({
       id: this.id,
       status: () => "ready",
-      // triggerRenderer: () => React.createElement(WorkflowWebSearchControlTrigger, { module: this }),
+      triggerRenderer: () => React.createElement(WorkflowWebSearchControlTrigger, { module: this }),
       getMetadata: () => this.isEnabled ? {
         workflowWebSearchEnabled: true,
         searchConfig: this.searchConfig,

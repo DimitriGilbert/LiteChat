@@ -54,6 +54,27 @@ export const settingsEvent = {
   runnableBlocksSecurityModelIdChanged: "settings.runnable.blocks.security.model.id.changed",
   runnableBlocksSecurityPromptChanged: "settings.runnable.blocks.security.prompt.changed",
   controlRuleAlwaysOnChanged: "settings.control.rule.always.on.changed",
+  
+  // Auto Tool Selection Events
+  autoToolSelectionEnabledChanged: "settings.auto.tool.selection.enabled.changed",
+  autoToolSelectionModelIdChanged: "settings.auto.tool.selection.model.id.changed",
+  autoToolSelectionPromptChanged: "settings.auto.tool.selection.prompt.changed",
+  
+  // Text Trigger Events
+  textTriggersEnabledChanged: "settings.text.triggers.enabled.changed",
+  textTriggerDelimitersChanged: "settings.text.trigger.delimiters.changed",
+
+  // Config Sync Events
+  configSyncEnabledChanged: "settings.config.sync.enabled.changed",
+  configSyncRepoIdChanged: "settings.config.sync.repo.id.changed",
+  configSyncAutoSyncChanged: "settings.config.sync.auto.sync.changed",
+  configSyncIncludeSettingsChanged: "settings.config.sync.include.settings.changed",
+  configSyncIncludeRulesChanged: "settings.config.sync.include.rules.changed",
+  configSyncIncludePromptTemplatesChanged: "settings.config.sync.include.prompt.templates.changed",
+  configSyncIncludeAgentsChanged: "settings.config.sync.include.agents.changed",
+  configSyncIncludeWorkflowsChanged: "settings.config.sync.include.workflows.changed",
+  configSyncIncludeMcpServersChanged: "settings.config.sync.include.mcp.servers.changed",
+  configSyncLastSyncedAtChanged: "settings.config.sync.last.synced.at.changed",
 
   // Action Request Events
   setThemeRequest: "settings.set.theme.request",
@@ -111,6 +132,27 @@ export const settingsEvent = {
   setRunnableBlocksSecurityModelIdRequest: "settings.set.runnable.blocks.security.model.id.request",
   setRunnableBlocksSecurityPromptRequest: "settings.set.runnable.blocks.security.prompt.request",
   setControlRuleAlwaysOnRequest: "settings.set.control.rule.always.on.request",
+  
+  // Auto Tool Selection Request Events
+  setAutoToolSelectionEnabledRequest: "settings.set.auto.tool.selection.enabled.request",
+  setAutoToolSelectionModelIdRequest: "settings.set.auto.tool.selection.model.id.request",
+  setAutoToolSelectionPromptRequest: "settings.set.auto.tool.selection.prompt.request",
+  
+  // Text Trigger Request Events
+  setTextTriggersEnabledRequest: "settings.set.text.triggers.enabled.request",
+  setTextTriggerDelimitersRequest: "settings.set.text.trigger.delimiters.request",
+
+  // Config Sync Request Events
+  setConfigSyncEnabledRequest: "settings.set.config.sync.enabled.request",
+  setConfigSyncRepoIdRequest: "settings.set.config.sync.repo.id.request",
+  setConfigSyncAutoSyncRequest: "settings.set.config.sync.auto.sync.request",
+  setConfigSyncIncludeSettingsRequest: "settings.set.config.sync.include.settings.request",
+  setConfigSyncIncludeRulesRequest: "settings.set.config.sync.include.rules.request",
+  setConfigSyncIncludePromptTemplatesRequest: "settings.set.config.sync.include.prompt.templates.request",
+  setConfigSyncIncludeAgentsRequest: "settings.set.config.sync.include.agents.request",
+  setConfigSyncIncludeWorkflowsRequest: "settings.set.config.sync.include.workflows.request",
+  setConfigSyncIncludeMcpServersRequest: "settings.set.config.sync.include.mcp.servers.request",
+  setConfigSyncLastSyncedAtRequest: "settings.set.config.sync.last.synced.at.request",
 
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
@@ -216,6 +258,27 @@ export interface SettingsEventPayloads {
   [settingsEvent.runnableBlocksSecurityModelIdChanged]: { modelId: SettingsState["runnableBlocksSecurityModelId"] };
   [settingsEvent.runnableBlocksSecurityPromptChanged]: { prompt: SettingsState["runnableBlocksSecurityPrompt"] };
   [settingsEvent.controlRuleAlwaysOnChanged]: { ruleId: string, alwaysOn: boolean };
+  
+  // Auto Tool Selection Event Payloads
+  [settingsEvent.autoToolSelectionEnabledChanged]: { enabled: SettingsState["autoToolSelectionEnabled"] };
+  [settingsEvent.autoToolSelectionModelIdChanged]: { modelId: SettingsState["autoToolSelectionModelId"] };
+  [settingsEvent.autoToolSelectionPromptChanged]: { prompt: SettingsState["autoToolSelectionPrompt"] };
+  
+  // Text Trigger Event Payloads
+  [settingsEvent.textTriggersEnabledChanged]: { enabled: SettingsState["textTriggersEnabled"] };
+  [settingsEvent.textTriggerDelimitersChanged]: { start: SettingsState["textTriggerStartDelimiter"], end: SettingsState["textTriggerEndDelimiter"] };
+
+  // Config Sync Event Payloads
+  [settingsEvent.configSyncEnabledChanged]: { enabled: SettingsState["configSyncEnabled"] };
+  [settingsEvent.configSyncRepoIdChanged]: { repoId: SettingsState["configSyncRepoId"] };
+  [settingsEvent.configSyncAutoSyncChanged]: { enabled: SettingsState["configSyncAutoSync"] };
+  [settingsEvent.configSyncIncludeSettingsChanged]: { include: SettingsState["configSyncIncludeSettings"] };
+  [settingsEvent.configSyncIncludeRulesChanged]: { include: SettingsState["configSyncIncludeRules"] };
+  [settingsEvent.configSyncIncludePromptTemplatesChanged]: { include: SettingsState["configSyncIncludePromptTemplates"] };
+  [settingsEvent.configSyncIncludeAgentsChanged]: { include: SettingsState["configSyncIncludeAgents"] };
+  [settingsEvent.configSyncIncludeWorkflowsChanged]: { include: SettingsState["configSyncIncludeWorkflows"] };
+  [settingsEvent.configSyncIncludeMcpServersChanged]: { include: SettingsState["configSyncIncludeMcpServers"] };
+  [settingsEvent.configSyncLastSyncedAtChanged]: { timestamp: SettingsState["configSyncLastSyncedAt"] };
 
   [settingsEvent.setThemeRequest]: { theme: SettingsState["theme"] };
   [settingsEvent.setGlobalSystemPromptRequest]: {
@@ -322,6 +385,27 @@ export interface SettingsEventPayloads {
   [settingsEvent.setRunnableBlocksSecurityModelIdRequest]: { modelId: SettingsState["runnableBlocksSecurityModelId"] };
   [settingsEvent.setRunnableBlocksSecurityPromptRequest]: { prompt: SettingsState["runnableBlocksSecurityPrompt"] };
   [settingsEvent.setControlRuleAlwaysOnRequest]: { ruleId: string, alwaysOn: boolean };
+  
+  // Auto Tool Selection Request Payloads
+  [settingsEvent.setAutoToolSelectionEnabledRequest]: { enabled: SettingsState["autoToolSelectionEnabled"] };
+  [settingsEvent.setAutoToolSelectionModelIdRequest]: { modelId: SettingsState["autoToolSelectionModelId"] };
+  [settingsEvent.setAutoToolSelectionPromptRequest]: { prompt: SettingsState["autoToolSelectionPrompt"] };
+  
+  // Text Trigger Request Payloads
+  [settingsEvent.setTextTriggersEnabledRequest]: { enabled: SettingsState["textTriggersEnabled"] };
+  [settingsEvent.setTextTriggerDelimitersRequest]: { start: SettingsState["textTriggerStartDelimiter"], end: SettingsState["textTriggerEndDelimiter"] };
+
+  // Config Sync Request Payloads
+  [settingsEvent.setConfigSyncEnabledRequest]: { enabled: SettingsState["configSyncEnabled"] };
+  [settingsEvent.setConfigSyncRepoIdRequest]: { repoId: SettingsState["configSyncRepoId"] };
+  [settingsEvent.setConfigSyncAutoSyncRequest]: { enabled: SettingsState["configSyncAutoSync"] };
+  [settingsEvent.setConfigSyncIncludeSettingsRequest]: { include: SettingsState["configSyncIncludeSettings"] };
+  [settingsEvent.setConfigSyncIncludeRulesRequest]: { include: SettingsState["configSyncIncludeRules"] };
+  [settingsEvent.setConfigSyncIncludePromptTemplatesRequest]: { include: SettingsState["configSyncIncludePromptTemplates"] };
+  [settingsEvent.setConfigSyncIncludeAgentsRequest]: { include: SettingsState["configSyncIncludeAgents"] };
+  [settingsEvent.setConfigSyncIncludeWorkflowsRequest]: { include: SettingsState["configSyncIncludeWorkflows"] };
+  [settingsEvent.setConfigSyncIncludeMcpServersRequest]: { include: SettingsState["configSyncIncludeMcpServers"] };
+  [settingsEvent.setConfigSyncLastSyncedAtRequest]: { timestamp: SettingsState["configSyncLastSyncedAt"] };
 
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;

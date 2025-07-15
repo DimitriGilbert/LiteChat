@@ -15,6 +15,8 @@ import { useConversationStore } from "@/store/conversation.store";
 import { useControlRegistryStore } from "@/store/control.store";
 import { useSettingsStore } from "@/store/settings.store";
 import type { SidebarItemType } from "@/types/litechat/chat";
+import { AIService } from "@/services/ai.service";
+import { splitModelId, instantiateModelInstance } from "@/lib/litechat/provider-helpers";
 
 export class ToolSelectorControlModule implements ControlModule {
   readonly id = "core-tool-selector";
@@ -34,6 +36,7 @@ export class ToolSelectorControlModule implements ControlModule {
   private notifyComponentUpdate: (() => void) | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
+    this.modApiRef = modApi;
     this.loadInitialState();
     this.updateVisibility();
     this.notifyComponentUpdate?.();
@@ -138,6 +141,136 @@ export class ToolSelectorControlModule implements ControlModule {
     this.notifyComponentUpdate = cb;
   };
 
+  public autoSelectTools = async (promptOverride?: string) => {
+    const settings = useSettingsStore.getState();
+    if (!settings.autoToolSelectionEnabled) {
+      console.info("Auto tool selection is disabled in settings");
+      return;
+    }
+    
+    // Get current prompt value from context
+    let userPrompt = promptOverride ?? "";
+    if (!userPrompt) {
+      // Try to get from context snapshot if available
+      try {
+        const context = this.modApiRef?.getContextSnapshot();
+        userPrompt = context?.promptInputValue ?? "";
+      } catch (error) {
+        console.warn("Could not get prompt from context:", error);
+      }
+    }
+    
+    if (!userPrompt) {
+      console.error("No prompt text available for tool selection");
+      return;
+    }
+    
+    const availableTools = useControlRegistryStore.getState().tools;
+    const toolsList = Object.entries(availableTools);
+    
+    if (toolsList.length === 0) {
+      console.error("No tools available for selection");
+      return;
+    }
+    
+    const modelId = settings.autoToolSelectionModelId;
+    if (!modelId) {
+      console.error("No model configured for auto tool selection");
+      return;
+    }
+    
+    console.log("Selecting relevant tools...");
+    
+    try {
+      const { providerId, modelId: specificModelId } = splitModelId(modelId);
+      
+      if (!providerId) {
+        throw new Error(`Could not determine provider from model ID: ${modelId}`);
+      }
+      
+      const providerConfig = useProviderStore
+        .getState()
+        .dbProviderConfigs.find((p) => p.id === providerId);
+      const apiKey = useProviderStore.getState().getApiKeyForProvider(providerId);
+      
+      if (!providerConfig || !specificModelId) {
+        throw new Error(`Invalid model ID or provider not found for ${modelId}`);
+      }
+      
+      const modelInstance = instantiateModelInstance(
+        providerConfig,
+        specificModelId,
+        apiKey === null ? undefined : apiKey,
+      );
+      
+      if (!modelInstance) {
+        throw new Error(`Failed to instantiate model: ${modelId}`);
+      }
+      
+      const toolsString = toolsList
+        .map(([toolName, toolData]) => 
+          `- ${toolName}: ${toolData.definition.description || 'No description available'}`
+        )
+        .join("\n");
+      
+      const systemPrompt = "You are a helpful assistant that selects relevant tools based on a user's prompt. You only respond with a valid JSON array of strings.";
+      
+      const promptTemplate = settings.autoToolSelectionPrompt || 
+        'Analyze the following user prompt and the list of available tools. Select the most relevant tools that would help accomplish the user\'s task. Respond with ONLY a JSON string array of the selected tool names, for example: ["tool1", "tool2"]. Do not include any other text, explanation, or markdown formatting.\n\nUSER PROMPT:\n{{prompt}}\n\nAVAILABLE TOOLS:\n{{tools}}';
+      
+      const filledPrompt = promptTemplate
+        .replace("{{prompt}}", userPrompt)
+        .replace("{{tools}}", toolsString);
+      
+      const result = await AIService.generateCompletion({
+        model: modelInstance,
+        system: systemPrompt,
+        messages: [{ role: "user", content: filledPrompt }],
+        temperature: 0.1,
+        maxTokens: 512,
+      });
+      
+      if (!result) {
+        throw new Error("AI returned an empty response.");
+      }
+      
+      let toolNames: string[] = [];
+      try {
+        // Parse JSON response
+        let cleaned = result.trim();
+        cleaned = cleaned.replace(/^```json[\r\n]+|^```[\r\n]+|```$/gim, "").trim();
+        const jsonMatch = cleaned.match(/\[.*?\]/s);
+        if (!jsonMatch) {
+          throw new Error("No JSON array found in the AI response.");
+        }
+        toolNames = JSON.parse(jsonMatch[0]);
+        if (!Array.isArray(toolNames) || !toolNames.every((name) => typeof name === "string")) {
+          throw new Error("AI response was not a valid JSON array of tool names.");
+        }
+      } catch (err) {
+        console.error("Failed to parse AI response for tool selection:", err, "Raw response:", result);
+        throw new Error(`AI response was not valid JSON. ${err instanceof Error ? err.message : ""}`);
+      }
+      
+      // Validate tool names exist
+      const validToolNames = toolNames.filter(name => availableTools[name]);
+      const invalidToolNames = toolNames.filter(name => !availableTools[name]);
+      
+      if (invalidToolNames.length > 0) {
+        console.warn("AI selected non-existent tools:", invalidToolNames);
+      }
+      
+      this.setEnabledTools(() => new Set(validToolNames));
+      console.log(`Selected ${validToolNames.length} tools: ${validToolNames.join(", ")}`);
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Auto tool selection failed: ${errorMessage}`);
+    }
+  };
+
+  private modApiRef: LiteChatModApi | null = null;
+
   register(modApi: LiteChatModApi): void {
     if (this.unregisterCallback) {
       console.warn(`[${this.id}] Already registered. Skipping.`);
@@ -184,6 +317,7 @@ export class ToolSelectorControlModule implements ControlModule {
       this.unregisterCallback = null;
     }
     this.notifyComponentUpdate = null;
+    this.modApiRef = null;
     console.log(`[${this.id}] Destroyed.`);
   }
 }

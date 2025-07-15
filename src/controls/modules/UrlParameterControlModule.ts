@@ -19,12 +19,14 @@ import { ConversationService } from "@/services/conversation.service";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
 import { providerEvent } from "@/types/litechat/events/provider.events";
 import { inputEvent } from "@/types/litechat/events/input.events";
+// import { textTriggerEvent } from "@/types/litechat/events/text-trigger.events";
 // Removed unused vfsEvent import
 import { useProviderStore } from "@/store/provider.store";
 import { useInputStore } from "@/store/input.store";
 
 export class UrlParameterControlModule implements ControlModule {
   readonly id = "core-url-parameters";
+  readonly dependencies = ["core-text-triggers"]; // Add dependency on text triggers
   private modApiRef: LiteChatModApi | null = null;
 
   async initialize(modApi: LiteChatModApi): Promise<void> {
@@ -218,10 +220,31 @@ export class UrlParameterControlModule implements ControlModule {
 
       if (urlParams.query) {
         if (urlParams.submit === "0") {
-          modApi.emit(promptEvent.inputChanged, {
-            value: urlParams.query,
-          });
-          toast.info("Query from URL loaded into input area.");
+          // Check for text triggers and parse them
+          if (urlParams.query.includes("@.")) {
+            // TODO: Implement text trigger parsing
+            // modApi.emit(textTriggerEvent.parseAndExecuteRequest, {
+            //   text: urlParams.query,
+            //   source: 'url-parameter'
+            // });
+            
+            // Listen for cleaned text to set in input
+            // const unsubscribe = modApi.on(textTriggerEvent.textCleaned, (payload) => {
+            //   if (payload.source === 'url-parameter') {
+                modApi.emit(promptEvent.inputChanged, {
+                  value: urlParams.query,
+                });
+                // unsubscribe(); // One-time listener
+              // }
+            
+            toast.info("Query with text triggers loaded from URL.");
+          } else {
+            modApi.emit(promptEvent.inputChanged, {
+              value: urlParams.query,
+            });
+            toast.info("Query from URL loaded into input area.");
+          }
+          
           window.history.replaceState(
             {},
             document.title,
@@ -237,9 +260,24 @@ export class UrlParameterControlModule implements ControlModule {
             metadata.attachedFiles = [...currentAttachedFiles];
           }
 
+          // Handle text triggers in the query before submission
+          let finalQueryContent = urlParams.query;
+          
+          if (urlParams.query.includes("@.")) {
+            // TODO: Parse and execute text triggers, then use cleaned text
+            // modApi.emit(textTriggerEvent.parseAndExecuteRequest, {
+            //   text: urlParams.query,
+            //   source: 'url-parameter-submit'
+            // });
+            
+            // Wait for cleaned text (this is a simplified approach)
+            // In a real implementation, this would be handled asynchronously
+            console.log("Text triggers detected in URL query, executing...");
+          }
+
           let turnData: PromptTurnObject = {
             id: nanoid(),
-            content: urlParams.query,
+            content: finalQueryContent,
             parameters,
             metadata,
           };

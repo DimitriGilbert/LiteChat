@@ -2,6 +2,7 @@
 // FULL FILE
 import React, { useCallback } from "react";
 import { ToolSelectorBase } from "./ToolSelectorBase";
+import { useSettingsStore } from "@/store/settings.store";
 import type { ToolSelectorControlModule } from "@/controls/modules/ToolSelectorControlModule";
 
 interface ToolSelectorControlComponentProps {
@@ -18,6 +19,7 @@ export const ToolSelectorControlComponent: React.FC<
   const selectedItemId = module.getSelectedItemId();
   const selectedItemType = module.getSelectedItemType();
   const globalDefaultMaxSteps = module.getGlobalDefaultMaxSteps();
+  const autoToolSelectionEnabled = useSettingsStore((s) => s.autoToolSelectionEnabled);
 
   const handleToggleTool = useCallback(
     (toolName: string, checked: boolean) => {
@@ -47,6 +49,10 @@ export const ToolSelectorControlComponent: React.FC<
     [module]
   );
 
+  const handleAutoSelect = useCallback(() => {
+    module.autoSelectTools();
+  }, [module]);
+
   const isDisabled = selectedItemType !== "conversation" || !selectedItemId;
   const disabledMessage = "Select a conversation to manage tools.";
 
@@ -55,6 +61,7 @@ export const ToolSelectorControlComponent: React.FC<
       enabledTools={enabledTools}
       onToggleTool={handleToggleTool}
       onToggleAll={handleToggleAll}
+      onAutoSelect={autoToolSelectionEnabled ? handleAutoSelect : undefined}
       disabled={isDisabled}
       className={className}
       maxSteps={popoverMaxSteps}

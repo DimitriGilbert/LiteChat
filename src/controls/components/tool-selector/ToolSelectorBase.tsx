@@ -13,6 +13,7 @@ export interface ToolSelectorBaseProps {
   enabledTools: Set<string>;
   onToggleTool: (toolName: string, checked: boolean) => void;
   onToggleAll: (enable: boolean, availableToolNames: string[]) => void;
+  onAutoSelect?: () => void;
   disabled?: boolean;
   className?: string;
   maxSteps?: number | null;
@@ -32,6 +33,7 @@ export const ToolSelectorBase: React.FC<ToolSelectorBaseProps> = ({
   enabledTools,
   onToggleTool,
   onToggleAll,
+  onAutoSelect,
   disabled = false,
   className,
   maxSteps,
@@ -104,6 +106,17 @@ export const ToolSelectorBase: React.FC<ToolSelectorBaseProps> = ({
           {filteredTools.length} tools shown ({enabledTools.size} enabled)
         </Label>
         <div className="space-x-2">
+          {onAutoSelect && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAutoSelect}
+              disabled={disabled || availableTools.length === 0}
+              title="Automatically select relevant tools based on your prompt"
+            >
+              Auto Select
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

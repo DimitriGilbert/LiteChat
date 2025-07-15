@@ -19,6 +19,7 @@ import { VfsToolsModule } from "@/controls/modules/VfsToolsModule";
 import { GitToolsModule } from "@/controls/modules/GitToolsModule";
 import { McpToolsModule } from "@/controls/modules/McpToolsModule";
 import { ToolSelectorControlModule } from "@/controls/modules/ToolSelectorControlModule";
+import { TextTriggerControlModule } from "@/controls/modules/TextTriggerControlModule";
 import { ProjectSettingsControlModule } from "@/controls/modules/ProjectSettingsControlModule";
 import { GlobalModelSelectorModule } from "@/controls/modules/GlobalModelSelectorModule";
 import { SystemPromptControlModule } from "@/controls/modules/SystemPromptControlModule";
@@ -50,6 +51,7 @@ import { AssistantSettingsModule } from "@/controls/modules/AssistantSettingsMod
 import { RunnableBlocksSettingsModule } from "@/controls/modules/RunnableBlocksSettingsModule";
 import { DataSettingsModule } from "@/controls/modules/DataSettingsModule";
 import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
+import { MarketplaceSettingsModule } from "@/controls/modules/MarketplaceSettingsModule";
 
 // Import canvas action control modules
 import { CopyActionControlModule } from "@/controls/modules/canvas/CopyActionControlModule";
@@ -94,6 +96,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   RunnableBlocksSettingsModule,
   DataSettingsModule,
   ModSettingsModule,
+  MarketplaceSettingsModule,
   ConversationListControlModule,
   SidebarToggleControlModule,
   SettingsControlModule,
@@ -112,6 +115,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   OpenRouterProviderControlModule,
   SystemPromptControlModule,
   ToolSelectorControlModule,
+  TextTriggerControlModule,
   ParameterControlModule,
   StructuredOutputControlModule,
   RacePromptControlModule,

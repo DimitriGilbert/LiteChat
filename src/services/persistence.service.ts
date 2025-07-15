@@ -12,6 +12,15 @@ import type { DbPromptTemplate, PromptTemplate } from "@/types/litechat/prompt-t
 import type { DbAppState, DbWorkflow } from "@/lib/litechat/db";
 import type { WorkflowTemplate } from "@/types/litechat/workflow";
 import type { FullExportOptions } from "./import-export.service";
+import type { 
+  DbMarketplaceSource, 
+  DbMarketplaceIndex, 
+  DbInstalledMarketplaceItem,
+  MarketplaceSource,
+  MarketplaceIndex,
+  InstalledMarketplaceItem,
+  MarketplacePackage
+} from "@/types/litechat/marketplace";
 import { nanoid } from "nanoid";
 
 // Helper function to ensure date fields are Date objects
@@ -864,6 +873,9 @@ export class PersistenceService {
           db.tagRuleLinks,
           db.promptTemplates,
           db.workflows,
+          db.marketplaceSources,
+          db.marketplaceIndexes,
+          db.installedMarketplaceItems,
         ],
         async () => {
           await db.conversations.clear();
@@ -879,6 +891,9 @@ export class PersistenceService {
           await db.tagRuleLinks.clear();
           await db.promptTemplates.clear();
           await db.workflows.clear();
+          await db.marketplaceSources.clear();
+          await db.marketplaceIndexes.clear();
+          await db.installedMarketplaceItems.clear();
         }
       );
     } catch (error) {
@@ -899,6 +914,168 @@ export class PersistenceService {
       }
     } catch (error) {
       console.error(`PersistenceService: Error clearing table "${tableName}":`, error);
+      throw error;
+    }
+  }
+
+  // --- Marketplace Operations ---
+  
+  // Marketplace Sources
+  static async loadMarketplaceSources(): Promise<MarketplaceSource[]> {
+    try {
+      const sources = await db.marketplaceSources.orderBy("name").toArray();
+      return sources.map((s) => ensureDateFields(s, ["lastRefreshed"]) as MarketplaceSource);
+    } catch (error) {
+      console.error("PersistenceService: Error loading marketplace sources:", error);
+      throw error;
+    }
+  }
+
+  static async saveMarketplaceSource(source: MarketplaceSource): Promise<string> {
+    try {
+      const dbSource: DbMarketplaceSource = {
+        ...source,
+        lastRefreshed: source.lastRefreshed ?? undefined,
+      };
+      return await db.marketplaceSources.put(dbSource);
+    } catch (error) {
+      console.error("PersistenceService: Error saving marketplace source:", error);
+      throw error;
+    }
+  }
+
+  static async deleteMarketplaceSource(id: string): Promise<void> {
+    try {
+      await db.marketplaceSources.delete(id);
+      // Also delete cached indexes for this source
+      await db.marketplaceIndexes.where("sourceId").equals(id).delete();
+      // Also delete installed items from this source
+      await db.installedMarketplaceItems.where("sourceId").equals(id).delete();
+    } catch (error) {
+      console.error("PersistenceService: Error deleting marketplace source:", error);
+      throw error;
+    }
+  }
+
+  // Marketplace Indexes (Cached)
+  static async loadMarketplaceIndex(sourceId: string): Promise<MarketplaceIndex | null> {
+    try {
+      const cached = await db.marketplaceIndexes.where("sourceId").equals(sourceId).first();
+      if (!cached) return null;
+      
+      // Check if expired
+      if (new Date() > cached.expiresAt) {
+        await db.marketplaceIndexes.delete(cached.id);
+        return null;
+      }
+      
+      return JSON.parse(cached.indexData);
+    } catch (error) {
+      console.error("PersistenceService: Error loading marketplace index:", error);
+      throw error;
+    }
+  }
+
+  static async saveMarketplaceIndex(sourceId: string, index: MarketplaceIndex, expiresInMs = 1000 * 60 * 60): Promise<void> {
+    try {
+      const now = new Date();
+      const expires = new Date(now.getTime() + expiresInMs);
+      
+      const dbIndex: DbMarketplaceIndex = {
+        id: `${sourceId}_index`,
+        sourceId,
+        indexData: JSON.stringify(index),
+        cachedAt: now,
+        expiresAt: expires,
+      };
+      
+      await db.marketplaceIndexes.put(dbIndex);
+    } catch (error) {
+      console.error("PersistenceService: Error saving marketplace index:", error);
+      throw error;
+    }
+  }
+
+  // Installed Marketplace Items
+  static async loadInstalledMarketplaceItems(): Promise<InstalledMarketplaceItem[]> {
+    try {
+      const items = await db.installedMarketplaceItems.orderBy("installedAt").reverse().toArray();
+      return items.map((item) => ({
+        packageId: item.packageId,
+        sourceId: item.sourceId,
+        installedAt: ensureDateFields(item).installedAt,
+        version: item.version,
+        enabled: item.enabled,
+        installedRules: JSON.parse(item.installedRules),
+        installedTemplates: JSON.parse(item.installedTemplates),
+        installedMcpServers: JSON.parse(item.installedMcpServers),
+      }));
+    } catch (error) {
+      console.error("PersistenceService: Error loading installed marketplace items:", error);
+      throw error;
+    }
+  }
+
+  static async saveInstalledMarketplaceItem(item: InstalledMarketplaceItem, packageData: MarketplacePackage): Promise<string> {
+    try {
+      const dbItem: DbInstalledMarketplaceItem = {
+        id: `${item.sourceId}_${item.packageId}`,
+        packageId: item.packageId,
+        sourceId: item.sourceId,
+        installedAt: item.installedAt,
+        version: item.version,
+        enabled: item.enabled,
+        installedRules: JSON.stringify(item.installedRules),
+        installedTemplates: JSON.stringify(item.installedTemplates),
+        installedMcpServers: JSON.stringify(item.installedMcpServers),
+        packageData: JSON.stringify(packageData),
+      };
+      
+      return await db.installedMarketplaceItems.put(dbItem);
+    } catch (error) {
+      console.error("PersistenceService: Error saving installed marketplace item:", error);
+      throw error;
+    }
+  }
+
+  static async loadInstalledMarketplacePackage(packageId: string): Promise<MarketplacePackage | null> {
+    try {
+      const item = await db.installedMarketplaceItems.where("packageId").equals(packageId).first();
+      if (!item) return null;
+      
+      return JSON.parse(item.packageData);
+    } catch (error) {
+      console.error("PersistenceService: Error loading installed marketplace package:", error);
+      throw error;
+    }
+  }
+
+  static async updateInstalledMarketplaceItem(packageId: string, updates: Partial<InstalledMarketplaceItem>): Promise<void> {
+    try {
+      const existing = await db.installedMarketplaceItems.where("packageId").equals(packageId).first();
+      if (!existing) {
+        throw new Error(`Installed marketplace item not found: ${packageId}`);
+      }
+      
+      const dbUpdates: Partial<DbInstalledMarketplaceItem> = {};
+      if (updates.enabled !== undefined) dbUpdates.enabled = updates.enabled;
+      if (updates.version !== undefined) dbUpdates.version = updates.version;
+      if (updates.installedRules !== undefined) dbUpdates.installedRules = JSON.stringify(updates.installedRules);
+      if (updates.installedTemplates !== undefined) dbUpdates.installedTemplates = JSON.stringify(updates.installedTemplates);
+      if (updates.installedMcpServers !== undefined) dbUpdates.installedMcpServers = JSON.stringify(updates.installedMcpServers);
+      
+      await db.installedMarketplaceItems.update(existing.id, dbUpdates);
+    } catch (error) {
+      console.error("PersistenceService: Error updating installed marketplace item:", error);
+      throw error;
+    }
+  }
+
+  static async deleteInstalledMarketplaceItem(packageId: string): Promise<void> {
+    try {
+      await db.installedMarketplaceItems.where("packageId").equals(packageId).delete();
+    } catch (error) {
+      console.error("PersistenceService: Error deleting installed marketplace item:", error);
       throw error;
     }
   }

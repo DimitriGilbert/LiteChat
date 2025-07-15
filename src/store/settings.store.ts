@@ -96,6 +96,28 @@ export interface SettingsState {
   runnableBlocksSecurityCheckEnabled: boolean;
   runnableBlocksSecurityModelId: string | null;
   runnableBlocksSecurityPrompt: string | null;
+  
+  // Auto Tool Selection Settings
+  autoToolSelectionEnabled: boolean;
+  autoToolSelectionModelId: string | null;
+  autoToolSelectionPrompt: string | null;
+  
+  // Text Trigger Settings
+  textTriggersEnabled: boolean;
+  textTriggerStartDelimiter: string;
+  textTriggerEndDelimiter: string;
+  
+  // Config Sync Settings
+  configSyncEnabled: boolean;
+  configSyncRepoId: string | null;
+  configSyncAutoSync: boolean;
+  configSyncIncludeSettings: boolean;
+  configSyncIncludeRules: boolean;
+  configSyncIncludePromptTemplates: boolean;
+  configSyncIncludeAgents: boolean;
+  configSyncIncludeWorkflows: boolean;
+  configSyncIncludeMcpServers: boolean;
+  configSyncLastSyncedAt: string | null;
 }
 
 interface SettingsActions {
@@ -146,6 +168,28 @@ interface SettingsActions {
   setRunnableBlocksSecurityCheckEnabled: (enabled: boolean) => void;
   setRunnableBlocksSecurityModelId: (modelId: string | null) => void;
   setRunnableBlocksSecurityPrompt: (prompt: string | null) => void;
+  
+  // Auto Tool Selection Actions
+  setAutoToolSelectionEnabled: (enabled: boolean) => void;
+  setAutoToolSelectionModelId: (modelId: string | null) => void;
+  setAutoToolSelectionPrompt: (prompt: string | null) => void;
+  
+  // Text Trigger Actions
+  setTextTriggersEnabled: (enabled: boolean) => void;
+  setTextTriggerDelimiters: (start: string, end: string) => void;
+  
+  // Config Sync Actions
+  setConfigSyncEnabled: (enabled: boolean) => void;
+  setConfigSyncRepoId: (repoId: string | null) => void;
+  setConfigSyncAutoSync: (enabled: boolean) => void;
+  setConfigSyncIncludeSettings: (include: boolean) => void;
+  setConfigSyncIncludeRules: (include: boolean) => void;
+  setConfigSyncIncludePromptTemplates: (include: boolean) => void;
+  setConfigSyncIncludeAgents: (include: boolean) => void;
+  setConfigSyncIncludeWorkflows: (include: boolean) => void;
+  setConfigSyncIncludeMcpServers: (include: boolean) => void;
+  setConfigSyncLastSyncedAt: (timestamp: string | null) => void;
+  
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
   resetAssistantSettings: () => Promise<void>;
@@ -200,6 +244,29 @@ const DEFAULT_RUNNABLE_BLOCKS_SECURITY_MODEL_ID = null;
 const DEFAULT_RUNNABLE_BLOCKS_SECURITY_PROMPT =
   "Analyze the following code for potential security risks or malicious behavior. Respond with ONLY a number from 0 to 100 where:\n- 0-30: Safe code (reading data, basic calculations, simple DOM manipulation)\n- 31-60: Moderate risk (file operations, network requests, eval usage)\n- 61-90: High risk (system commands, dangerous APIs, potential privacy violations)\n- 91-100: Extremely dangerous (malware, destructive operations, clear security threats)\n\nCode to analyze:\n{{code}}\n\nReturn only the numeric risk score (0-100).";
 
+// Auto Tool Selection Settings
+const DEFAULT_AUTO_TOOL_SELECTION_ENABLED = false;
+const DEFAULT_AUTO_TOOL_SELECTION_MODEL_ID = null;
+const DEFAULT_AUTO_TOOL_SELECTION_PROMPT = 
+  "Analyze the following user prompt and the list of available tools. Select the most relevant tools that would help accomplish the user's task. Respond with ONLY a JSON string array of the selected tool names, for example: [\"tool1\", \"tool2\"]. Do not include any other text, explanation, or markdown formatting.\n\nUSER PROMPT:\n{{prompt}}\n\nAVAILABLE TOOLS:\n{{tools}}";
+
+// Text Trigger Settings  
+const DEFAULT_TEXT_TRIGGERS_ENABLED = true;
+const DEFAULT_TEXT_TRIGGER_START_DELIMITER = "@.";
+const DEFAULT_TEXT_TRIGGER_END_DELIMITER = ";";
+
+// Config Sync Settings
+const DEFAULT_CONFIG_SYNC_ENABLED = false;
+const DEFAULT_CONFIG_SYNC_REPO_ID = null;
+const DEFAULT_CONFIG_SYNC_AUTO_SYNC = false;
+const DEFAULT_CONFIG_SYNC_INCLUDE_SETTINGS = true;
+const DEFAULT_CONFIG_SYNC_INCLUDE_RULES = true;
+const DEFAULT_CONFIG_SYNC_INCLUDE_PROMPT_TEMPLATES = true;
+const DEFAULT_CONFIG_SYNC_INCLUDE_AGENTS = true;
+const DEFAULT_CONFIG_SYNC_INCLUDE_WORKFLOWS = true;
+const DEFAULT_CONFIG_SYNC_INCLUDE_MCP_SERVERS = true;
+const DEFAULT_CONFIG_SYNC_LAST_SYNCED_AT = null;
+
 // Add a static array of all SettingsState keys for robust, type-safe enumeration
 export const SETTINGS_KEYS: (keyof SettingsState)[] = [
   "theme",
@@ -245,6 +312,22 @@ export const SETTINGS_KEYS: (keyof SettingsState)[] = [
   "runnableBlocksSecurityCheckEnabled",
   "runnableBlocksSecurityModelId",
   "runnableBlocksSecurityPrompt",
+  "autoToolSelectionEnabled",
+  "autoToolSelectionModelId", 
+  "autoToolSelectionPrompt",
+  "textTriggersEnabled",
+  "textTriggerStartDelimiter",
+  "textTriggerEndDelimiter",
+  "configSyncEnabled",
+  "configSyncRepoId",
+  "configSyncAutoSync",
+  "configSyncIncludeSettings",
+  "configSyncIncludeRules",
+  "configSyncIncludePromptTemplates",
+  "configSyncIncludeAgents",
+  "configSyncIncludeWorkflows",
+  "configSyncIncludeMcpServers",
+  "configSyncLastSyncedAt",
 ];
 
 const persistSetting = async <K extends keyof SettingsState>(
@@ -301,6 +384,28 @@ export const useSettingsStore = create(
     runnableBlocksSecurityCheckEnabled: DEFAULT_RUNNABLE_BLOCKS_SECURITY_CHECK_ENABLED,
     runnableBlocksSecurityModelId: DEFAULT_RUNNABLE_BLOCKS_SECURITY_MODEL_ID,
     runnableBlocksSecurityPrompt: DEFAULT_RUNNABLE_BLOCKS_SECURITY_PROMPT,
+    
+    // Auto Tool Selection Settings
+    autoToolSelectionEnabled: DEFAULT_AUTO_TOOL_SELECTION_ENABLED,
+    autoToolSelectionModelId: DEFAULT_AUTO_TOOL_SELECTION_MODEL_ID,
+    autoToolSelectionPrompt: DEFAULT_AUTO_TOOL_SELECTION_PROMPT,
+    
+    // Text Trigger Settings
+    textTriggersEnabled: DEFAULT_TEXT_TRIGGERS_ENABLED,
+    textTriggerStartDelimiter: DEFAULT_TEXT_TRIGGER_START_DELIMITER,
+    textTriggerEndDelimiter: DEFAULT_TEXT_TRIGGER_END_DELIMITER,
+    
+    // Config Sync Settings
+    configSyncEnabled: DEFAULT_CONFIG_SYNC_ENABLED,
+    configSyncRepoId: DEFAULT_CONFIG_SYNC_REPO_ID,
+    configSyncAutoSync: DEFAULT_CONFIG_SYNC_AUTO_SYNC,
+    configSyncIncludeSettings: DEFAULT_CONFIG_SYNC_INCLUDE_SETTINGS,
+    configSyncIncludeRules: DEFAULT_CONFIG_SYNC_INCLUDE_RULES,
+    configSyncIncludePromptTemplates: DEFAULT_CONFIG_SYNC_INCLUDE_PROMPT_TEMPLATES,
+    configSyncIncludeAgents: DEFAULT_CONFIG_SYNC_INCLUDE_AGENTS,
+    configSyncIncludeWorkflows: DEFAULT_CONFIG_SYNC_INCLUDE_WORKFLOWS,
+    configSyncIncludeMcpServers: DEFAULT_CONFIG_SYNC_INCLUDE_MCP_SERVERS,
+    configSyncLastSyncedAt: DEFAULT_CONFIG_SYNC_LAST_SYNCED_AT,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -553,6 +658,91 @@ export const useSettingsStore = create(
       set({ runnableBlocksSecurityPrompt: prompt });
       persistSetting("runnableBlocksSecurityPrompt", prompt);
       emitter.emit(settingsEvent.runnableBlocksSecurityPromptChanged, { prompt });
+    },
+    
+    // Auto Tool Selection Actions
+    setAutoToolSelectionEnabled: (enabled) => {
+      set({ autoToolSelectionEnabled: enabled });
+      persistSetting("autoToolSelectionEnabled", enabled);
+      emitter.emit(settingsEvent.autoToolSelectionEnabledChanged, { enabled });
+    },
+    setAutoToolSelectionModelId: (modelId) => {
+      set({ autoToolSelectionModelId: modelId });
+      persistSetting("autoToolSelectionModelId", modelId);
+      emitter.emit(settingsEvent.autoToolSelectionModelIdChanged, { modelId });
+    },
+    setAutoToolSelectionPrompt: (prompt) => {
+      set({ autoToolSelectionPrompt: prompt });
+      persistSetting("autoToolSelectionPrompt", prompt);
+      emitter.emit(settingsEvent.autoToolSelectionPromptChanged, { prompt });
+    },
+    
+    // Text Trigger Actions
+    setTextTriggersEnabled: (enabled) => {
+      set({ textTriggersEnabled: enabled });
+      persistSetting("textTriggersEnabled", enabled);
+      emitter.emit(settingsEvent.textTriggersEnabledChanged, { enabled });
+    },
+    setTextTriggerDelimiters: (start, end) => {
+      set((state) => {
+        state.textTriggerStartDelimiter = start;
+        state.textTriggerEndDelimiter = end;
+      });
+      persistSetting("textTriggerStartDelimiter", start);
+      persistSetting("textTriggerEndDelimiter", end);
+      emitter.emit(settingsEvent.textTriggerDelimitersChanged, { start, end });
+    },
+    
+    // Config Sync Actions
+    setConfigSyncEnabled: (enabled) => {
+      set({ configSyncEnabled: enabled });
+      persistSetting("configSyncEnabled", enabled);
+      emitter.emit(settingsEvent.configSyncEnabledChanged, { enabled });
+    },
+    setConfigSyncRepoId: (repoId) => {
+      set({ configSyncRepoId: repoId });
+      persistSetting("configSyncRepoId", repoId);
+      emitter.emit(settingsEvent.configSyncRepoIdChanged, { repoId });
+    },
+    setConfigSyncAutoSync: (enabled) => {
+      set({ configSyncAutoSync: enabled });
+      persistSetting("configSyncAutoSync", enabled);
+      emitter.emit(settingsEvent.configSyncAutoSyncChanged, { enabled });
+    },
+    setConfigSyncIncludeSettings: (include) => {
+      set({ configSyncIncludeSettings: include });
+      persistSetting("configSyncIncludeSettings", include);
+      emitter.emit(settingsEvent.configSyncIncludeSettingsChanged, { include });
+    },
+    setConfigSyncIncludePromptTemplates: (include: boolean) => {
+      set({ configSyncIncludePromptTemplates: include });
+      persistSetting("configSyncIncludePromptTemplates", include);
+      emitter.emit(settingsEvent.configSyncIncludePromptTemplatesChanged, { include });
+    },
+    setConfigSyncIncludeRules: (include) => {
+      set({ configSyncIncludeRules: include });
+      persistSetting("configSyncIncludeRules", include);
+      emitter.emit(settingsEvent.configSyncIncludeRulesChanged, { include });
+    },
+    setConfigSyncIncludeAgents: (include: boolean) => {
+      set({ configSyncIncludeAgents: include });
+      persistSetting("configSyncIncludeAgents", include);
+      emitter.emit(settingsEvent.configSyncIncludeAgentsChanged, { include });
+    },
+    setConfigSyncIncludeWorkflows: (include: boolean) => {
+      set({ configSyncIncludeWorkflows: include });
+      persistSetting("configSyncIncludeWorkflows", include);
+      emitter.emit(settingsEvent.configSyncIncludeWorkflowsChanged, { include });
+    },
+    setConfigSyncIncludeMcpServers: (include: boolean) => {
+      set({ configSyncIncludeMcpServers: include });
+      persistSetting("configSyncIncludeMcpServers", include);
+      emitter.emit(settingsEvent.configSyncIncludeMcpServersChanged, { include });
+    },
+    setConfigSyncLastSyncedAt: (timestamp: string | null) => {
+      set({ configSyncLastSyncedAt: timestamp });
+      persistSetting("configSyncLastSyncedAt", timestamp);
+      emitter.emit(settingsEvent.configSyncLastSyncedAtChanged, { timestamp });
     },
 
     loadSettings: async () => {
@@ -895,6 +1085,36 @@ export const useSettingsStore = create(
           eventName: settingsEvent.setRunnableBlocksSecurityPromptRequest,
           handler: (p: SettingsEventPayloads[typeof settingsEvent.setRunnableBlocksSecurityPromptRequest]) =>
             actions.setRunnableBlocksSecurityPrompt(p.prompt),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoToolSelectionEnabledRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setAutoToolSelectionEnabledRequest]) =>
+            actions.setAutoToolSelectionEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoToolSelectionModelIdRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setAutoToolSelectionModelIdRequest]) =>
+            actions.setAutoToolSelectionModelId(p.modelId),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setAutoToolSelectionPromptRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setAutoToolSelectionPromptRequest]) =>
+            actions.setAutoToolSelectionPrompt(p.prompt),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setTextTriggersEnabledRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setTextTriggersEnabledRequest]) =>
+            actions.setTextTriggersEnabled(p.enabled),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setTextTriggerDelimitersRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setTextTriggerDelimitersRequest]) =>
+            actions.setTextTriggerDelimiters(p.start, p.end),
           storeId,
         },
         {

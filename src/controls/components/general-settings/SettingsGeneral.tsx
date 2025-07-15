@@ -27,6 +27,14 @@ const SettingsGeneralComponent: React.FC = () => {
     enableAutoScrollOnStream: z.boolean(),
     streamingRenderFPS: z.number().min(3, t('generalSettings.validation.minFps')).max(60, t('generalSettings.validation.maxFps')),
     autoScrollInterval: z.number().min(50, t('generalSettings.validation.minMs')).max(5000, t('generalSettings.validation.maxMs')),
+    
+    // Auto Tool Selection Settings
+    autoToolSelectionEnabled: z.boolean(),
+    
+    // Text Trigger Settings
+    textTriggersEnabled: z.boolean(),
+    textTriggerStartDelimiter: z.string().min(1),
+    textTriggerEndDelimiter: z.string().min(1),
   });
 
   const storeSetters = useSettingsStore(
@@ -41,6 +49,13 @@ const SettingsGeneralComponent: React.FC = () => {
       setEnableAutoScrollOnStream: state.setEnableAutoScrollOnStream,
       setEnableAdvancedSettings: state.setEnableAdvancedSettings,
       resetGeneralSettings: state.resetGeneralSettings,
+      
+      // Auto Tool Selection Setters
+      setAutoToolSelectionEnabled: state.setAutoToolSelectionEnabled,
+      
+      // Text Trigger Setters
+      setTextTriggersEnabled: state.setTextTriggersEnabled,
+      setTextTriggerDelimiters: state.setTextTriggerDelimiters,
     }))
   );
   const storeValues = useSettingsStore(
@@ -53,6 +68,14 @@ const SettingsGeneralComponent: React.FC = () => {
       autoScrollInterval: state.autoScrollInterval,
       enableAutoScrollOnStream: state.enableAutoScrollOnStream,
       enableAdvancedSettings: state.enableAdvancedSettings,
+      
+      // Auto Tool Selection Values
+      autoToolSelectionEnabled: state.autoToolSelectionEnabled,
+      
+      // Text Trigger Values
+      textTriggersEnabled: state.textTriggersEnabled,
+      textTriggerStartDelimiter: state.textTriggerStartDelimiter,
+      textTriggerEndDelimiter: state.textTriggerEndDelimiter,
     }))
   );
 
@@ -67,6 +90,14 @@ const SettingsGeneralComponent: React.FC = () => {
       enableAutoScrollOnStream: storeValues.enableAutoScrollOnStream ?? true,
       streamingRenderFPS: storeValues.streamingRenderFPS ?? 15,
       autoScrollInterval: storeValues.autoScrollInterval ?? 1000,
+      
+      // Auto Tool Selection Defaults
+      autoToolSelectionEnabled: storeValues.autoToolSelectionEnabled ?? false,
+      
+      // Text Trigger Defaults
+      textTriggersEnabled: storeValues.textTriggersEnabled ?? true,
+      textTriggerStartDelimiter: storeValues.textTriggerStartDelimiter ?? "@.",
+      textTriggerEndDelimiter: storeValues.textTriggerEndDelimiter ?? ";",
     },
     validators: {
       onChangeAsync: settingsSchema,
@@ -84,6 +115,13 @@ const SettingsGeneralComponent: React.FC = () => {
       storeSetters.setEnableAutoScrollOnStream(value.enableAutoScrollOnStream);
       storeSetters.setStreamingRenderFPS(value.streamingRenderFPS);
       storeSetters.setAutoScrollInterval(value.autoScrollInterval);
+      
+      // Auto Tool Selection Settings
+      storeSetters.setAutoToolSelectionEnabled(value.autoToolSelectionEnabled);
+      
+      // Text Trigger Settings
+      storeSetters.setTextTriggersEnabled(value.textTriggersEnabled);
+      storeSetters.setTextTriggerDelimiters(value.textTriggerStartDelimiter, value.textTriggerEndDelimiter);
     },
   });
 
@@ -98,6 +136,14 @@ const SettingsGeneralComponent: React.FC = () => {
       enableAutoScrollOnStream: storeValues.enableAutoScrollOnStream ?? true,
       streamingRenderFPS: storeValues.streamingRenderFPS ?? 15,
       autoScrollInterval: storeValues.autoScrollInterval ?? 1000,
+      
+      // Auto Tool Selection Reset Values
+      autoToolSelectionEnabled: storeValues.autoToolSelectionEnabled ?? false,
+      
+      // Text Trigger Reset Values
+      textTriggersEnabled: storeValues.textTriggersEnabled ?? true,
+      textTriggerStartDelimiter: storeValues.textTriggerStartDelimiter ?? "@.",
+      textTriggerEndDelimiter: storeValues.textTriggerEndDelimiter ?? ";",
     });
   }, [
     storeValues.enableStreamingMarkdown,
@@ -107,6 +153,10 @@ const SettingsGeneralComponent: React.FC = () => {
     storeValues.enableAutoScrollOnStream,
     storeValues.streamingRenderFPS,
     storeValues.autoScrollInterval,
+    storeValues.autoToolSelectionEnabled,
+    storeValues.textTriggersEnabled,
+    storeValues.textTriggerStartDelimiter,
+    storeValues.textTriggerEndDelimiter,
     form,
   ]);
 
@@ -263,6 +313,76 @@ const SettingsGeneralComponent: React.FC = () => {
             </div>
             <p className={cn("text-sm text-muted-foreground", { 'text-muted-foreground/50': !form.state.values.enableAutoScrollOnStream })}>
               {t('generalSettings.autoScrollIntervalDescription')}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <h3 className="text-lg font-medium">Auto Tool Selection</h3>
+        
+        <SwitchField
+          form={form}
+          name="autoToolSelectionEnabled"
+          label="Enable Automatic Tool Selection"
+          description="Allow AI to automatically select relevant tools based on your prompt content."
+        />
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <h3 className="text-lg font-medium">Text Triggers</h3>
+        
+        <SwitchField
+          form={form}
+          name="textTriggersEnabled"
+          label="Enable Text Triggers"
+          description="Allow inline commands in prompts using trigger syntax (e.g., @.tools.activate websearch;)."
+        />
+
+        {storeValues.enableAdvancedSettings && (
+          <div className="rounded-lg border p-3 shadow-sm space-y-3">
+            <h4 className="text-sm font-medium">Trigger Delimiters</h4>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="textTriggerStartDelimiter" className="block text-sm font-medium mb-1">
+                  Start Delimiter
+                </label>
+                <form.Field name="textTriggerStartDelimiter" children={(field) => (
+                  <input
+                    id="textTriggerStartDelimiter"
+                    type="text"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-input rounded-md text-sm"
+                    placeholder="@."
+                  />
+                )} />
+              </div>
+              
+              <div>
+                <label htmlFor="textTriggerEndDelimiter" className="block text-sm font-medium mb-1">
+                  End Delimiter
+                </label>
+                <form.Field name="textTriggerEndDelimiter" children={(field) => (
+                  <input
+                    id="textTriggerEndDelimiter"
+                    type="text"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-input rounded-md text-sm"
+                    placeholder=";"
+                  />
+                )} />
+              </div>
+            </div>
+            
+            <p className="text-sm text-muted-foreground">
+              Customize the delimiters used for text triggers. Default: @.namespace.method args;
             </p>
           </div>
         )}

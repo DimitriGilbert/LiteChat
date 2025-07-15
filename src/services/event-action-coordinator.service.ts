@@ -19,6 +19,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import { usePromptTemplateStore } from "@/store/prompt-template.store";
 import { useMcpStore } from "@/store/mcp.store";
 import { useWorkflowStore } from "@/store/workflow.store";
+import { useMarketplaceStore } from "@/store/marketplace.store";
 
 // Array of all store hooks that have the getRegisteredActionHandlers method
 const storesWithActionHandlers = [
@@ -37,6 +38,7 @@ const storesWithActionHandlers = [
   usePromptTemplateStore,
   useMcpStore,
   useWorkflowStore,
+  useMarketplaceStore,
 ];
 
 export class EventActionCoordinatorService {
