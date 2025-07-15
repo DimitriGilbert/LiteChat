@@ -26,6 +26,7 @@ import { configSyncService } from "@/services/config-sync.service";
 import type { SyncStatus } from "@/types/litechat/sync";
 import { useTranslation } from "react-i18next";
 import { useFormedible } from "@/hooks/use-formedible";
+import { fs } from "@zenfs/core";
 
 const SettingsConfigSyncComponent: React.FC = () => {
   const { t } = useTranslation('settings');
@@ -86,6 +87,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
         description: t('configSync.repository.description'),
         placeholder: t('configSync.repository.placeholder'),
         conditional: (values) => !!values.configSyncEnabled,
+        // TODO replace when formedible updated
         options: syncRepos.map(repo => repo.id)
       },
       {
@@ -140,7 +142,7 @@ const SettingsConfigSyncComponent: React.FC = () => {
     }
 
     try {
-      const fsInstance = (await import("@zenfs/core")).fs;
+      const fsInstance = fs;
       await configSyncService.syncConfiguration(
         fsInstance,
         selectedRepo,
