@@ -634,16 +634,26 @@ export const WorkflowService = {
       }
 
       // Compile step prompt with array item as context
-      const parallelOnKey = parentStep.parallelOn?.split('.').pop();
-      if (!parallelOnKey) {
-        throw new Error(`Invalid parallelOn format: ${parentStep.parallelOn}`);
-      }
-      
-      const arrayItemContext = {
-        [parallelOnKey]: arrayItem,
+      // Build context that allows direct access to array item properties
+      let arrayItemContext: Record<string, any> = {
         branchIndex,
         totalBranches
       };
+
+      // If array item is an object, spread its properties directly into context
+      // This allows templates to use {{title}} instead of {{items[0].title}}
+      if (arrayItem && typeof arrayItem === 'object' && !Array.isArray(arrayItem)) {
+        arrayItemContext = {
+          ...arrayItemContext,
+          ...arrayItem
+        };
+      } else {
+        // For primitive values, use a safe key name
+        arrayItemContext.item = arrayItem;
+      }
+
+      // Also provide the full array item under a safe 'currentItem' key for backward compatibility
+      arrayItemContext.currentItem = arrayItem;
 
       const compiled = await WorkflowService._compileStepPrompt(branchStep, run, stepIndex, arrayItemContext);
 

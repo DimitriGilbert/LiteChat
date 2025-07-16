@@ -153,13 +153,13 @@ export class AIService {
         finalReasoning = Array.isArray(reasoningArray) 
           ? reasoningArray.map(r => r.text).join('\n')
           : reasoningArray;
-        console.log(
-          `[AIService] Extracted final reasoning for ${interactionId}`,
-        );
-      } else {
-        console.log(
-          `[AIService] No final reasoning found in stream result for ${interactionId}.`,
-        );
+      //   console.log(
+      //     `[AIService] Extracted final reasoning for ${interactionId}`,
+      //   );
+      // } else {
+      //   console.log(
+      //     `[AIService] No final reasoning found in stream result for ${interactionId}.`,
+      //   );
       }
 
       // Call onFinish callback *after* the stream is done
