@@ -1,0 +1,79 @@
+# LiteChat Workflow Engine (for LLMs)
+
+## Overview
+The workflow engine in LiteChat enables multi-step, event-driven orchestration of AI, tool, and human-in-the-loop (HITL) steps. It supports advanced branching, parallelism, sub-workflows, agent/task logic, and full prompt/template integration.
+
+---
+
+## Workflow Template Structure
+- **WorkflowTemplate**: (see `src/types/litechat/workflow.ts`)
+  - `id`, `name`, `description`, `steps[]`, `triggerPrompt`, `triggerType`, `triggerRef`, etc.
+  - Each step: `WorkflowStep` (type, name, templateId, transformMappings, parallelOn, subWorkflowTemplateId, etc.)
+
+---
+
+## Step Types
+- **Prompt Step**: Runs a prompt template (with variable injection, model selection)
+- **Transform Step**: Maps/reshapes outputs using JSONPath/static values for next step
+- **Parallel Step**: Runs a step for each item in an array (race/branching)
+- **Sub-Workflow Step**: Runs another workflow as a step, with input mapping
+- **Agent-Task Step**: Runs a task template as part of an agent workflow
+- **Custom Prompt Step**: Inline prompt content/variables (no templateId)
+- **Human-in-the-Loop (HITL) Step**: Pauses for user input/approval
+
+---
+
+## Orchestration Logic
+- **File**: `src/services/workflow.service.ts`
+- **Initialization**: `WorkflowService.initialize()` sets up event listeners
+- **Start**: `handleWorkflowStartRequest(payload)` triggers workflow run
+- **Main Orchestration**: `handleWorkflowConversion(prompt, conversationId, config)` creates main interaction, run, and flow content
+- **Step Execution**:
+  - `createTriggerStep(mainInteraction, run, baseTurnData)` starts the first step
+  - `_executeTransformStep`, `_executeParallelStep`, `_executeSubWorkflowStep` handle advanced step types
+  - `_compileStepPrompt` compiles prompt for each step (loads template, merges context)
+  - `_parseStepOutput` parses/validates structured output
+- **Parallelism**: `_createParallelBranch` and `_waitForBranchCompletion` manage parallel execution and result aggregation
+- **Sub-Workflows**: `_executeSubWorkflowInternal` launches and waits for nested workflow completion
+- **Event-Driven**: All progress, completion, and error handling is event-based (see `workflowEvent.*`)
+
+---
+
+## Flow Visualization
+- **Flow content**: Embedded in stream buffer as markdown+flow block
+- **Flow generator**: `WorkflowFlowGenerator` (see `src/lib/litechat/workflow-flow-generator.ts`)
+- **Status updates**: `_updateStepStatusInFlow`, `_addStepOutputToFlow`, `_finalizeFlowVisualization`
+
+---
+
+## Advanced Patterns
+- **Dynamic context**: Each step receives outputs from all previous steps (via `_buildTransformContext`)
+- **JSONPath mapping**: Transform and sub-workflow steps use JSONPath/static values for flexible data flow
+- **Structured output**: Steps can require/validate structured output (schema auto-generated from template variables)
+- **Manual/auto branching**: Parallel steps can race models, process arrays, or branch on custom logic
+- **Timeouts and error handling**: All async steps have timeouts and robust error propagation
+- **Persistence**: All runs, steps, and outputs are persisted via `PersistenceService`
+
+---
+
+## Event Integration
+- **Events**: `workflowEvent.*`, `interactionEvent.*` (see `src/types/litechat/events/`)
+- **Stores**: `useWorkflowStore`, `useInteractionStore`, etc. (see `src/store/`)
+- **UI**: Workflow builder, visualizer, and step config components (see `src/controls/components/workflow/`)
+
+---
+
+## Extension Guidance for LLMs
+- To add new step types, extend `WorkflowStep` and update orchestration logic
+- To add new orchestration patterns, implement new event handlers and step executors
+- For advanced flows, leverage parallel, sub-workflow, and transform steps
+- For prompt integration, see `llm.prompt-system.txt`
+- For persistence, see `llm.persistence.txt` (to be created)
+
+---
+
+## Key Files
+- Engine: `src/services/workflow.service.ts`
+- Types: `src/types/litechat/workflow.ts`, `src/types/litechat/prompt-template.ts`, `src/types/litechat/prompt.ts`
+- Flow: `src/lib/litechat/workflow-flow-generator.ts`
+- UI: `src/controls/components/workflow/`, `src/controls/modules/WorkflowBlockRendererModule.ts` 

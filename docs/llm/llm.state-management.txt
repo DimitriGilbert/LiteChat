@@ -1,0 +1,57 @@
+# LiteChat State Management with Zustand (for LLMs)
+
+## Overview
+- All state is managed with Zustand + Immer (see `src/store/`)
+- Each domain (conversation, interaction, provider, settings, etc.) has its own store
+- Stores are event-driven: actions are triggered by events, not direct calls
+
+## Store Structure Pattern
+- Each store is a Zustand slice with Immer for immutable updates
+- State and actions are defined together
+- Each store implements `getRegisteredActionHandlers()` to map events to actions
+- Example pattern:
+```typescript
+export const useExampleStore = create(
+  immer<ExampleState & ExampleActions>((set, get) => ({
+    // State properties
+    data: [],
+    loading: false,
+    error: null,
+    // Action methods
+    loadData: async () => { ... },
+    // Event integration
+    getRegisteredActionHandlers: () => [
+      { eventName: exampleEvent.loadDataRequest, handler: () => get().loadData(), storeId: "exampleStore" },
+    ],
+  }))
+);
+```
+
+## Event Integration
+- All actions are triggered by events (see `llm.events.txt`)
+- The `EventActionCoordinatorService` (see `src/services/event-action-coordinator.service.ts`) connects events to store actions at app startup
+- Stores register their action handlers via `getRegisteredActionHandlers()`
+
+## Key Stores (see `src/store/`)
+- `conversation.store.ts`: Conversations, projects, selection state, Git sync
+- `interaction.store.ts`: Messages/interactions, streaming, parent-child, race conditions
+- `provider.store.ts`: AI provider configs, API keys, model selection
+- `settings.store.ts`: Global app settings, control rule preferences, Git user config
+- `vfs.store.ts`: Virtual File System state, file/folder tree, context switching
+- `project.store.ts`: Project hierarchy, settings inheritance
+- `prompt-template.store.ts`: Prompt templates, agents, tasks, compilation
+- `mcp.store.ts`: MCP server configs, connection status, tool discovery
+- `control.store.ts`: Central registry for all Control Module registrations
+- `rules.store.ts`: User-defined rules/tags, always-on logic
+
+## Extension Pattern
+- To add a new store:
+  1. Create `src/store/<domain>.store.ts` with Zustand + Immer
+  2. Implement state, actions, and `getRegisteredActionHandlers()`
+  3. Register with `EventActionCoordinatorService`
+- To add new actions, add event handlers and update the event domain as needed
+
+## For LLMs: To reason about or extend state management, reference:
+- `src/store/` (for all stores)
+- `src/services/event-action-coordinator.service.ts`
+- `src/types/litechat/events/` (for event domains) 

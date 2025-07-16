@@ -1,0 +1,82 @@
+# LiteChat Web Search & External Tools (for LLMs)
+
+## Overview
+LiteChat integrates web search, file system, block rendering, AI image generation, and Model Context Protocol (MCP) tools into a unified, event-driven tool orchestration system. All tools are modular, extensible, and event-integrated.
+
+---
+
+## Web Search Service
+- **File**: `src/services/websearch.service.ts`
+- **Class**: `WebSearchService`
+  - `searchWeb(query, options)`: DuckDuckGo search with caching, deduplication, relevance filtering
+  - `searchImages(query, options)`: DuckDuckGo image search
+  - `batchSearch(queries, options)`: Batch/rate-limited search
+  - `extractPageContent(url)`, `batchExtractContent(urls)`: Markdown extraction from URLs
+  - **Caching**: In-memory, TTL, deduplication, cache stats/clear
+  - **Quality metrics**: Relevance, credibility, freshness, uniqueness
+
+---
+
+## Block Renderer Service
+- **File**: `src/services/block-renderer.service.ts`
+- **Class**: `BlockRendererService`
+  - `findRendererForLanguage(lang, renderers)`: Selects best renderer by language/priority
+  - `renderBlock(context)`: Renders code block using registered renderer
+  - `getRegisteredRenderers()`, `hasRendererForLanguage(lang)`
+  - **Integration**: Used for streaming, tool output, and universal block rendering
+
+---
+
+## AI Image Generation
+- **File**: `src/services/ai-image-generation.service.ts`
+- **Class**: `AiImageGenerationService`
+  - `generateImage(request)`: (Planned) Generates images using provider models (DALL-E, SD, etc.)
+  - **Current**: Throws if no image models available; placeholder for future provider support
+
+---
+
+## VFS Tools Module
+- **File**: `src/controls/modules/VfsToolsModule.ts`
+- **Class**: `VfsToolsModule` (ControlModule)
+  - Registers VFS tools: `vfsListFiles`, `vfsReadFile`, `vfsWriteFile`, `vfsDelete`, `vfsCreateDirectory`, `vfsRename`
+  - **Schemas**: All tool inputs validated with Zod
+  - **Context**: Tools operate on VFS instance in chat context
+  - **Integration**: Tools registered with AI SDK for LLM access
+
+---
+
+## MCP Tools Module
+- **File**: `src/controls/modules/McpToolsModule.ts`
+- **Class**: `McpToolsModule` (ControlModule)
+  - Manages MCP client connections (streamable HTTP, SSE, stdio)
+  - Dynamically registers tools from connected MCP servers
+  - Handles retry logic, connection status, event-driven reconnection
+  - **Public API**: `registerMcpToolWithAI`, `unregisterMcpToolFromAI`, `getConnectionStatus`, `retryServerConnection`
+  - **Event integration**: Listens for server changes, emits connection/tool events
+  - **Extension**: New tools can be added by MCP servers and are auto-registered
+
+---
+
+## Orchestration & Integration Patterns
+- **All tools** are registered via ControlModules and exposed to the AI SDK
+- **Event-driven**: Tool registration, execution, and status are managed via events and stores
+- **Streaming output**: BlockRendererService used for tool output rendering
+- **VFS and MCP**: Both support batch operations, error handling, and context-aware execution
+
+---
+
+## Extension Guidance for LLMs
+- To add new tools, implement a ControlModule and register with the AI SDK
+- For web search/image tools, extend `WebSearchService` or `AiImageGenerationService`
+- For VFS/MCP, add new tool schemas and handlers in the respective modules
+- For output rendering, register new block renderers and update BlockRendererService
+- For event integration, emit/listen for tool events as needed
+
+---
+
+## Key Files
+- Web Search: `src/services/websearch.service.ts`
+- Block Renderer: `src/services/block-renderer.service.ts`
+- Image Generation: `src/services/ai-image-generation.service.ts`
+- VFS Tools: `src/controls/modules/VfsToolsModule.ts`
+- MCP Tools: `src/controls/modules/McpToolsModule.ts` 

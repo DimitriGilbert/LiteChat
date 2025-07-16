@@ -1,0 +1,48 @@
+# LiteChat AI Integration Architecture (for LLMs)
+
+## Overview
+- AI integration is handled via the Vercel AI SDK (see `ai` package imports)
+- Supports multiple providers: OpenAI, OpenRouter, Google, Ollama, OpenAI-compatible, local, etc.
+- All AI operations are event-driven and modular
+
+## AI Service (see `src/services/ai.service.ts`)
+- `AIService.executeInteraction(interactionId, options, callbacks)`
+  - Streams text, tool calls, reasoning, and step events
+  - Handles aborts, errors, and OpenRouter quirks
+  - Calls `streamText` from the AI SDK
+- `AIService.generateCompletion(options)`
+  - Non-streaming text completion
+
+## Provider Management (see `src/store/provider.store.ts`)
+- Zustand store for all provider configs, API keys, model selection
+- Loads configs and keys from `PersistenceService`
+- Handles model selection, API key management, and enabled model lists
+- Provides helpers for model config lookup, instantiation, and sorting
+- All actions are event-driven (see `providerEvent`)
+
+## Model Fetching (see `src/services/model-fetcher.ts`)
+- `fetchModelsForProvider(config, apiKey)` fetches available models for a provider
+- Supports OpenAI, OpenRouter, Ollama, OpenAI-compatible, Google
+- Maps all models to a unified `OpenRouterModel` structure
+- Uses in-memory cache for efficiency
+
+## AI Image Generation (see `src/services/ai-image-generation.service.ts`)
+- `AiImageGenerationService.generateImage(request)`
+  - Checks if the model supports image output
+  - Throws if not supported or not yet implemented
+  - Placeholder for future DALL-E, Stable Diffusion, etc. support
+
+## Streaming & Tool Calls
+- Streaming supports text, reasoning, tool calls, tool input streaming, and step events
+- Callbacks: `onChunk`, `onToolCall`, `onToolResult`, `onReasoningChunk`, `onStepStart`, `onStepFinish`, `onFinish`, `onError`
+
+## Extension Pattern
+- To add a new provider, update `provider.store.ts`, `model-fetcher.ts`, and event domains
+- To add new model types or features, extend the AI service and provider store
+
+## For LLMs: To reason about or extend AI integration, reference:
+- `src/services/ai.service.ts`
+- `src/store/provider.store.ts`
+- `src/services/model-fetcher.ts`
+- `src/services/ai-image-generation.service.ts`
+- `src/types/litechat/provider.ts` (for model/provider types) 

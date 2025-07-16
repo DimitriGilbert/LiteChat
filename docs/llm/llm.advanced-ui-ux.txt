@@ -1,0 +1,68 @@
+# LiteChat Advanced UI/UX Patterns (for LLMs)
+
+## Overview
+LiteChat's UI is built for advanced, event-driven, highly interactive workflows. It features live preview, debounced validation, drag-and-drop, visual workflow editing, raw JSON editing, and robust error handling. All forms use TanStack Form via the `useFormedible` abstraction.
+
+---
+
+## Live Preview & Formedible
+- **File**: `src/hooks/use-formedible.tsx`
+- **Hook**: `useFormedible`
+  - Wraps TanStack Form for all forms (prompt, workflow, settings, etc.)
+  - Supports field configs, schema validation (Zod), multi-page forms, custom field components
+  - Live preview via debounced onChange (no re-renders, maintains focus)
+  - Progress, navigation, and page components are customizable
+  - Used in all prompt and workflow forms for consistent UX
+
+---
+
+## Workflow Builder & Visualizer
+- **Files**: `src/controls/components/workflow/WorkflowBuilder.tsx`, `WorkflowVisualizer.tsx`, `WorkflowRawEditor.tsx`
+- **WorkflowBuilder**: Drag-and-drop, multi-tab builder for workflows
+  - Metadata, trigger config, step cards, visualizer, and raw JSON editor
+  - Uses `useFormedible` for all forms (metadata, trigger, step config)
+  - Drag-and-drop via `@dnd-kit/core` and `@dnd-kit/sortable`
+  - Tabbed layout for builder, visualizer, and raw editor (single outer scroll only)
+- **WorkflowVisualizer**: React Flow-based static visualizer
+  - Node/edge rendering, status coloring, icons, model/tool info
+  - Pure display, no processing—data prepared by builder
+- **WorkflowRawEditor**: JSON editor with real-time validation, debounced error display, and save
+  - Only updates parent on save, not on every keystroke
+  - Used for advanced users and debugging
+
+---
+
+## Event-Driven UI Patterns
+- **All UI** is event-driven: emits/handles events for state sync, error reporting, and UI updates
+- **TabbedLayout**: (see `src/controls/components/LiteChat/common/TabbedLayout.tsx`)
+  - Only outermost container is scrollable (no nested scrollbars)
+  - Used for workflow builder, prompt library, and other multi-tab UIs
+- **ActionTooltipButton**: (see `src/controls/components/LiteChat/common/ActionTooltipButton.tsx`)
+  - Used for all action buttons with tooltips, event-driven actions
+
+---
+
+## Error Handling & Race Condition Management
+- **MCP Store**: `src/store/mcp.store.ts`
+  - All connection, retry, and error state is managed in the store
+  - Emits events for connection changes, errors, and tool status
+  - All async actions have robust error handling and retry logic
+- **UI**: All forms and editors display errors in real-time, with debounced validation and clear feedback
+- **Workflow/Prompt**: All async actions (save, compile, run) have error toasts and rollback logic
+
+---
+
+## Extension Guidance for LLMs
+- To add new forms, use `useFormedible` for consistent UX and validation
+- For new workflow UIs, use builder/visualizer/raw editor patterns
+- For event-driven UI, emit/handle events for all state changes
+- For error handling, always display errors in UI and emit error events
+- For advanced UX, use debounced validation, drag-and-drop, and live preview
+
+---
+
+## Key Files
+- Form: `src/hooks/use-formedible.tsx`
+- Workflow: `src/controls/components/workflow/WorkflowBuilder.tsx`, `WorkflowVisualizer.tsx`, `WorkflowRawEditor.tsx`
+- UI: `src/controls/components/LiteChat/common/TabbedLayout.tsx`, `ActionTooltipButton.tsx`
+- Error Handling: `src/store/mcp.store.ts` 

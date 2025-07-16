@@ -1,0 +1,46 @@
+# LiteChat Virtual File System (VFS) Architecture (for LLMs)
+
+## Overview
+- Browser-based VFS using ZenFS with IndexedDB backend (see `src/lib/litechat/vfs-operations.ts`)
+- All VFS operations run in a dedicated worker for performance
+- Supports multiple VFS contexts: project, orphan, sync repos
+
+## VFS Context Switching
+- VFS operates with different contexts:
+  - **Project VFS**: `vfsKey = projectId` — project-specific filesystem
+  - **Orphan VFS**: `vfsKey = "orphan"` — for conversations without projects
+  - **Sync VFS**: `vfsKey = "sync_repos"` — for Git repositories
+
+## Core Operations (see `src/lib/litechat/vfs-operations.ts`)
+- `initializeFsOp(vfsKey: string): Promise<typeof fs | null>` — initialize VFS for context
+- `writeFileOp(path: string, content: ArrayBuffer | string, opts?)`
+- `readFileOp(path: string, opts?)`
+- `deleteItemOp(path: string, recursive?: boolean, opts?)`
+- `createDirectoryOp(path: string, opts?)`
+- `listFilesOp(path: string, opts?)`
+- All operations accept an optional `fsInstance` for context
+
+## VFS Store Integration (see `src/store/vfs.store.ts`)
+- Manages VFS state and coordinates operations
+- State includes:
+  - `nodes: Record<string, VfsNode>` — file/folder tree
+  - `childrenMap: Record<string, string[]>` — parent-child relationships
+  - `rootId: string | null` — root directory node ID
+  - `currentParentId: string | null`
+  - `selectedFileIds: Set<string>`
+  - `fs: typeof fs | null` — ZenFS instance
+  - `vfsKey: string | null` — current VFS context
+  - `configuredVfsKey: string | null` — active VFS context
+
+## VFS Events
+- All VFS actions and state changes are event-driven (see `vfs.events.ts`)
+- Example events: `vfsKeyChanged`, `nodesUpdated`, `fileWritten`, `fileRead`, `fileDeleted`, etc.
+
+## Extension Pattern
+- To add new VFS operations, extend `vfs-operations.ts` and update the VFS worker
+- To add new VFS state or actions, update `vfs.store.ts` and register new event handlers
+
+## For LLMs: To reason about or extend VFS, reference:
+- `src/lib/litechat/vfs-operations.ts`
+- `src/store/vfs.store.ts`
+- `src/types/litechat/events/vfs.events.ts` 

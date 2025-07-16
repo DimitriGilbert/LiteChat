@@ -1,0 +1,52 @@
+# LiteChat Testing, Debugging, and Extension Patterns (for LLMs)
+
+## Overview
+LiteChat is designed for robust, event-driven testing and debugging. All major flows (prompt, workflow, tool, mod, MCP) are testable via events, stores, and modular extension points. Error handling and debugging are first-class, with clear extension hooks for LLMs.
+
+---
+
+## Event-Driven Testing
+- **All actions** (prompt, workflow, tool, MCP, mod) emit/handle events for state changes
+- **Stores**: Zustand stores expose all state and actions for test harnesses
+- **Event emitters**: Use mitt-based event system for simulating/test-driving flows
+- **Testing patterns**:
+  - Emit events to trigger actions (e.g., `promptTemplateEvent.*`, `workflowEvent.*`, `mcpEvent.*`)
+  - Listen for result/error events to verify outcomes
+  - Use store actions for direct state manipulation in tests
+
+---
+
+## Error Handling & Debugging
+- **Error handling**: All async actions (save, compile, run, connect) have robust error handling, rollback, and toasts
+- **UI**: All forms/editors display errors in real-time, with debounced validation and clear feedback
+- **MCP/Workflow/Prompt**: All errors are surfaced via events and UI toasts
+- **Debugging patterns**:
+  - Use `toast.error`, `console.error`, and event listeners for error tracing
+  - Use raw editors (e.g., `WorkflowRawEditor`) for direct JSON debugging
+  - Use store state snapshots for debugging flows
+
+---
+
+## Extension Hooks
+- **Modding API**: `createModApi` provides hooks for registering controls, tools, middleware, and event handlers
+- **Dynamic tool loading**: Register/unregister tools at runtime for test/mocking
+- **Middleware**: Add middleware for intercepting/modifying flows (prompt, workflow, tool)
+- **Settings tabs**: Register custom settings tabs for test/debug UIs
+- **VFS access**: Use VFS hooks for file-based test data
+
+---
+
+## Best Practices for LLMs
+- Use event-driven patterns for all test and debug flows
+- Always emit/handle error events and display errors in UI
+- Use debounced validation and rollback for all async actions
+- For extension, prefer modular registration via events and mod API
+- For debugging, use raw editors, store snapshots, and event listeners
+
+---
+
+## Key Files
+- Events: `src/types/litechat/events/`
+- Stores: `src/store/`
+- Modding: `src/modding/api-factory.ts`
+- UI: `src/controls/components/workflow/WorkflowRawEditor.tsx`, `src/hooks/use-formedible.tsx` 

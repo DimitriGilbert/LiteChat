@@ -1,0 +1,78 @@
+# LiteChat Persistence & Recovery (for LLMs)
+
+## Overview
+LiteChat uses a browser-based Dexie.js (IndexedDB) database for all persistence: conversations, interactions, projects, prompt templates, workflows, rules, tags, marketplace, and settings. All CRUD, export/import, and recovery logic is centralized in `PersistenceService`.
+
+---
+
+## Database Schema
+- **File**: `src/lib/litechat/db.ts`
+- **Database**: `LiteChatDatabase` (Dexie v12)
+- **Tables**:
+  - `conversations`, `interactions`, `mods`, `appState`, `providerConfigs`, `apiKeys`, `syncRepos`, `projects`, `rules`, `tags`, `tagRuleLinks`, `promptTemplates`, `workflows`, `marketplaceSources`, `marketplaceIndexes`, `installedMarketplaceItems`
+- **Schema versioning**: Explicit version upgrades for migrations
+
+---
+
+## Entity Types
+- **Conversation, Interaction**: Chat history, streaming, parent/child, rating
+- **Project**: Project metadata, system prompt, model config, tags/rules
+- **PromptTemplate, WorkflowTemplate**: Prompt/task/agent templates, workflows (JSON definition)
+- **Rule, Tag, TagRuleLink**: Prompt/rule/tag system
+- **ProviderConfig, ApiKey**: Model/provider credentials
+- **SyncRepo**: Git/sync integration
+- **Mod**: Control modules
+- **MarketplaceSource, MarketplaceIndex, InstalledMarketplaceItem**: Marketplace integration
+- **AppState**: Settings, MCP servers, etc.
+
+---
+
+## PersistenceService (src/services/persistence.service.ts)
+- **CRUD**: All entities have `load`, `save`, `delete` methods (async, batched)
+- **Bulk operations**: `bulkPut`, `transaction` for atomic updates
+- **Date handling**: `ensureDateFields` normalizes all date fields
+- **Event-driven**: CRUD emits events for store/UI sync
+
+---
+
+## Export/Import & Recovery
+- **FullExportData**: Unified export format (see interface in `persistence.service.ts`)
+- **getAllDataForExport(options)**: Export selected entities/settings
+- **importAllData(data, options)**: Import with selective clearing, ID normalization, and version check
+- **clearAllData/clearTable**: Wipe all or specific tables (for recovery/reset)
+- **Versioning**: Export format versioned (currently `version: 1`)
+- **Marketplace**: Marketplace sources, indexes, and installed items are included in export/import
+
+---
+
+## Marketplace Integration
+- **MarketplaceSources**: Remote package sources
+- **MarketplaceIndexes**: Cached package indexes (with expiry)
+- **InstalledMarketplaceItems**: Installed packages, rules, templates, MCP servers
+- **CRUD**: All marketplace entities have load/save/delete/update methods
+
+---
+
+## Advanced Patterns
+- **Atomic transactions**: All import/export and multi-entity operations use Dexie transactions for consistency
+- **Selective import**: Import can target only specific entity types (e.g., just prompt templates, just workflows)
+- **ID normalization**: Missing IDs are generated on import
+- **Date normalization**: All imported/exported dates are normalized to Date objects
+- **Settings as key-value**: AppState table stores all settings as `{ key, value }`
+- **MCP servers**: Stored as a special appState key (`settings:mcpServers`)
+
+---
+
+## Extension Guidance for LLMs
+- To add new entity types, extend the Dexie schema and add CRUD to `PersistenceService`
+- For new export/import fields, update `FullExportData` and related methods
+- For recovery, use `clearAllData` or `clearTable` as needed
+- For event-driven sync, emit events after CRUD
+- For advanced backup/restore, leverage versioned export/import
+
+---
+
+## Key Files
+- Schema: `src/lib/litechat/db.ts`
+- Service: `src/services/persistence.service.ts`
+- Types: `src/types/litechat/` 

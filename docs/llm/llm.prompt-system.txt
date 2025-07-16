@@ -1,0 +1,98 @@
+# LiteChat Prompt System (for LLMs)
+
+## Overview
+The prompt system in LiteChat is a modular, event-driven architecture for managing, compiling, enhancing, and applying prompt templates. It supports advanced prompt engineering, agent/task/shortcut templates, variable injection, and live preview, with full event and store integration.
+
+---
+
+## Core Types & Interfaces
+- **PromptTemplate, PromptVariable, CompiledPrompt**: `src/types/litechat/prompt-template.ts`
+- **PromptObject, PromptTurnObject**: `src/types/litechat/prompt.ts`
+- **PromptFormData**: `{ [key: string]: any }` (see above)
+
+---
+
+## Prompt Template Structure
+- Each template has:
+  - `id`, `name`, `description`, `prompt` (string with `{{variable}}` placeholders)
+  - `variables`: array of `PromptVariable` (name, type, required, default, description)
+  - `tags`, `tools`, `rules`: for auto-selection
+  - `type`: "prompt" | "task" | "agent" (for agent/task/shortcut logic)
+  - `parentId`: for task/agent hierarchy
+  - `structuredOutput`, `followUps`, `isShortcut`, `isPublic`, timestamps
+
+---
+
+## Prompt Compilation Logic
+- **Core function**: `compilePromptTemplate(template, formData)` in `src/lib/litechat/prompt-util.ts`
+  - Validates required variables, applies defaults, fills placeholders
+  - Serializes arrays/objects, supports flexible spacing in placeholders
+  - Returns `{ content, selectedTools, selectedRules }`
+- **Variable parsing**: `parseVariableValue(value, type)`
+- **Token cost calculation**: `calculateTokenCost(promptTokens, completionTokens, promptPrice, completionPrice)`
+
+---
+
+## Prompt Template Store
+- **File**: `src/store/prompt-template.store.ts`
+- **State**: `promptTemplates`, `loading`, `error`
+- **Actions**:
+  - `loadPromptTemplates`, `addPromptTemplate`, `updatePromptTemplate`, `deletePromptTemplate`
+  - `compilePromptTemplate(templateId, formData)` (calls util)
+  - Helpers: `getTemplatesByType`, `getAgents`, `getTasksForAgent`, `getAvailableFollowUps`
+  - **Event integration**: `getRegisteredActionHandlers()` maps events to actions
+- **Persistence**: Uses `PersistenceService` for DB operations
+
+---
+
+## Prompt Library UI & Module
+- **PromptLibraryControl**: `src/controls/components/prompt/PromptLibraryControl.tsx`
+  - Template selection, search, live preview, variable form (TanStack Form)
+  - Manages template application, settings, and shortcut logic
+- **PromptLibraryControlModule**: `src/controls/modules/PromptLibraryControlModule.ts`
+  - Registers control, event handlers, text trigger namespace (for `/template use ...`)
+  - Methods: `compileTemplate`, `applyTemplate`, `getShortcutTemplates`
+  - Handles direct template application via triggers
+
+---
+
+## Specialized Prompt Controls
+- **RacePromptControl**: `src/controls/components/prompt/RacePromptControl.tsx`
+  - UI for racing multiple models, combining outputs, advanced model selection
+- **ImprovePromptControl**: `src/controls/components/prompt/ImprovePromptControl.tsx`
+  - UI for AI-powered prompt enhancement, model selection, custom system prompt
+  - Emits enhancement events, handles result application
+
+---
+
+## Event Integration
+- All prompt actions are event-driven:
+  - Template CRUD, compilation, and application emit/handle events
+  - Enhancement and race controls emit/handle prompt events
+  - UI and modules subscribe to status and result events for reactivity
+
+---
+
+## Advanced Patterns
+- **Agent/Task/Shortcut Templates**: Use `type`, `parentId`, and `isShortcut` for advanced orchestration
+- **Follow-ups**: Templates can reference others for multi-step flows
+- **Live Preview**: PromptLibraryControl provides real-time preview as variables are filled
+- **Text Triggers**: `/template use <id|name> key=value ...` for direct template application
+- **Formedible**: All forms use TanStack Form via `useFormedible` (see `src/hooks/use-formedible.tsx`)
+
+---
+
+## Key Files
+- Types: `src/types/litechat/prompt-template.ts`, `src/types/litechat/prompt.ts`
+- Store: `src/store/prompt-template.store.ts`
+- Util: `src/lib/litechat/prompt-util.ts`
+- UI: `src/controls/components/prompt/PromptLibraryControl.tsx`, `RacePromptControl.tsx`, `ImprovePromptControl.tsx`
+- Module: `src/controls/modules/PromptLibraryControlModule.ts`
+
+---
+
+## Extension Guidance for LLMs
+- To add new prompt types, extend `PromptTemplateType` and update store/helpers
+- To add new controls, register via a ControlModule and emit/handle prompt events
+- For advanced prompt engineering, leverage variables, rules, tools, and structured output fields
+- For workflow integration, see `llm.workflow-engine.txt` (to be created) 
