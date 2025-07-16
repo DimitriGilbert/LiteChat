@@ -45,8 +45,8 @@ export interface Interaction {
   // Add rating field
   rating?: number | null;
   metadata: Metadata & {
-    promptTokens?: number;
-    completionTokens?: number;
+    inputTokens?: number;
+    outputTokens?: number;
     totalTokens?: number;
     modelId?: string;
     providerId?: string;
