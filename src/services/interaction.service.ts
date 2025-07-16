@@ -1167,8 +1167,8 @@ export const InteractionService = {
       metadata: {
         ...currentMetadata,
         ...(finishDetails?.usage && {
-          inputTokens: finishDetails.usage.inputTokens,
-          outputTokens: finishDetails.usage.outputTokens,
+          promptTokens: finishDetails.usage.inputTokens,
+          completionTokens: finishDetails.usage.outputTokens,
           totalTokens: finishDetails.usage.totalTokens,
         }),
         ...(finishDetails?.providerMetadata && {
