@@ -38,7 +38,7 @@ import {
   type LanguageModelUsage,
   type ProviderMetadata,
   type LanguageModel,
-  type CoreMessage,
+  type ModelMessage,
 } from "ai";
 import type { fs } from "@zenfs/core";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
@@ -51,7 +51,7 @@ import { PromptEnhancementService } from "@/services/prompt-enhancement.service"
 
 interface AIServiceCallOptions {
   model: LanguageModel;
-  messages: CoreMessage[];
+  messages: ModelMessage[];
   abortSignal: AbortSignal;
   system?: string;
   tools?: Record<string, Tool<any>>;

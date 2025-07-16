@@ -3,18 +3,18 @@
 
 import { streamText, generateText, StreamTextResult, LanguageModel } from "ai";
 import type {
-  CoreMessage,
   Tool,
   ToolCallPart,
   ToolResultPart,
   FinishReason,
   LanguageModelUsage,
   ProviderMetadata,
+  ModelMessage,
 } from "ai";
 
 export interface AIServiceCallOptions {
   model: LanguageModel;
-  messages: CoreMessage[];
+  messages: ModelMessage[];
   abortSignal: AbortSignal;
   system?: string;
   tools?: Record<string, Tool<any>>;
@@ -69,10 +69,9 @@ export class AIService {
 
     try {
       // Directly call streamText with the provided options
-      // Store the result promise
       streamResult = await streamText(options);
 
-      // Process the stream parts
+      // Process the stream parts with error handling for OpenRouter bug
       for await (const part of streamResult.fullStream) {
         // Check for abort signal *before* processing the part
         if (options.abortSignal.aborted) {
@@ -83,10 +82,11 @@ export class AIService {
         // Process the stream part based on its type
         switch (part.type) {
           case "text":
+            // AI SDK v5: text parts now use 'text' property directly
             callbacks.onChunk(part.text);
             break;
-          // Handle the reasoning part type directly
           case "reasoning":
+            // AI SDK v5: reasoning parts now use 'text' property directly
             callbacks.onReasoningChunk(part.text);
             break;
           case "tool-call":
@@ -95,16 +95,15 @@ export class AIService {
           case "tool-result":
             callbacks.onToolResult(part as any);
             break;
-          case "start":
-            // Handle start events - these indicate the start of a processing step
+          case "start-step":
+            // Handle start-step events - these indicate the start of a processing step
             if (callbacks.onStepStart) {
               callbacks.onStepStart({
-                messageId: (part as any).messageId,
+                messageId: (part as any).messageId || 'unknown',
                 request: (part as any).request,
                 warnings: (part as any).warnings || []
               });
             }
-            console.log(`[AIService] Step started for ${interactionId} - Message ID: ${(part as any).messageId}`);
             break;
           case "finish-step":
             // Handle finish-step events - these indicate completion of a processing step
@@ -116,31 +115,45 @@ export class AIService {
                 warnings: (part as any).warnings || []
               });
             }
-            console.log(`[AIService] Step finished for ${interactionId} - Reason: ${(part as any).finishReason}, Continued: ${(part as any).isContinued}`);
+            break;
+          case "start":
+            // Stream started
             break;
           case "finish":
             // Store finish details but don't call onFinish yet
             receivedFinishPart = true;
             finalFinishReason = part.finishReason;
+            // AI SDK v5: finish parts now use 'totalUsage' instead of 'usage'
             finalUsage = part.totalUsage;
             finalProviderMetadata = (part as any).providerMetadata;
             break;
           case "error":
-            // SDK provides an error part
+            // SDK provides an error part - handle OpenRouter "text part not found" bug
+            const errorMessage = part.error instanceof Error ? part.error.message : String(part.error);
+            
+            // Check if this is the OpenRouter "text part not found" bug
+            if (typeof errorMessage === 'string' && errorMessage.includes('text part') && errorMessage.includes('not found')) {
+              // console.warn(`[AIService] OpenRouter provider bug detected for ${interactionId}: ${errorMessage}. Continuing stream...`);
+              // Don't stop the stream, just continue processing
+              break;
+            }
+            
+            // For other errors, handle normally
+            console.error(`[AIService] Stream error for ${interactionId}:`, errorMessage, part);
             callbacks.onError(
-              new Error(
-                `AI Stream Error Part: ${part.error instanceof Error ? part.error.message : part.error}`,
-              ),
+              new Error(`AI Stream Error Part: ${errorMessage}`)
             );
-            // Stop processing further parts on SDK error
+            // Stop processing further parts on non-OpenRouter errors
             return;
-          // Ignore other part types for now
+          // Handle other part types
           default:
-            // Log unexpected part types with more context
-            console.warn(
-              `[AIService] Received unexpected stream part type: ${(part as any).type} for ${interactionId}`,
-              part,
-            );
+            // Log unexpected part types but don't spam the console
+            if ((part as any).type && !['source', 'file', 'tool-call-streaming-start', 'tool-call-delta', 'reasoning-part-finish'].includes((part as any).type)) {
+              console.warn(
+                `[AIService] Received unexpected stream part type: ${(part as any).type} for ${interactionId}`,
+                part,
+              );
+            }
             break;
         }
       }
@@ -148,18 +161,8 @@ export class AIService {
       // --- After the stream finishes (or is aborted) ---
 
       // Extract final reasoning from the result object if available
-      if (streamResult?.reasoning) {
-        const reasoningArray = await streamResult.reasoning;
-        finalReasoning = Array.isArray(reasoningArray) 
-          ? reasoningArray.map(r => r.text).join('\n')
-          : reasoningArray;
-      //   console.log(
-      //     `[AIService] Extracted final reasoning for ${interactionId}`,
-      //   );
-      // } else {
-      //   console.log(
-      //     `[AIService] No final reasoning found in stream result for ${interactionId}.`,
-      //   );
+      if (streamResult?.reasoningText) {
+        finalReasoning = await streamResult.reasoningText;
       }
 
       // Call onFinish callback *after* the stream is done
@@ -199,7 +202,7 @@ export class AIService {
   // Generates a non-streaming text completion.
   static async generateCompletion(options: {
     model: LanguageModel;
-    messages: CoreMessage[];
+    messages: ModelMessage[];
     system?: string;
     temperature?: number;
     maxTokens?: number;

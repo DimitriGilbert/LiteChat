@@ -16,7 +16,7 @@ import { useSettingsStore } from "@/store/settings.store";
 import { splitModelId } from "@/lib/litechat/provider-helpers";
 import { toast } from "sonner";
 import type {
-  CoreMessage,
+  ModelMessage,
   ImagePart,
   TextPart,
   ToolCallPart,
@@ -211,9 +211,9 @@ export function processFileMetaToUserContent(
 
 export function buildHistoryMessages(
   historyInteractions: Interaction[]
-): CoreMessage[] {
-  return historyInteractions.flatMap((i): CoreMessage[] => {
-    const msgs: CoreMessage[] = [];
+): ModelMessage[] {
+  return historyInteractions.flatMap((i): ModelMessage[] => {
+    const msgs: ModelMessage[] = [];
     const userPrompt = i.prompt;
     if (userPrompt) {
       const userMessageContentParts: (TextPart | ImagePart)[] = [];
