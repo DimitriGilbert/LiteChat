@@ -154,6 +154,9 @@ export function instantiateModelInstance(
         return createOpenRouter({
           apiKey,
           extraBody: { include_reasoning: true },
+          headers: {
+            'X-Title': 'LiteChat',
+          },
         })(modelId);
       case "ollama":
         // Always ensure /api is present in the base URL
