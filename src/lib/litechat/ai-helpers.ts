@@ -20,6 +20,7 @@ import type {
   ImagePart,
   TextPart,
 } from "ai";
+import { convertToModelMessages } from "ai";
 import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 import { nanoid } from "nanoid";
 import { useInputStore } from "@/store/input.store";
@@ -210,114 +211,119 @@ export function processFileMetaToUserContent(
 export function buildHistoryMessages(
   historyInteractions: Interaction[]
 ): ModelMessage[] {
-  return historyInteractions.flatMap((i): ModelMessage[] => {
-    const msgs: ModelMessage[] = [];
-    const userPrompt = i.prompt;
-    if (userPrompt) {
-      const userMessageContentParts: (TextPart | ImagePart)[] = [];
-      if (userPrompt.content) {
-        userMessageContentParts.push({
-          type: "text",
-          text: userPrompt.content,
-        });
-      }
+  // Filter and process interactions using the same logic as PromptCompilationService
+  const filteredInteractions = historyInteractions
+    .filter((i) => {
+      // Only include main conversation interactions
+      return (
+        i.parentId === null &&
+        i.status === "COMPLETED" &&
+        (i.type === "message.user_assistant" || i.type === "message.assistant_regen")
+      );
+    })
+    .map((activeInteraction) => {
+      // Handle regeneration interactions
       if (
-        userPrompt.metadata?.attachedFiles &&
-        userPrompt.metadata.attachedFiles.length > 0
+        activeInteraction.type === "message.assistant_regen" &&
+        activeInteraction.metadata?.regeneratedFromId
       ) {
-        userPrompt.metadata.attachedFiles.forEach((f) => {
-          userMessageContentParts.push({
-            type: "text",
-            text: `[User attached file: ${f.name}]`,
-          });
-        });
+        const originalInteraction = historyInteractions.find(
+          (orig) => orig.id === activeInteraction.metadata!.regeneratedFromId
+        );
+        if (
+          originalInteraction &&
+          originalInteraction.prompt &&
+          originalInteraction.type === "message.user_assistant"
+        ) {
+          return {
+            ...activeInteraction,
+            prompt: originalInteraction.prompt,
+            type: "message.user_assistant",
+          } as Interaction;
+        }
       }
-      if (userMessageContentParts.length > 0) {
-        msgs.push({ role: "user", content: userMessageContentParts });
+      
+      // Only include interactions with prompts
+      if (
+        activeInteraction.type === "message.user_assistant" &&
+        activeInteraction.prompt
+      ) {
+        return activeInteraction;
       }
-    }
+      
+      return null;
+    })
+    .filter(Boolean) as Interaction[];
 
-    // Build assistant message with response and tool calls
-    const assistantContent: any[] = [];
+  // Convert filtered interactions to UIMessage format
+  const uiMessages: any[] = filteredInteractions.flatMap((i) => {
+    const msgs: any[] = [];
     
-    // Add text response if present
-    if (i.response && typeof i.response === "string") {
-      assistantContent.push({
-        type: "text",
-        text: i.response,
-      });
+    // Add user message
+    if (i.prompt) {
+      const userMessage: any = {
+        id: i.id + "-user",
+        role: "user",
+        content: i.prompt.content || "",
+      };
+      
+      if (i.prompt.metadata?.attachedFiles && i.prompt.metadata.attachedFiles.length > 0) {
+        userMessage.attachments = i.prompt.metadata.attachedFiles.map(f => ({
+          name: f.name,
+          contentType: f.type,
+          url: f.contentBase64 ? `data:${f.type};base64,${f.contentBase64}` : undefined
+        }));
+      }
+      
+      msgs.push(userMessage);
     }
 
-    // Add tool calls if present
-    if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
-      i.metadata.toolCalls.forEach((callStr) => {
-        try {
-          const parsedCall = JSON.parse(callStr);
-          if (
-            parsedCall &&
-            parsedCall.type === "tool-call" &&
-            parsedCall.toolCallId &&
-            parsedCall.toolName &&
-            (parsedCall.args !== undefined || parsedCall.input !== undefined)
-          ) {
-            assistantContent.push(parsedCall);
-          } else {
-            console.warn(
-              "[AIService] buildHistory: Invalid tool call structure after parsing:",
-              callStr
-            );
-          }
-        } catch (e) {
-          console.error(
-            "[AIService] buildHistory: Failed to parse tool call string:",
-            callStr,
-            e
-          );
-        }
-      });
-    }
-
-    // Add assistant message if there's any content
-    if (assistantContent.length > 0) {
-      msgs.push({
+    // Add assistant message
+    if (i.response || (i.metadata?.toolCalls && i.metadata.toolCalls.length > 0)) {
+      const assistantMessage: any = {
+        id: i.id + "-assistant",
         role: "assistant",
-        content: assistantContent,
-      } as ModelMessage);
-    }
-
-    // Add tool results as separate tool messages
-    if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
-      i.metadata.toolResults.forEach((resultStr) => {
-        try {
-          const parsedResult = JSON.parse(resultStr);
-          if (
-            parsedResult &&
-            parsedResult.type === "tool-result" &&
-            parsedResult.toolCallId &&
-            parsedResult.toolName &&
-            (parsedResult.result !== undefined || parsedResult.output !== undefined)
-          ) {
-            msgs.push({
-              role: "tool",
-              content: [parsedResult],
-            } as ModelMessage);
-          } else {
-            console.warn(
-              "[AIService] buildHistory: Invalid tool result structure after parsing:",
-              resultStr
-            );
+        content: i.response || "",
+      };
+      
+      // Add tool invocations if present
+      if (i.metadata?.toolCalls && i.metadata.toolCalls.length > 0) {
+        assistantMessage.toolInvocations = i.metadata.toolCalls.map((callStr, idx) => {
+          try {
+            const parsedCall = JSON.parse(callStr);
+            const toolInvocation: any = {
+              toolCallId: parsedCall.toolCallId,
+              toolName: parsedCall.toolName,
+              args: parsedCall.input,
+              state: "result"
+            };
+            
+            // Find matching result
+            if (i.metadata?.toolResults && i.metadata.toolResults[idx]) {
+              try {
+                const parsedResult = JSON.parse(i.metadata.toolResults[idx]);
+                toolInvocation.result = parsedResult.output;
+              } catch (e) {
+                console.error("Failed to parse tool result:", e);
+              }
+            }
+            
+            return toolInvocation;
+          } catch (e) {
+            console.error("Failed to parse tool call:", e);
+            return null;
           }
-        } catch (e) {
-          console.error(
-            "[AIService] buildHistory: Failed to parse tool result string:",
-            resultStr,
-            e
-          );
-        }
-      });
+        }).filter(Boolean);
+      }
+      
+      msgs.push(assistantMessage);
     }
+    
     return msgs;
   });
+
+  // Convert UIMessages to ModelMessages using the official function
+  return convertToModelMessages(uiMessages);
 }
 
 export async function buildCurrentPromptTurnData(overrideContent?: string): Promise<PromptTurnObject> {
