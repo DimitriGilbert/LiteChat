@@ -1,0 +1,116 @@
+{
+  "id": "basic-websearch",
+  "name": "Basic Web Search",
+  "description": "Performs web search with configurable depth and result selection",
+  "triggerType": "custom",
+  "isShortcut": false,
+  "templateVariables": {
+    "maxQueries": 3,
+    "maxResults": 5,
+    "queryGenerationModel": "gpt-4o-mini",
+    "resultSelectionModel": "gpt-4o-mini",
+    "condensationModel": "gpt-4o-mini",
+    "enableCondensation": true
+  },
+  "steps": [
+    {
+      "id": "query-generation",
+      "name": "Generate Search Queries",
+      "type": "prompt",
+      "templateId": "websearch-query-generator",
+      "modelId": "{{queryGenerationModel}}",
+      "inputMapping": {
+        "userQuery": "$.workflow.triggerPrompt",
+        "maxQueries": "$.workflow.templateVariables.maxQueries"
+      },
+      "structuredOutput": {
+        "schema": {
+          "queries": "array"
+        },
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["queries"]
+        }
+      }
+    },
+    {
+      "id": "execute-searches",
+      "name": "Execute Web Searches",
+      "type": "tool",
+      "toolName": "webSearchMultiple",
+      "inputMapping": {
+        "queries": "$.query-generation.queries",
+        "maxResults": "$.workflow.templateVariables.maxResults"
+      }
+    },
+    {
+      "id": "select-results",
+      "name": "Select Relevant Results",
+      "type": "prompt",
+      "templateId": "websearch-result-selector",
+      "modelId": "{{resultSelectionModel}}",
+      "inputMapping": {
+        "results": "$.execute-searches.searches",
+        "originalQuery": "$.workflow.triggerPrompt",
+        "maxResults": "$.workflow.templateVariables.maxResults"
+      },
+      "structuredOutput": {
+        "schema": {
+          "selectedResults": "array"
+        },
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "selectedResults": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "query": { "type": "string" },
+                  "index": { "type": "number" },
+                  "title": { "type": "string" },
+                  "source": { "type": "string" },
+                  "reasoning": { "type": "string" }
+                },
+                "required": ["query", "index", "title", "source", "reasoning"]
+              }
+            }
+          },
+          "required": ["selectedResults"]
+        }
+      }
+    },
+    {
+      "id": "extract-content",
+      "name": "Extract Page Content",
+      "type": "tool",
+      "toolName": "webExtractContent",
+      "inputMapping": {
+        "urls": "$.select-results.selectedResults[*].source",
+        "maxContentLength": "$.workflow.templateVariables.maxContentLength"
+      }
+    },
+    {
+      "id": "condense-information",
+      "name": "Condense Information",
+      "type": "prompt",
+      "templateId": "websearch-content-condenser",
+      "modelId": "{{condensationModel}}",
+      "inputMapping": {
+        "content": "$.extract-content.extractions",
+        "originalQuery": "$.workflow.triggerPrompt",
+        "enableCondensation": "$.workflow.templateVariables.enableCondensation"
+      }
+    }
+  ],
+  "createdAt": "2025-01-14T00:00:00.000Z",
+  "updatedAt": "2025-01-14T00:00:00.000Z"
+}

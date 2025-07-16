@@ -1,0 +1,165 @@
+{
+  "id": "deep-websearch",
+  "name": "Deep Web Search",
+  "description": "Performs deep web search with avenue identification and recursive searching",
+  "triggerType": "custom",
+  "isShortcut": false,
+  "templateVariables": {
+    "maxQueries": 3,
+    "maxResults": 5,
+    "maxDepth": 2,
+    "maxAvenues": 3,
+    "queryGenerationModel": "gpt-4o-mini",
+    "resultSelectionModel": "gpt-4o-mini",
+    "avenueIdentifierModel": "gpt-4o-mini",
+    "condensationModel": "gpt-4o-mini",
+    "enableCondensation": true
+  },
+  "steps": [
+    {
+      "id": "initial-query-generation",
+      "name": "Generate Initial Search Queries",
+      "type": "prompt",
+      "templateId": "websearch-query-generator",
+      "modelId": "{{queryGenerationModel}}",
+      "inputMapping": {
+        "userQuery": "$.workflow.triggerPrompt",
+        "maxQueries": "$.workflow.templateVariables.maxQueries"
+      },
+      "structuredOutput": {
+        "schema": {
+          "queries": "array"
+        },
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["queries"]
+        }
+      }
+    },
+    {
+      "id": "initial-search",
+      "name": "Execute Initial Web Searches",
+      "type": "tool",
+      "toolName": "webSearchMultiple",
+      "inputMapping": {
+        "queries": "$.initial-query-generation.queries",
+        "maxResults": "$.workflow.templateVariables.maxResults"
+      }
+    },
+    {
+      "id": "initial-result-selection",
+      "name": "Select Initial Results",
+      "type": "prompt",
+      "templateId": "websearch-result-selector",
+      "modelId": "{{resultSelectionModel}}",
+      "inputMapping": {
+        "results": "$.initial-search.searches",
+        "originalQuery": "$.workflow.triggerPrompt",
+        "maxResults": "$.workflow.templateVariables.maxResults"
+      },
+      "structuredOutput": {
+        "schema": {
+          "selectedResults": "array"
+        },
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "selectedResults": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "query": { "type": "string" },
+                  "index": { "type": "number" },
+                  "title": { "type": "string" },
+                  "source": { "type": "string" },
+                  "reasoning": { "type": "string" }
+                },
+                "required": ["query", "index", "title", "source", "reasoning"]
+              }
+            }
+          },
+          "required": ["selectedResults"]
+        }
+      }
+    },
+    {
+      "id": "extract-initial-content",
+      "name": "Extract Initial Content",
+      "type": "tool",
+      "toolName": "webExtractContent",
+      "inputMapping": {
+        "urls": "$.initial-result-selection.selectedResults[*].source",
+        "maxContentLength": "$.workflow.templateVariables.maxContentLength"
+      }
+    },
+    {
+      "id": "identify-avenues",
+      "name": "Identify Research Avenues",
+      "type": "prompt",
+      "templateId": "websearch-avenue-identifier",
+      "modelId": "{{avenueIdentifierModel}}",
+      "inputMapping": {
+        "originalQuery": "$.workflow.triggerPrompt",
+        "initialResults": "$.extract-initial-content.extractions",
+        "maxAvenues": "$.workflow.templateVariables.maxAvenues"
+      },
+      "structuredOutput": {
+        "schema": {
+          "avenues": "array"
+        },
+        "jsonSchema": {
+          "type": "object",
+          "properties": {
+            "avenues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "direction": { "type": "string" },
+                  "queries": { "type": "array", "items": { "type": "string" } },
+                  "reasoning": { "type": "string" }
+                },
+                "required": ["direction", "queries", "reasoning"]
+              }
+            }
+          },
+          "required": ["avenues"]
+        }
+      }
+    },
+    {
+      "id": "deep-search",
+      "name": "Execute Deep Searches",
+      "type": "tool",
+      "toolName": "webSearchAvenues",
+      "inputMapping": {
+        "avenues": "$.identify-avenues.avenues",
+        "maxResults": "$.workflow.templateVariables.maxResults"
+      }
+    },
+    {
+      "id": "synthesize-results",
+      "name": "Synthesize All Results",
+      "type": "prompt",
+      "templateId": "websearch-deep-synthesizer",
+      "modelId": "{{condensationModel}}",
+      "inputMapping": {
+        "originalQuery": "$.workflow.triggerPrompt",
+        "initialContent": "$.extract-initial-content.extractions",
+        "deepResults": "$.deep-search.deepSearchResults",
+        "enableCondensation": "$.workflow.templateVariables.enableCondensation"
+      }
+    }
+  ],
+  "createdAt": "2025-01-14T00:00:00.000Z",
+  "updatedAt": "2025-01-14T00:00:00.000Z"
+}
