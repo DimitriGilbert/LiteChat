@@ -151,7 +151,7 @@ export function processFileMetaToUserContent(
         return {
           type: "image",
           image: fileMeta.contentBytes,
-          mimeType: mimeType,
+          mediaType: mimeType,
         };
       } else {
         console.warn(
@@ -170,7 +170,7 @@ export function processFileMetaToUserContent(
       };
     } else if (fileMeta.contentBase64 !== undefined && isImage) {
       const buffer = base64ToUint8Array(fileMeta.contentBase64);
-      return { type: "image", image: buffer, mimeType: mimeType };
+      return { type: "image", image: buffer, mediaType: mimeType };
     } else if (fileMeta.contentBase64 !== undefined && !isText && !isImage) {
       console.warn(
         `AIService: Unsupported direct upload type "${mimeType}" for direct inclusion. Sending note.`

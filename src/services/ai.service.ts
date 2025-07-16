@@ -1,7 +1,7 @@
 // src/services/ai.service.ts
 // FULL FILE
 
-import { streamText, generateText, StreamTextResult, LanguageModelV1 } from "ai";
+import { streamText, generateText, StreamTextResult, LanguageModel } from "ai";
 import type {
   CoreMessage,
   Tool,
@@ -13,7 +13,7 @@ import type {
 } from "ai";
 
 export interface AIServiceCallOptions {
-  model: LanguageModelV1;
+  model: LanguageModel;
   messages: CoreMessage[];
   abortSignal: AbortSignal;
   system?: string;
@@ -82,21 +82,21 @@ export class AIService {
 
         // Process the stream part based on its type
         switch (part.type) {
-          case "text-delta":
-            callbacks.onChunk(part.textDelta);
+          case "text":
+            callbacks.onChunk(part.text);
             break;
           // Handle the reasoning part type directly
           case "reasoning":
-            callbacks.onReasoningChunk(part.textDelta);
+            callbacks.onReasoningChunk(part.text);
             break;
           case "tool-call":
             callbacks.onToolCall(part);
             break;
           case "tool-result":
-            callbacks.onToolResult(part);
+            callbacks.onToolResult(part as any);
             break;
-          case "step-start":
-            // Handle step-start events - these indicate the start of a processing step
+          case "start":
+            // Handle start events - these indicate the start of a processing step
             if (callbacks.onStepStart) {
               callbacks.onStepStart({
                 messageId: (part as any).messageId,
@@ -106,8 +106,8 @@ export class AIService {
             }
             console.log(`[AIService] Step started for ${interactionId} - Message ID: ${(part as any).messageId}`);
             break;
-          case "step-finish":
-            // Handle step-finish events - these indicate completion of a processing step
+          case "finish-step":
+            // Handle finish-step events - these indicate completion of a processing step
             if (callbacks.onStepFinish) {
               callbacks.onStepFinish({
                 finishReason: (part as any).finishReason,
@@ -122,8 +122,8 @@ export class AIService {
             // Store finish details but don't call onFinish yet
             receivedFinishPart = true;
             finalFinishReason = part.finishReason;
-            finalUsage = part.usage;
-            finalProviderMetadata = part.providerMetadata;
+            finalUsage = part.totalUsage;
+            finalProviderMetadata = (part as any).providerMetadata;
             break;
           case "error":
             // SDK provides an error part
@@ -149,7 +149,10 @@ export class AIService {
 
       // Extract final reasoning from the result object if available
       if (streamResult?.reasoning) {
-        finalReasoning = await streamResult.reasoning;
+        const reasoningArray = await streamResult.reasoning;
+        finalReasoning = Array.isArray(reasoningArray) 
+          ? reasoningArray.map(r => r.text).join('\n')
+          : reasoningArray;
         console.log(
           `[AIService] Extracted final reasoning for ${interactionId}`,
         );
@@ -195,7 +198,7 @@ export class AIService {
 
   // Generates a non-streaming text completion.
   static async generateCompletion(options: {
-    model: LanguageModelV1;
+    model: LanguageModel;
     messages: CoreMessage[];
     system?: string;
     temperature?: number;
