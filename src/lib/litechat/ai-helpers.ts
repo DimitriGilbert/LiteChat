@@ -19,8 +19,6 @@ import type {
   ModelMessage,
   ImagePart,
   TextPart,
-  ToolCallPart,
-  ToolResultPart,
 } from "ai";
 import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 import { nanoid } from "nanoid";
@@ -239,12 +237,19 @@ export function buildHistoryMessages(
       }
     }
 
+    // Build assistant message with response and tool calls
+    const assistantContent: any[] = [];
+    
+    // Add text response if present
     if (i.response && typeof i.response === "string") {
-      msgs.push({ role: "assistant", content: i.response });
+      assistantContent.push({
+        type: "text",
+        text: i.response,
+      });
     }
 
+    // Add tool calls if present
     if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
-      const validToolCalls: ToolCallPart[] = [];
       i.metadata.toolCalls.forEach((callStr) => {
         try {
           const parsedCall = JSON.parse(callStr);
@@ -253,9 +258,9 @@ export function buildHistoryMessages(
             parsedCall.type === "tool-call" &&
             parsedCall.toolCallId &&
             parsedCall.toolName &&
-            parsedCall.args !== undefined
+            (parsedCall.args !== undefined || parsedCall.input !== undefined)
           ) {
-            validToolCalls.push(parsedCall as ToolCallPart);
+            assistantContent.push(parsedCall);
           } else {
             console.warn(
               "[AIService] buildHistory: Invalid tool call structure after parsing:",
@@ -270,16 +275,18 @@ export function buildHistoryMessages(
           );
         }
       });
-      if (validToolCalls.length > 0) {
-        msgs.push({
-          role: "assistant",
-          content: validToolCalls,
-        });
-      }
     }
 
+    // Add assistant message if there's any content
+    if (assistantContent.length > 0) {
+      msgs.push({
+        role: "assistant",
+        content: assistantContent,
+      } as ModelMessage);
+    }
+
+    // Add tool results as separate tool messages
     if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
-      const validToolResults: ToolResultPart[] = [];
       i.metadata.toolResults.forEach((resultStr) => {
         try {
           const parsedResult = JSON.parse(resultStr);
@@ -288,9 +295,12 @@ export function buildHistoryMessages(
             parsedResult.type === "tool-result" &&
             parsedResult.toolCallId &&
             parsedResult.toolName &&
-            parsedResult.result !== undefined
+            (parsedResult.result !== undefined || parsedResult.output !== undefined)
           ) {
-            validToolResults.push(parsedResult as ToolResultPart);
+            msgs.push({
+              role: "tool",
+              content: [parsedResult],
+            } as ModelMessage);
           } else {
             console.warn(
               "[AIService] buildHistory: Invalid tool result structure after parsing:",
@@ -305,12 +315,6 @@ export function buildHistoryMessages(
           );
         }
       });
-      if (validToolResults.length > 0) {
-        msgs.push({
-          role: "tool",
-          content: validToolResults,
-        });
-      }
     }
     return msgs;
   });
