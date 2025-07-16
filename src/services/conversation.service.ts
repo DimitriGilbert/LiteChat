@@ -15,7 +15,7 @@ import {
   buildHistoryMessages,
   processFileMetaToUserContent,
 } from "@/lib/litechat/ai-helpers";
-import type { CoreMessage, ImagePart, TextPart } from "ai";
+import type { ModelMessage, ImagePart, TextPart } from "ai";
 import { toast } from "sonner";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import type { fs as FsType } from "@zenfs/core";
@@ -236,7 +236,7 @@ export const ConversationService = {
           i.parentId === null
       )
       .sort((a, b) => a.index - b.index);
-    const historyMessages: CoreMessage[] =
+    const historyMessages: ModelMessage[] =
       buildHistoryMessages(historyInteractions);
 
     let userContent = originalTurnData.content;
@@ -731,7 +731,7 @@ Provide a clear, comprehensive explanation that would help someone understand th
         .sort((a, b) => a.index - b.index);
 
       // Build the conversation history for compacting
-      const historyMessages: CoreMessage[] = buildHistoryMessages(
+      const historyMessages: ModelMessage[] = buildHistoryMessages(
         interactionsToCompact
       );
 

@@ -37,8 +37,9 @@ import {
   type FinishReason,
   type LanguageModelUsage,
   type ProviderMetadata,
-  type LanguageModelV1,
-  type CoreMessage,
+  type LanguageModel,
+  type ModelMessage,
+  stepCountIs,
 } from "ai";
 import type { fs } from "@zenfs/core";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
@@ -50,8 +51,8 @@ import { PromptEnhancementService } from "@/services/prompt-enhancement.service"
 
 
 interface AIServiceCallOptions {
-  model: LanguageModelV1;
-  messages: CoreMessage[];
+  model: LanguageModel;
+  messages: ModelMessage[];
   abortSignal: AbortSignal;
   system?: string;
   tools?: Record<string, Tool<any>>;
@@ -760,7 +761,7 @@ export const InteractionService = {
                       // Create a clean tool object for AI SDK - don't spread existing tool
                       const toolDefinition: Tool<any> = {
                         description: registeredToolInfo.definition.description,
-                        parameters: registeredToolInfo.definition.parameters,
+                        inputSchema: (registeredToolInfo.definition as any).parameters || registeredToolInfo.definition.inputSchema,
                         execute: async (args: any) => {
                           if (registeredToolInfo.implementation) {
                             // Use the registered implementation which already handles MCP calls properly
@@ -792,7 +793,7 @@ export const InteractionService = {
               // Create a clean tool object for AI SDK - don't spread existing tool
               const toolDefinition: Tool<any> = {
                 description: toolInfo.definition.description,
-                parameters: toolInfo.definition.parameters,
+                inputSchema: (toolInfo.definition as any).parameters || toolInfo.definition.inputSchema,
                 execute: async (args: any) => {
                 const currentConvId =
                   useInteractionStore.getState().currentConversationId;
@@ -835,7 +836,7 @@ export const InteractionService = {
                 }
                 try {
                   const contextSnapshot = getContextSnapshot();
-                  const parsedArgs = toolInfo.definition.parameters.parse(args);
+                  const parsedArgs = ((toolInfo.definition as any).parameters || toolInfo.definition.inputSchema).parse(args);
                   const implementation: ToolImplementation<any> =
                     toolInfo.implementation!;
                   const contextWithFs: ToolContext = {
@@ -897,6 +898,13 @@ export const InteractionService = {
         toolsWithExecute &&
         Object.keys(toolsWithExecute).length > 0 && {
           tools: toolsWithExecute,
+          // Enable multi-step calls for all interactions EXCEPT system ones that shouldn't have them
+          ...(interactionType !== "conversation.title_generation" && 
+              interactionType !== "conversation.compact" && 
+              interactionType !== "system.info" && 
+              interactionType !== "system.error" && {
+            stopWhen: stepCountIs(maxSteps || 5),
+          }),
         }),
       ...(finalPrompt.parameters?.providerOptions && {
         providerOptions: finalPrompt.parameters.providerOptions,
@@ -1159,8 +1167,8 @@ export const InteractionService = {
       metadata: {
         ...currentMetadata,
         ...(finishDetails?.usage && {
-          promptTokens: finishDetails.usage.promptTokens,
-          completionTokens: finishDetails.usage.completionTokens,
+          inputTokens: finishDetails.usage.inputTokens,
+          outputTokens: finishDetails.usage.outputTokens,
           totalTokens: finishDetails.usage.totalTokens,
         }),
         ...(finishDetails?.providerMetadata && {
