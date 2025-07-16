@@ -1,0 +1,51 @@
+# LiteChat MCP, Marketplace, and Modding (for LLMs)
+
+## Overview
+LiteChat supports dynamic tool loading, marketplace integration, and full modding via the Model Context Protocol (MCP), marketplace APIs, and a modular mod API. All are event-driven, extensible, and support runtime tool registration.
+
+---
+
+## MCP (Model Context Protocol)
+- **Files**: `src/controls/modules/McpToolsModule.ts`, `src/store/mcp.store.ts`
+- **McpToolsModule**: Manages MCP client connections (streamable HTTP, SSE, stdio)
+  - Dynamically registers tools from connected MCP servers
+  - Handles retry logic, connection status, event-driven reconnection
+  - Public API: `registerMcpToolWithAI`, `unregisterMcpToolFromAI`, `getConnectionStatus`, `retryServerConnection`
+- **McpStore**: Manages server configs, connection state, retry/error logic, bridge config, and emits all connection/tool events
+- **Dynamic tool loading**: Tools are registered/unregistered at runtime as servers connect/disconnect
+
+---
+
+## Marketplace Integration
+- **Files**: `src/services/persistence.service.ts`, `src/lib/litechat/db.ts`
+- **Entities**: MarketplaceSource, MarketplaceIndex, InstalledMarketplaceItem
+- **PersistenceService**: CRUD for all marketplace entities, export/import, cache expiry
+- **Dynamic install**: Marketplace items (tools, templates, rules, MCP servers) can be installed/uninstalled at runtime
+- **Event-driven**: All marketplace changes emit events for UI and tool registry
+
+---
+
+## Modding API
+- **File**: `src/modding/api-factory.ts`
+- **Function**: `createModApi(mod)` returns a `LiteChatModApi` instance
+  - Register prompt/chat/canvas/selection controls, block renderers, rules, tools, middleware, settings tabs, modal providers
+  - Event-driven: All registration/unregistration is via events
+  - Provides context snapshot, toast/log helpers, VFS access, and more
+  - Supports dynamic tool registration with Zod schemas and AI SDK integration
+- **Unsubscribers**: All registrations return an unsubscribe function for cleanup
+
+---
+
+## Extension Guidance for LLMs
+- To add new MCP tools, connect a server and register tools via MCP protocol (auto-registered by McpToolsModule)
+- For marketplace, add new sources/items and use PersistenceService for CRUD
+- For mods, use `createModApi` to register controls, tools, and event handlers
+- For dynamic tool loading, always emit registration/unregistration events and handle runtime changes
+- For event-driven integration, listen for all relevant events (tool, server, marketplace, mod)
+
+---
+
+## Key Files
+- MCP: `src/controls/modules/McpToolsModule.ts`, `src/store/mcp.store.ts`
+- Marketplace: `src/services/persistence.service.ts`, `src/lib/litechat/db.ts`
+- Modding: `src/modding/api-factory.ts` 

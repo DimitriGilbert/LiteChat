@@ -45,8 +45,8 @@ export interface Interaction {
   // Add rating field
   rating?: number | null;
   metadata: Metadata & {
-    promptTokens?: number;
-    completionTokens?: number;
+    inputTokens?: number;
+    outputTokens?: number;
     totalTokens?: number;
     modelId?: string;
     providerId?: string;
@@ -67,5 +67,14 @@ export interface Interaction {
     timeToFirstToken?: number;
     generationTime?: number;
     isTitleGeneration?: boolean;
+    // Parallel execution metadata
+    isParallelBranch?: boolean;
+    parallelBranchIndex?: number;
+    parallelParentStepId?: string;
+    parallelArrayItem?: any;
+    // Sub-workflow metadata
+    isSubWorkflowMain?: boolean;
+    subWorkflowTemplateId?: string;
+    subWorkflowParentStepId?: string;
   };
 }

@@ -1,7 +1,7 @@
 // src/types/litechat/prompt.ts
 // FULL FILE
 import type React from "react";
-import type { CoreMessage, Tool } from "ai";
+import type { ModelMessage, Tool } from "ai";
 import { ChatControlStatus } from "./chat";
 
 // Define a structure for resolved rule content in metadata
@@ -40,7 +40,7 @@ export interface PromptTurnObject {
 
 export interface PromptObject {
   system?: string;
-  messages: CoreMessage[];
+  messages: ModelMessage[];
   tools?: Tool[];
   toolChoice?:
     | "auto"

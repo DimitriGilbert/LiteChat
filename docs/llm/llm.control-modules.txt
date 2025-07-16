@@ -1,0 +1,94 @@
+# LiteChat Control Module System (for LLMs)
+
+## Core Interfaces & Types
+- **ControlModule interface**: `src/types/litechat/control.ts`
+  - `id: string` — unique module ID
+  - `dependencies?: string[]` — optional dependency list
+  - `initialize(modApi: LiteChatModApi): Promise<void>` — async setup, event subscriptions
+  - `register(modApi: LiteChatModApi): void` — register UI/tools/rules
+  - `destroy(modApi: LiteChatModApi): void` — cleanup
+  - `getTextTriggerNamespaces?(): TriggerNamespace[]` — (optional) for text triggers
+- **ControlModuleConstructor**: class with static `translations` property for i18n
+- **LiteChatModApi**: `src/types/litechat/modding.ts` — API for module registration, event, tool, and rule integration
+- **Prompt/Chat/Canvas/Block Controls**: see `ModPromptControl`, `ModChatControl`, `CoreCanvasControlFromTypes`, `BlockRenderer`
+- **Control Rules**: `ModControlRule` (type: "control", alwaysOn, moduleId)
+
+## Module Registration
+- All modules are registered in strict order in `src/App.tsx` via `controlModulesToRegister: ControlModuleConstructor[]`
+- Initialization and registration handled in `src/components/LiteChat/LiteChat.tsx` via `performFullInitialization`
+- Each module must implement the ControlModule interface
+
+## Module Types
+- **Settings Modules**: Register settings tabs (see `GeneralSettingsModule`, `ThemeSettingsControlModule`)
+- **Prompt Control Modules**: Add UI to prompt area (see `ParameterControlModule`, `TextTriggerControlModule`)
+- **Chat Control Modules**: Add UI to chat areas (sidebar, header, etc.) (see `ConversationListControlModule`)
+- **Tool Modules**: Register AI tools (see `VfsToolsModule`, `GitToolsModule`, `McpToolsModule`)
+- **Canvas Control Modules**: Add controls to chat canvas (see `CopyActionControlModule`, `RegenerateActionControlModule`)
+- **Block Renderer Modules**: Register custom code block renderers (see below)
+
+## Block Renderer Modules (see `src/controls/modules/`)
+- **All implement ControlModule, register a BlockRenderer, and often a control rule**
+- **BlockRenderer interface**: `src/types/litechat/canvas/block-renderer.ts`
+  - `id: string`
+  - `supportedLanguages?: string[]` (undefined = fallback)
+  - `priority?: number` (higher = more specific)
+  - `renderer(context: BlockRendererContext): React.ReactNode`
+  - `onMounted?`, `onUnmounted?` (optional lifecycle hooks)
+
+### Built-in Block Renderer Modules
+- `CodeBlockRendererModule` — fallback, all languages, low priority
+- `MermaidBlockRendererModule` — mermaid diagrams, priority 10, registers control rule
+- `FlowBlockRendererModule` — flow diagrams, priority 10, registers control rule
+- `FormedibleBlockRendererModule` — interactive forms, priority 10, registers control rule
+- `ChartBlockRendererModule` — charts/graphs, priority 20, registers control rule
+- `JsRunnableBlockRendererModule` — JS execution, priority 15, registers control rule
+- `PythonRunnableBlockRendererModule` — Python execution (Pyodide), priority 15, registers control rule
+- `BeatBlockRendererModule` — Strudel/TidalCycles music, priority 10, registers control rule
+- `WorkflowBlockRendererModule` — workflow definitions, priority 10, registers control rule
+
+### BlockRendererContext
+- `lang: string | undefined`
+- `code: string`
+- `filepath?: string`
+- `isStreaming?: boolean`
+- `blockId?: string`
+- `interactionId?: string`
+
+## Control Rule Pattern
+- Each block renderer module registers a control rule (see `modApi.registerRule`) with a detailed prompt for the AI
+- Control rules are alwaysOn by default, except for potentially dangerous modules (e.g., Python execution)
+
+## Example: Registering a Block Renderer Module
+```typescript
+export class MermaidBlockRendererModule implements ControlModule {
+  readonly id = "core-block-renderer-mermaid";
+  private unregisterCallback?: () => void;
+  private unregisterRuleCallback?: () => void;
+  async initialize(): Promise<void> {}
+  register(modApi: LiteChatModApi): void {
+    const mermaidBlockRenderer: BlockRenderer = {
+      id: this.id,
+      supportedLanguages: ["mermaid"],
+      priority: 10,
+      renderer: (context) => React.createElement(MermaidBlockRenderer, { code: context.code, isStreaming: context.isStreaming }),
+    };
+    this.unregisterCallback = modApi.registerBlockRenderer(mermaidBlockRenderer);
+    this.unregisterRuleCallback = modApi.registerRule({
+      id: `${this.id}-control-rule`,
+      name: "Mermaid Diagram Control",
+      content: MERMAID_CONTROL_PROMPT,
+      description: "Enables AI to generate Mermaid diagrams and flowcharts",
+      type: "control",
+      alwaysOn: true,
+      moduleId: this.id,
+    });
+  }
+  destroy(): void { ... }
+}
+```
+
+## For LLMs: To extend or reason about modules, always reference:
+- `src/types/litechat/control.ts`
+- `src/types/litechat/modding.ts`
+- `src/controls/modules/` (for module examples)
+- `src/App.tsx` (for registration order) 

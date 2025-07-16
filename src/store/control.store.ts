@@ -252,7 +252,7 @@ export const useControlRegistryStore = create(
             `ControlRegistryStore: Tool "${toolName}" already registered by mod "${state.tools[toolName].modId}". Overwriting with registration from mod "${modId}".`
           );
         }
-        state.tools[toolName] = { definition, implementation, modId };
+        state.tools[toolName] = { definition, implementation, modId } as any;
       });
       emitter.emit(controlRegistryEvent.toolsChanged, {
         tools: get().tools,

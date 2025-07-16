@@ -35,3 +35,4 @@ public/versions/
 
 # hides all local stuff :)
 *.local.*
+build

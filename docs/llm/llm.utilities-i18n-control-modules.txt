@@ -1,0 +1,82 @@
+# LiteChat Utilities, i18n/Locales, and Control Modules (for LLMs)
+
+## 1. Utilities & Helpers (`src/lib/litechat/`)
+
+LiteChat's `lib/litechat/` directory contains core utilities and helpers for AI, VFS, workflow, provider, prompt, and event logic. Key files:
+
+- **ai-helpers.ts**: Formatting, context snapshot, prompt turn building, file content filtering, history message building. Used for prompt orchestration and AI context management.
+- **provider-helpers.ts**: Model/provider ID helpers, instantiation of model instances for OpenAI, Google, OpenRouter, Ollama, etc. Used by provider settings, AI orchestration, and prompt compilation.
+- **db.ts**: Dexie.js database schema and migration logic for all persistent entities (conversations, interactions, providers, projects, rules, tags, templates, workflows, marketplace, etc.).
+- **event-emitter.ts**: Exports a mitt-based event emitter for all app events, typed with ModEventPayloadMap. Used everywhere for event-driven architecture.
+- **file-extensions.ts**: Central registry of common text file extensions for file type detection.
+- **file-manager-utils.ts**: Path formatting, byte formatting, and file manager helpers.
+- **prompt-util.ts**: Prompt template compilation, variable parsing, placeholder filling, validation. Used by prompt system and agent/task orchestration.
+- **vfs-operations.ts**: VFS (ZenFS) operations, directory creation, file CRUD, event emission, error handling. Integrates with VFS store and event system.
+- **vfs-git-operations.ts**: Git operations (clone, init, commit, pull, push, status, branch, remotes) on VFS using isomorphic-git. Handles user config, error reporting, and integration with settings.
+- **workflow-util.ts**: Workflow context building for transform/function steps, used by workflow engine.
+- **useMarkdownParser.ts**: Markdown parsing to UniversalBlockData for block rendering.
+- **url-helpers.ts**: App URL parameter parsing and helpers.
+
+**Best Practices:**
+- Use these helpers for all core logic—never duplicate utility logic in modules or components.
+- Extend by adding new helpers or updating existing ones; always type inputs/outputs.
+- For new AI providers, add instantiation logic to `provider-helpers.ts`.
+- For new persistent entities, update `db.ts` and migration logic.
+
+---
+
+## 2. i18n & Locales (`src/i18n/`, `src/locales/`)
+
+LiteChat uses i18next for full localization. Key files:
+
+- **config.ts**: Initializes i18next with language, namespaces, and resources. Loads language from env or defaults to 'en'.
+- **resources.ts**: Imports all JSON translation files for each language and namespace, and exports a `resources` object for i18next.
+- **locales/**: Contains per-language folders (`en/`, `fr/`, `de/`, `es/`, `it/`), each with JSON files for namespaces: `common`, `controls`, `canvas`, `settings`, `prompt`, `vfs`, `git`, `ai`, `tools`, `renderers`, `welcome`, `assistantSettings`.
+
+**How to Add/Extend Locales:**
+- Add a new folder in `src/locales/` (e.g., `pt/` for Portuguese).
+- Add all required namespace JSON files (copy from `en/` as a template).
+- Import new files in `resources.ts` and add to the `resources` object.
+- i18next will auto-detect and use the new language if configured.
+- Control modules can register additional translations at runtime (see `initializeControlModules` in `lib/litechat/initialization.ts`).
+
+**Integration:**
+- All UI, modules, and settings use i18n keys for labels, tooltips, and messages.
+- Control modules can add resource bundles dynamically for module-specific translations.
+
+---
+
+## 3. Control Modules (`src/controls/modules/`)
+
+Control Modules are the core extension mechanism for UI, block rendering, prompt controls, settings, and tool orchestration. Each implements the `ControlModule` interface and is registered at startup. Key patterns:
+
+- **Settings Modules**: Register settings tabs (e.g., `GeneralSettingsModule`, `AssistantSettingsModule`, `ThemeSettingsControlModule`, `ProviderSettingsModule`, `DataSettingsModule`, `MarketplaceSettingsModule`, `ModSettingsModule`). Each provides a settings tab/component, i18n title, and order.
+- **Block Renderer Modules**: Register block renderers for specific languages/types (e.g., `CodeBlockRendererModule`, `MermaidBlockRendererModule`, `FormedibleBlockRendererModule`, `FlowBlockRendererModule`, `WorkflowBlockRendererModule`, `ChartBlockRendererModule`, `JsRunnableBlockRendererModule`, `PythonRunnableBlockRendererModule`, `BeatBlockRendererModule`). Each provides a renderer, supported languages, priority, and may register control rules.
+- **Prompt/Canvas/Chat Controls**: Register prompt controls (e.g., `AgentControlModule`, `ParameterControlModule`, `TextTriggerControlModule`, `UrlParameterControlModule`, `RulesControlModule`, `ProjectSettingsControlModule`, `SettingsControlModule`). Each provides UI, event handlers, and orchestration logic.
+- **Tool Modules**: Register tools for VFS, MCP, web search, etc. (e.g., `VfsToolsModule`, `McpToolsModule`, `WebSearchToolsModule`).
+- **Workflow/Marketplace/Usage**: Modules for workflow UI, marketplace, usage dashboard, etc.
+- **Example/Custom Modules**: Example modules for custom controls, block renderers, or UI.
+
+**Registration & Lifecycle:**
+- Modules are instantiated and initialized in dependency order (`initializeControlModules` in `lib/litechat/initialization.ts`).
+- Each module implements `initialize(modApi)`, `register(modApi)`, and `destroy()`.
+- Modules can register settings tabs, block renderers, prompt/canvas/chat controls, tools, rules, event handlers, and translations.
+- Unregister logic is required for cleanup.
+
+**Best Practices:**
+- Use i18n for all user-facing strings in modules.
+- Register all controls, renderers, and tools via the provided `modApi`.
+- Use event-driven patterns for all orchestration and state changes.
+- For new features, create a dedicated module and register it in the initialization phase.
+- Always provide unregister/cleanup logic in `destroy()`.
+
+**Key Files:**
+- Control modules: `src/controls/modules/` (one file per module)
+- Module interface: `src/types/litechat/control.ts`
+- Initialization: `src/lib/litechat/initialization.ts`
+- i18n: `src/i18n/`, `src/locales/`, `resources.ts`
+- Utilities: `src/lib/litechat/`
+
+---
+
+This documentation chunk is exhaustive, code-referenced, and suitable for LLMs to reason about, extend, or generate new utilities, i18n/locales, or control modules in LiteChat. 

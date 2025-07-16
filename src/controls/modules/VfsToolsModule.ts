@@ -73,10 +73,10 @@ export class VfsToolsModule implements ControlModule {
     }
     console.log(`[${this.id}] Registering Core VFS Tools...`);
 
-    const listFilesTool: Tool<typeof listFilesSchema> = {
+    const listFilesTool: Tool<any> = {
       description:
         "List files and directories in a specified VFS path, or the current path if none is given.",
-      parameters: listFilesSchema,
+      inputSchema: listFilesSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -115,9 +115,9 @@ export class VfsToolsModule implements ControlModule {
       )
     );
 
-    const readFileTool: Tool<typeof readFileSchema> = {
+    const readFileTool: Tool<any> = {
       description: "Read the content of a file from the VFS.",
-      parameters: readFileSchema,
+      inputSchema: readFileSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -153,9 +153,9 @@ export class VfsToolsModule implements ControlModule {
       )
     );
 
-    const writeFileTool: Tool<typeof writeFileSchema> = {
+    const writeFileTool: Tool<any> = {
       description: "Write content to a file in the VFS.",
-      parameters: writeFileSchema,
+      inputSchema: writeFileSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -197,9 +197,9 @@ export class VfsToolsModule implements ControlModule {
       )
     );
 
-    const deleteFileTool: Tool<typeof deleteFileSchema> = {
+    const deleteFileTool: Tool<any> = {
       description: "Delete a file or directory from the VFS.",
-      parameters: deleteFileSchema,
+      inputSchema: deleteFileSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -229,9 +229,9 @@ export class VfsToolsModule implements ControlModule {
       )
     );
 
-    const createDirectoryTool: Tool<typeof createDirectorySchema> = {
+    const createDirectoryTool: Tool<any> = {
       description: "Create a directory (including parents) in the VFS.",
-      parameters: createDirectorySchema,
+      inputSchema: createDirectorySchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -259,9 +259,9 @@ export class VfsToolsModule implements ControlModule {
       )
     );
 
-    const renameTool: Tool<typeof renameSchema> = {
+    const renameTool: Tool<any> = {
       description: "Rename a file or directory in the VFS.",
-      parameters: renameSchema,
+      inputSchema: renameSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(

@@ -828,6 +828,26 @@ export class PersistenceService {
     }
   }
 
+  static async loadWorkflow(id: string): Promise<WorkflowTemplate | null> {
+    try {
+      const workflow = await db.workflows.get(id);
+      if (!workflow) {
+        return null;
+      }
+      return {
+        ...JSON.parse(workflow.definition),
+        id: workflow.id,
+        name: workflow.name,
+        description: workflow.description,
+        createdAt: workflow.createdAt.toISOString(),
+        updatedAt: workflow.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error("PersistenceService: Error loading workflow:", error);
+      throw error;
+    }
+  }
+
   static async saveWorkflow(workflow: WorkflowTemplate): Promise<string> {
     try {
       const dbWorkflow: DbWorkflow = {

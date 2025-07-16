@@ -1,0 +1,55 @@
+# LiteChat Universal Block Renderer System (for LLMs)
+
+## Overview
+- Extensible system for rendering code blocks by language/type.
+- Core logic in `src/services/block-renderer.service.ts` and `src/components/LiteChat/common/UniversalBlockRenderer.tsx`.
+- Block renderers are registered by Control Modules (see `src/controls/modules/`).
+
+## BlockRenderer Interface
+- Defined in `src/types/litechat/canvas/block-renderer.ts`:
+  - `id: string`
+  - `supportedLanguages?: string[]` — e.g., ["mermaid"], ["js", "typescript"], undefined = fallback
+  - `priority?: number` — higher = more specific
+  - `renderer(context: BlockRendererContext): React.ReactNode`
+  - `onMounted?`, `onUnmounted?` — optional lifecycle hooks
+- `BlockRendererContext` provides:
+  - `lang: string | undefined`
+  - `code: string`
+  - `filepath?: string`
+  - `isStreaming?: boolean`
+  - `blockId?: string`
+  - `interactionId?: string`
+
+## Renderer Selection Logic
+- **Specific Language Match**: Renderers with `supportedLanguages` matching the block's language
+- **Priority**: Among matches, higher `priority` wins
+- **Fallback**: Renderers with no `supportedLanguages` (undefined) serve as fallback
+- **Default**: If no match, fallback to simple pre/code rendering
+
+## Built-in Renderers (see `src/controls/modules/`)
+- `CodeBlockRendererModule` — fallback, all languages
+- `MermaidBlockRendererModule` — mermaid diagrams
+- `FlowBlockRendererModule` — flow diagrams
+- `FormedibleBlockRendererModule` — interactive forms
+- `ChartBlockRendererModule` — charts/graphs
+- `JsRunnableBlockRendererModule` — JS execution
+- `PythonRunnableBlockRendererModule` — Python execution (Pyodide)
+- `BeatBlockRendererModule` — Strudel/TidalCycles music
+- `WorkflowBlockRendererModule` — workflow definitions
+
+## Main Components
+- `UniversalBlockRenderer.tsx`: Main component, routes to appropriate renderer
+- `block-renderer.service.ts`: Manages renderer selection and execution
+
+## Extension Pattern
+- To add a new renderer:
+  1. Implement a ControlModule that registers a BlockRenderer (see `src/controls/modules/` for examples)
+  2. Set `supportedLanguages` and `priority` as needed
+  3. Register with `modApi.registerBlockRenderer`
+  4. (Optional) Register a control rule for AI guidance
+
+## For LLMs: To reason about or extend block rendering, reference:
+- `src/types/litechat/canvas/block-renderer.ts`
+- `src/services/block-renderer.service.ts`
+- `src/components/LiteChat/common/UniversalBlockRenderer.tsx`
+- `src/controls/modules/` (for renderer modules) 

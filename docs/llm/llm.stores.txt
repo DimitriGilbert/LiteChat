@@ -1,0 +1,100 @@
+# LiteChat Store Architecture (for LLMs)
+
+## Overview
+LiteChat uses Zustand stores for all major state domains, but is architected for a future move toward event-driven and service-based state management. All stores expose state, actions, and event integration via `getRegisteredActionHandlers`. LLMs should prefer event/service patterns over direct store access when possible.
+
+---
+
+## Major Stores
+
+### Conversation Store
+- **File:** `src/store/conversation.store.ts`
+- **State:** Conversations, sync repos, selection, sync status, error/loading
+- **Actions:** CRUD, sync, import/export, project linking, tool settings
+- **Events:** Listens/emits for conversation, sync, VFS, interaction, UI events
+- **Sync:** Integrates with VFS and BulkSyncService for repo sync (see also marketplace sync)
+
+### VFS Store
+- **File:** `src/store/vfs.store.ts`
+- **State:** VFS nodes, children, selection, loading/error, fs instance, VFS key
+- **Actions:** File/folder CRUD, upload/download, selection, VFS init, event-driven updates
+- **Events:** Listens/emits for VFS events, integrates with conversation/project sync
+
+### Interaction Store
+- **File:** `src/store/interaction.store.ts`
+- **State:** Interactions, streaming buffers, error/status, current conversation
+- **Actions:** CRUD, streaming, rating, promote, clear, buffer management
+- **Events:** Listens/emits for interaction, conversation, VFS events
+
+### Provider Store
+- **File:** `src/store/provider.store.ts`
+- **State:** Provider configs, API keys, selected model, enabled models, fetch status
+- **Actions:** CRUD, model selection, API key management, fetch models, sort order
+- **Events:** Listens/emits for provider events, integrates with settings, prompt, and sync
+
+### Rules Store
+- **File:** `src/store/rules.store.ts`
+- **State:** Rules, tags, tag-rule links, loading/error
+- **Actions:** CRUD, tag/rule linking, query by tag/rule
+- **Events:** Listens/emits for rules events, integrates with prompt, project, and sync
+
+### Project Store
+- **File:** `src/store/project.store.ts`
+- **State:** Projects, hierarchy, loading/error
+- **Actions:** CRUD, hierarchy, effective settings, project selection
+- **Events:** Listens/emits for project events, integrates with conversation, settings, sync
+
+### Input Store
+- **File:** `src/store/input.store.ts`
+- **State:** Attached files metadata
+- **Actions:** Add/remove/clear attached files
+- **Events:** Listens/emits for input events, integrates with prompt, file controls
+
+### UI State Store
+- **File:** `src/store/ui.store.ts`
+- **State:** UI panel state, sidebar, global loading/error, focus flags
+- **Actions:** Toggle panels/sidebar, set loading/error, focus input
+- **Events:** Listens/emits for UI events, integrates with modal manager
+
+### Settings Store
+- **File:** `src/store/settings.store.ts`
+- **State:** All global settings (theme, prompt, streaming, sync, tool/agent/rule config, etc.)
+- **Actions:** Setters for every setting, load/reset, advanced config
+- **Events:** Listens/emits for settings events, integrates with provider, project, sync
+
+### Mod Store
+- **File:** `src/store/mod.store.ts`
+- **State:** Mods, loaded mod instances, mod settings tabs, loading/error
+- **Actions:** CRUD, set loaded mods, mod settings tab management
+- **Events:** Listens/emits for mod events, integrates with mod loader, marketplace
+
+### Prompt State Store
+- **File:** `src/store/prompt.store.ts`
+- **State:** Prompt parameters for next submission (model, temp, tokens, etc.)
+- **Actions:** Setters, initialize/reset, parameter change
+- **Events:** Listens/emits for prompt events, integrates with prompt controls, provider, settings
+
+### Control Registry Store
+- **File:** `src/store/control.store.ts`
+- **State:** Registered controls (prompt, chat, canvas, block renderers, middleware, tools, rules, triggers)
+- **Actions:** Register/unregister controls, middleware, tools, triggers
+- **Events:** Listens/emits for control registry and block renderer events
+
+### Prompt Template Store
+- **File:** `src/store/prompt-template.store.ts`
+- **State:** Prompt templates (prompt, agent, task, followup), loading/error
+- **Actions:** CRUD, compile, query by type/agent/task/followup
+- **Events:** Listens/emits for prompt template events, integrates with prompt system, agent/task orchestration
+
+---
+
+## Architectural Direction
+- **Event/Service-Driven:** LLMs should prefer event-driven and service-based patterns over direct store access. All stores expose event-driven action handlers for this purpose.
+- **Sync/Marketplace Patterns:** Sync logic (BulkSyncService, ImportExportService, StartupSyncService) is shared between conversations, projects, VFS, and marketplace. See also marketplace sync for distributed state.
+- **Cross-Domain Relationships:** Many stores are cross-linked (e.g., conversations link to projects, projects inherit settings, rules/tags/agents/tasks are linked via IDs).
+
+**See also:**
+- `llm.architecture.txt` for event/action wiring and initialization
+- `llm.persistence.txt` for database schema and persistence
+- `llm.external-tools.txt` for sync/marketplace tool orchestration
+- All store files in `src/store/` for up-to-date state/actions/events 

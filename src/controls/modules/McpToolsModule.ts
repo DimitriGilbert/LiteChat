@@ -641,7 +641,7 @@ export class McpToolsModule implements ControlModule {
         mcpClient.tools.forEach((tool: any) => {
           tools[tool.name] = {
             description: tool.description,
-            parameters: tool.inputSchema, // MCP uses inputSchema, AI SDK expects parameters
+            inputSchema: tool.inputSchema, // MCP uses inputSchema, AI SDK v5 also uses inputSchema
           };
         });
         
@@ -739,7 +739,7 @@ export class McpToolsModule implements ControlModule {
         
         const toolDefinition: Tool<any> = {
           description: mcpTool.description || `MCP tool ${toolName} from ${server.name}`,
-          parameters: parametersSchema,
+          inputSchema: parametersSchema,
         };
         
         // Tool implementation that calls the MCP bridge
@@ -908,7 +908,7 @@ export class McpToolsModule implements ControlModule {
       // Tool definition (without execute function)
       const toolDefinition: Tool<any> = {
         description: tool.description || `MCP tool ${toolName} from ${clientInfo.name}`,
-        parameters: tool.parameters || z.object({}),
+        inputSchema: tool.inputSchema || z.object({}),
       };
       
       // Tool implementation (separate from definition)

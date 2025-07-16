@@ -1,0 +1,65 @@
+# LiteChat LLM Architecture Overview
+
+## 100% Client-Side Modular Event-Driven React App
+
+- **Frontend**: React 19, TypeScript, Tailwind CSS, shadcn/ui
+- **State Management**: Zustand + Immer
+- **Event System**: mitt (see `src/types/litechat/events/`)
+- **Build System**: Vite
+- **Forms**: TanStack Form (see `src/hooks/use-formedible.tsx`)
+- **Database**: Dexie.js (IndexedDB)
+- **VFS**: ZenFS (IndexedDB backend)
+- **Git**: isomorphic-git (browser-based)
+- **AI**: Vercel AI SDK, multiple providers
+
+## Entry Points
+- `src/main.tsx`: App entry, Immer, i18n, PWA, renders `<App />`
+- `src/App.tsx`: Registers all Control Modules, renders `<LiteChat controls={...} />`
+- `src/components/LiteChat/LiteChat.tsx`: Initializes modules, event system, context-aware event emission, dynamic UI
+
+## Project Structure (src/)
+- `components/`: UI, LiteChat, canvas, chat, prompt, file-manager, common, ui (shadcn)
+- `controls/`: Control Modules (modules/), module-specific components (components/)
+- `hooks/`: Custom hooks (form, prompt, etc.)
+- `lib/`: Core utilities, VFS, git, helpers
+- `modding/`: Modding API and loader
+- `services/`: Business logic (AI, workflow, persistence, etc.)
+- `store/`: Zustand state stores
+- `types/`: TypeScript types, events, canvas, middleware
+- `assets/`, `i18n/`, `locales/`: Static and localization assets
+- `main.tsx`, `App.tsx`, `index.css`: Entry, root, global styles
+
+## For LLMs: Always reference these files for high-level context before deeper reasoning.
+- `src/main.tsx`
+- `src/App.tsx`
+- `src/components/LiteChat/LiteChat.tsx` 
+
+---
+
+## EventActionCoordinator & Initialization System
+
+### EventActionCoordinatorService
+- **File:** `src/services/event-action-coordinator.service.ts`
+- **Purpose:** Dynamically registers all event-driven action handlers from every store at runtime.
+- **How it works:**
+  - Scans all Zustand stores for `getRegisteredActionHandlers`.
+  - Registers each handler with the global event emitter (`mitt`).
+  - Ensures all event→action mappings are live and extensible.
+- **Key method:** `EventActionCoordinatorService.initialize()`
+- **Why important:** This is the glue for the event-driven architecture—LLMs must understand how all stores/actions are wired up at runtime.
+
+### Initialization & Dependency Management
+- **File:** `src/lib/litechat/initialization.ts`
+- **Purpose:** Handles full app initialization, module instantiation, dependency resolution, core data loading, and phased startup.
+- **How it works:**
+  - Resolves module dependencies and sorts modules for correct init order.
+  - Loads all core data (settings, providers, rules, conversations, projects) via events.
+  - Initializes and registers all control modules.
+  - Emits phased completion events for each stage.
+- **Key methods:**
+  - `performFullInitialization()`
+  - `initializeControlModules()`
+  - `loadCoreData()`
+- **Why important:** Explains how the app boots, how modules are ordered, and how all core data is loaded and ready for use.
+
+**See also:** All major Zustand stores (documented in `llm.stores.txt`) for the event/action hooks that are registered here. 

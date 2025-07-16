@@ -4,7 +4,7 @@ import { InteractionService } from "@/services/interaction.service";
 import { useInteractionStore } from "@/store/interaction.store";
 import { buildHistoryMessages } from "@/lib/litechat/ai-helpers";
 import type { PromptObject, PromptTurnObject } from "@/types/litechat/prompt";
-import type { CoreMessage, TextPart } from "ai";
+import type { ModelMessage, TextPart } from "ai";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 
@@ -53,7 +53,7 @@ export class PromptEnhancementService {
         )
         .sort((a, b) => a.index - b.index);
 
-      const historyMessages: CoreMessage[] = buildHistoryMessages(conversationInteractions);
+      const historyMessages: ModelMessage[] = buildHistoryMessages(conversationInteractions);
 
       // Create the enhancement system prompt
       const defaultEnhancementPrompt = `You are an expert prompt engineer. Your task is to improve and enhance the given user prompt to make it more effective, specific, and likely to produce better results from AI models.
@@ -70,7 +70,7 @@ Return ONLY the enhanced prompt without any explanations, comments, or additiona
       const finalSystemPrompt = systemPrompt || defaultEnhancementPrompt;
 
       // Prepare the enhancement request message
-      const enhancementMessage: CoreMessage = {
+      const enhancementMessage: ModelMessage = {
         role: "user",
         content: [
           {

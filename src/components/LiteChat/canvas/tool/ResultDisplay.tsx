@@ -14,22 +14,22 @@ export const ToolResultDisplay: React.FC<{ toolResult: ToolResultPart }> = ({
     try {
       // Check for structured error from AIService wrapper
       if (
-        typeof toolResult.result === "object" &&
-        toolResult.result !== null &&
-        (toolResult.result as any)._isError === true
+        typeof toolResult.output === "object" &&
+        toolResult.output !== null &&
+        (toolResult.output as any)._isError === true
       ) {
-        return `Error: ${(toolResult.result as any).error}`;
+        return `Error: ${(toolResult.output as any).error}`;
       }
-      return JSON.stringify(toolResult.result, null, 2);
+      return JSON.stringify(toolResult.output, null, 2);
     } catch {
-      return String(toolResult.result);
+      return String(toolResult.output);
     }
-  }, [toolResult.result]);
+  }, [toolResult.output]);
 
   const isErrorResult =
-    typeof toolResult.result === "object" &&
-    toolResult.result !== null &&
-    (toolResult.result as any)._isError === true;
+    typeof toolResult.output === "object" &&
+    toolResult.output !== null &&
+    (toolResult.output as any)._isError === true;
 
   return (
     <div

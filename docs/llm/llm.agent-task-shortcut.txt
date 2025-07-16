@@ -1,0 +1,52 @@
+# LiteChat Agent/Task/Shortcut Patterns (for LLMs)
+
+## Overview
+LiteChat supports advanced agent, task, and shortcut prompt orchestration using a unified prompt template system. Agents and tasks are first-class prompt templates, with parent/child relationships, follow-ups, and shortcut logic. All orchestration is event-driven and extensible.
+
+---
+
+## Prompt Template System
+- **File**: `src/store/prompt-template.store.ts`
+- **Types**: `PromptTemplate`, `PromptTemplateType` ("prompt" | "task" | "agent")
+- **Agent**: Template with `type: "agent"`
+- **Task**: Template with `type: "task"`, `parentId` references agent
+- **Shortcut**: Template with `isShortcut: true`
+- **Follow-ups**: Templates can reference others for multi-step flows
+
+---
+
+## Store & Actions
+- **Store**: `usePromptTemplateStore`
+  - `getAgents()`: Returns all agent templates
+  - `getTasksForAgent(agentId)`: Returns all tasks for a given agent
+  - `getTemplatesByType(type)`: Returns all templates of a given type
+  - `getAvailableFollowUps(templateId, type)`: Returns follow-up templates
+  - **CRUD**: Add, update, delete, compile templates
+  - **Event integration**: All actions emit/handle events for UI sync
+
+---
+
+## UI & Orchestration
+- **PromptLibraryControl**: `src/controls/components/prompt/PromptLibraryControl.tsx`
+  - Agent/task/shortcut templates are selectable, searchable, and previewable
+  - Live preview and variable injection for all templates
+  - Shortcut templates are highlighted and can be run directly
+- **WorkflowBuilder**: `src/controls/components/workflow/WorkflowBuilder.tsx`
+  - Supports agent/task/shortcut templates as workflow steps and triggers
+  - TriggerConfigForm allows selection of agent/task/shortcut as workflow entry
+
+---
+
+## Extension Guidance for LLMs
+- To add new agent/task types, extend `PromptTemplateType` and update store/helpers
+- For new orchestration patterns, use parentId/followUps for multi-step flows
+- For shortcut logic, set `isShortcut: true` and handle in UI/modules
+- For event-driven orchestration, emit/handle prompt template events
+- For workflow integration, use agent/task templates as steps/triggers
+
+---
+
+## Key Files
+- Store: `src/store/prompt-template.store.ts`
+- UI: `src/controls/components/prompt/PromptLibraryControl.tsx`, `src/controls/components/workflow/WorkflowBuilder.tsx`
+- Types: `src/types/litechat/prompt-template.ts` 

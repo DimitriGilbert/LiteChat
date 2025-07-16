@@ -70,9 +70,9 @@ export class GitToolsModule implements ControlModule {
     }
     // console.log(`[${this.id}] Registering Core Git Tools...`);
 
-    const gitInitTool: Tool<typeof gitInitSchema> = {
+    const gitInitTool: Tool<any> = {
       description: "Initialize an empty Git repository in a VFS directory.",
-      parameters: gitInitSchema,
+      inputSchema: gitInitSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -102,9 +102,9 @@ export class GitToolsModule implements ControlModule {
       )
     );
 
-    const gitCommitTool: Tool<typeof gitCommitSchema> = {
+    const gitCommitTool: Tool<any> = {
       description: "Stage all changes and commit them in a VFS Git repository.",
-      parameters: gitCommitSchema,
+      inputSchema: gitCommitSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -139,10 +139,10 @@ export class GitToolsModule implements ControlModule {
       )
     );
 
-    const gitPullTool: Tool<typeof gitPullSchema> = {
+    const gitPullTool: Tool<any> = {
       description:
         "Pull changes from the remote repository for the specified branch.",
-      parameters: gitPullSchema,
+      inputSchema: gitPullSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -171,10 +171,10 @@ export class GitToolsModule implements ControlModule {
       )
     );
 
-    const gitPushTool: Tool<typeof gitPushSchema> = {
+    const gitPushTool: Tool<any> = {
       description:
         "Push committed changes from the local branch to the remote repository.",
-      parameters: gitPushSchema,
+      inputSchema: gitPushSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(
@@ -203,9 +203,9 @@ export class GitToolsModule implements ControlModule {
       )
     );
 
-    const gitStatusTool: Tool<typeof gitStatusSchema> = {
+    const gitStatusTool: Tool<any> = {
       description: "Get the Git status for a VFS repository.",
-      parameters: gitStatusSchema,
+      inputSchema: gitStatusSchema,
     };
     this.unregisterCallbacks.push(
       modApi.registerTool(

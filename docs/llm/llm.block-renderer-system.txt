@@ -1,0 +1,84 @@
+# LiteChat Block Renderer System (for LLMs)
+
+## Overview
+The Block Renderer System in LiteChat is a modular, extensible architecture for rendering code blocks, diagrams, forms, workflows, and interactive/runnable content. It supports language-specific renderers, priority-based selection, and seamless integration with the event and control module systems.
+
+---
+
+## Core Architecture
+- **BlockRenderer Interface**: `src/types/litechat/canvas/block-renderer.ts`
+- **BlockRendererService**: `src/services/block-renderer.service.ts`
+- **UniversalBlockRenderer**: `src/components/LiteChat/common/UniversalBlockRenderer.tsx`
+- **Control Modules**: Register all block renderers (see `src/controls/modules/`)
+- **StreamingContentView**: Renders all blocks via UniversalBlockRenderer
+
+---
+
+## Registration & Selection
+- **Registration**: Each block renderer is registered by a ControlModule via `modApi.registerBlockRenderer()`
+- **Selection Logic** (see BlockRendererService):
+  1. **Specific Language Match**: Renderers with `supportedLanguages` matching the block's language
+  2. **Priority**: Among matches, higher `priority` wins
+  3. **Fallback**: Renderers with no `supportedLanguages` (universal fallback)
+  4. **Default**: If no renderer, fallback to simple pre/code
+- **Context**: `BlockRendererContext` provides `lang`, `code`, `filepath`, `isStreaming`, `blockId`, `interactionId`
+
+---
+
+## UniversalBlockRenderer
+- **File**: `src/components/LiteChat/common/UniversalBlockRenderer.tsx`
+- **Usage**: All code blocks, diagrams, and special content are rendered through this component
+- **Error Handling**: Catches renderer errors, falls back to simple rendering
+- **Integration**: Used in `StreamingContentView`, canvas, and all block display areas
+
+---
+
+## Built-in Block Renderer Modules
+- **CodeBlockRendererModule**: Fallback for all code (syntax highlighting, copy/fold, file path)
+- **MermaidBlockRendererModule**: Mermaid diagrams
+- **FormedibleBlockRendererModule**: Interactive forms ("formedible" language)
+- **FlowBlockRendererModule**: React Flow diagrams ("flow", "workflow", "reactflow")
+- **WorkflowBlockRendererModule**: Workflow definitions ("workflow", "wf")
+- **ChartBlockRendererModule**: Charts/graphs ("chart", "charts", "graph", "data")
+- **JsRunnableBlockRendererModule**: Runnable JavaScript blocks ("runjs")
+- **PythonRunnableBlockRendererModule**: Runnable Python blocks ("runpy")
+- **BeatBlockRendererModule**: Musical beat patterns ("beat")
+- **ExampleBlockRendererModule**: Example for custom JSON rendering ("json")
+
+---
+
+## Advanced Features
+- **Interactive Renderers**: Support for forms, runnable code, workflow editing/execution
+- **Streaming Support**: All renderers receive `isStreaming` for live updates
+- **Context-Aware**: Renderers can use file path, block ID, interaction ID for enhanced UX
+- **Lifecycle Hooks**: `onMounted`, `onUnmounted` for advanced integration
+- **Event System**: Renderers can emit/listen for events (e.g., theme changes, custom actions)
+- **Control Rules**: Many renderers register control rules to enable/disable features or guide AI
+
+---
+
+## Best Practices
+- Use consistent UI patterns (headers, actions, responsive design)
+- Handle edge cases (empty, invalid, large, streaming blocks)
+- Use React.memo/lazy loading for heavy renderers
+- Always provide error handling and fallback rendering
+- Integrate with event system for dynamic updates
+
+---
+
+## Extension Guidance for LLMs
+- To add a new renderer, create a ControlModule and register a BlockRenderer with `supportedLanguages` and `priority`
+- For interactive/runnable content, use context and event system for actions
+- For advanced features, implement lifecycle hooks and control rules
+- For custom selection logic, use priority and language matching
+- Always test with edge cases and verify renderer selection
+
+---
+
+## Key Files
+- Types: `src/types/litechat/canvas/block-renderer.ts`
+- Service: `src/services/block-renderer.service.ts`
+- Universal: `src/components/LiteChat/common/UniversalBlockRenderer.tsx`
+- Modules: `src/controls/modules/` (all *BlockRendererModule.ts)
+- Example: `src/controls/modules/example/ExampleBlockRendererModule.ts`
+- Usage: `src/components/LiteChat/canvas/StreamingContentView.tsx` 

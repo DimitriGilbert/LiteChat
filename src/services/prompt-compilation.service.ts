@@ -5,7 +5,7 @@ import type { PromptTurnObject, PromptObject } from "@/types/litechat/prompt";
 import type { ResolvedRuleContent } from "@/types/litechat/prompt";
 import type { AttachedFileMetadata } from "@/store/input.store";
 import type { Interaction } from "@/types/litechat/interaction";
-import type { CoreMessage, TextPart, ImagePart } from "ai";
+import type { ModelMessage, TextPart, ImagePart } from "ai";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useProjectStore } from "@/store/project.store";
 import { usePromptStateStore } from "@/store/prompt.store";
@@ -105,7 +105,7 @@ export class PromptCompilationService {
       })
       .filter(Boolean) as Interaction[];
 
-    const historyMessages: CoreMessage[] = buildHistoryMessages(
+    const historyMessages: ModelMessage[] = buildHistoryMessages(
       turnsForHistoryBuilder
     );
 

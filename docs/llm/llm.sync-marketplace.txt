@@ -1,0 +1,48 @@
+# LiteChat Sync & Marketplace Architecture (for LLMs)
+
+## Overview
+LiteChat implements robust, event-driven sync and marketplace logic for distributed, collaborative workflows. Sync is deeply integrated with conversations, projects, VFS, and the marketplace, and is extensible for future distributed/remote scenarios.
+
+---
+
+## Core Sync Services
+
+### BulkSyncService
+- **File:** `src/services/bulk-sync.service.ts`
+- **Purpose:** Batch syncs all conversations, projects, and VFS nodes across local and remote (marketplace) contexts.
+- **Key methods:** `syncAll`, `syncPendingConversations`, `initializeAllRepositories`
+- **Integration:** Used by conversation/project stores, initialization, and marketplace sync.
+
+### ImportExportService
+- **File:** `src/services/import-export.service.ts`
+- **Purpose:** Handles import/export of conversations, projects, rules, prompt templates, workflows, and VFS data.
+- **Key methods:** `importConversation`, `exportConversation`, `exportProject`, etc.
+- **Integration:** Used by conversation/project stores, UI, and marketplace.
+
+### StartupSyncService
+- **File:** `src/services/startup-sync.service.ts`
+- **Purpose:** Runs background sync operations at startup after core data is loaded.
+- **Integration:** Called from initialization after core data load.
+
+---
+
+## Marketplace Sync
+- **Pattern:** Marketplace sync uses the same event-driven, batch-oriented logic as project/conversation sync, but targets distributed/remote state (marketplace, cloud, etc.).
+- **Integration:** Marketplace sync is triggered by events and can be extended for new remote backends.
+
+---
+
+## VFS/Project/Conversation Sync
+- **Pattern:** All sync operations are event-driven and coordinated via the event emitter. VFS, project, and conversation state are kept in sync across local and remote contexts.
+- **Cross-domain:** Sync logic is shared between conversations, projects, VFS, and marketplace for unified distributed state.
+
+---
+
+## Extension Patterns
+- **Event-driven:** All sync operations are triggered and coordinated by events, not direct calls.
+- **Extensible:** New sync targets (cloud, marketplace, remote VFS) can be added by implementing event handlers and extending sync services.
+
+**See also:**
+- `llm.stores.txt` for store-level sync integration
+- `llm.architecture.txt` for initialization and event wiring
+- All sync services in `src/services/` for up-to-date logic 

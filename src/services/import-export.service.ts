@@ -120,6 +120,14 @@ const formatInteractionsToMarkdown = (
 
 `;
         }
+        if (
+          interaction.metadata?.inputTokens ||
+          interaction.metadata?.outputTokens
+        ) {
+          mdString += `*Tokens: ${interaction.metadata.inputTokens ?? "?"} (input) / ${interaction.metadata.outputTokens ?? "?"} (output)*
+
+`;
+        }
       }
       mdString += `---
 

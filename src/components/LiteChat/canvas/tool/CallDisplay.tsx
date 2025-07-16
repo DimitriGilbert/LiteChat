@@ -11,11 +11,11 @@ export const ToolCallDisplay: React.FC<{ toolCall: ToolCallPart }> = ({
   const toggleFold = () => setIsArgsFolded((p) => !p);
   const argsString = useMemo(() => {
     try {
-      return JSON.stringify(toolCall.args, null, 2);
+      return JSON.stringify(toolCall.input, null, 2);
     } catch {
-      return String(toolCall.args);
+      return String(toolCall.input);
     }
-  }, [toolCall.args]);
+  }, [toolCall.input]);
 
   return (
     <div className="my-2 p-2 border border-amber-500/30 bg-amber-500/10 rounded-md text-xs">

@@ -131,8 +131,8 @@ export const UsageDashboard: React.FC = () => {
         console.warn(`[UsageDashboard] Missing pricing for modelId: ${modelId}`);
         return;
       }
-      const promptTokens = interaction.metadata?.promptTokens || 0;
-      const completionTokens = interaction.metadata?.completionTokens || 0;
+      const promptTokens = interaction.metadata?.promptTokens || interaction.metadata?.inputTokens || 0;
+      const completionTokens = interaction.metadata?.completionTokens || interaction.metadata?.outputTokens || 0;
       const totalTokens = promptTokens + completionTokens;
       const totalCost = calculateTokenCost(promptTokens, completionTokens, promptPrice, completionPrice).cost;
       existing.cost += totalCost;
@@ -172,8 +172,8 @@ export const UsageDashboard: React.FC = () => {
       }
       // Get model name for display
       const modelName = modelDef?.name || specificModelId || "Unknown";
-      const promptTokens = interaction.metadata?.promptTokens || 0;
-      const completionTokens = interaction.metadata?.completionTokens || 0;
+      const promptTokens = interaction.metadata?.promptTokens || interaction.metadata?.inputTokens || 0;
+      const completionTokens = interaction.metadata?.completionTokens || interaction.metadata?.outputTokens || 0;
       const totalTokens = promptTokens + completionTokens;
       const totalCost = calculateTokenCost(promptTokens, completionTokens, promptPrice, completionPrice).cost;
       

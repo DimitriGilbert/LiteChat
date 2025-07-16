@@ -1,0 +1,73 @@
+# LiteChat AI Orchestration & Conversation Engine (for LLMs)
+
+## Overview
+LiteChat's AI engine is a modular, event-driven orchestration of:
+- Prompt compilation, enhancement, and template logic
+- Conversation and interaction management (streaming, parent-child, race, error handling)
+- Multi-step workflow execution (tools, agents, HITL, parallel, sub-workflow)
+- File/VFS integration and streaming output
+- Persistence, recovery, and export/import
+- Web search and external tool integration
+- Block rendering and real-time streaming
+
+## Key Services & Files
+- `src/services/interaction.service.ts`: Central streaming, tool orchestration, error/race handling
+- `src/services/conversation.service.ts`: Conversation state, prompt submission, title generation, regeneration, forking
+- `src/services/prompt-compilation.service.ts`: Prompt compilation, variable substitution, rule merging, file attachment
+- `src/services/prompt-enhancement.service.ts`: Prompt rewriting/optimization (event-driven)
+- `src/services/workflow.service.ts`: Multi-step workflow engine (step execution, HITL, parallel, sub-workflow)
+- `src/services/persistence.service.ts`: IndexedDB persistence for all app data (conversations, interactions, templates, rules, projects, etc.)
+- `src/services/websearch.service.ts`: Web search, image search, content extraction, deduplication, scoring
+- `src/services/block-renderer.service.ts`: Streaming block rendering, renderer selection
+
+## Prompt Compilation & Enhancement
+- `PromptCompilationService.compilePrompt(turnData, conversationId, opts)`: Centralizes prompt building (history, rules, files, parameters, controls)
+- `PromptEnhancementService`: Listens for enhancement requests, rewrites prompts using AI, emits events
+- Prompt templates, rules, and variables are merged at compile time
+
+## Conversation & Interaction Management
+- `InteractionService`: Handles streaming, tool orchestration, aborts, error/race handling, parent-child, regeneration, forking, rating, etc.
+  - Methods: `startInteraction`, `abortInteraction`, `_handleChunk`, `_handleToolCall`, `_handleFinish`, `_handleError`, `_finalizeInteraction`, etc.
+- `ConversationService`: Handles prompt submission, title generation, regeneration, forking, file attachment, etc.
+- All actions are event-driven (see `interactionEvent`, `conversationEvent`)
+
+## Workflow Engine
+- `WorkflowService`: Multi-step workflows (prompt, agent-task, transform, tool-call, function, HITL, parallel, sub-workflow)
+  - Handles step execution, state, error, HITL, parallel, sub-workflow, flow visualization
+  - Methods: `handleWorkflowStartRequest`, `handleStepCompleted`, `handleWorkflowResumeRequest`, etc.
+  - Uses `PromptCompilationService` for each step
+- Workflow templates and runs are persisted and can be visualized/edited
+
+## Streaming, Tools, and Block Rendering
+- Streaming is managed by `InteractionService` and `AIService`, with chunked output, tool calls, reasoning, and step events
+- Tool orchestration is event-driven and modular (see Control Modules, Tool registration)
+- Block rendering is handled by `BlockRendererService` and the UniversalBlockRenderer system (see `llm.block-renderers.txt`)
+
+## File/VFS Integration
+- Prompts and workflows can attach files (see `PromptCompilationService._processFilesForPrompt`)
+- VFS operations are event-driven and run in a worker (see `llm.vfs.txt`)
+
+## Persistence & Recovery
+- All app data is persisted in IndexedDB via `PersistenceService`
+- Supports full export/import, backup, and recovery
+- Methods for all domains: conversations, interactions, projects, rules, templates, workflows, marketplace, etc.
+
+## Web Search & External Tools
+- `WebSearchService`: DuckDuckGo search, image search, content extraction, deduplication, scoring, batch search
+- Tool integration is modular and event-driven (see Control Modules, Tool registration)
+
+## Error & Race Condition Handling
+- All streaming and workflow operations have robust error and race handling (see `_handleError`, `_handleFinish`, parent-child promotion, etc.)
+- Regeneration, forking, and parallel execution are managed with safety checks and event-driven state
+
+## For LLMs: To reason about or extend the AI engine, reference:
+- `src/services/interaction.service.ts`
+- `src/services/conversation.service.ts`
+- `src/services/prompt-compilation.service.ts`
+- `src/services/prompt-enhancement.service.ts`
+- `src/services/workflow.service.ts`
+- `src/services/persistence.service.ts`
+- `src/services/websearch.service.ts`
+- `src/services/block-renderer.service.ts`
+- All event domains in `src/types/litechat/events/`
+- All relevant stores in `src/store/` 
