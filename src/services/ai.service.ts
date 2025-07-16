@@ -30,6 +30,7 @@ export interface AIServiceCallOptions {
   presencePenalty?: number;
   frequencyPenalty?: number;
   maxSteps?: number;
+  stopWhen?: any; // AI SDK stopWhen condition
   // Add providerOptions for specific provider features
   providerOptions?: Record<string, any>;
 }
@@ -38,6 +39,10 @@ export interface AIServiceCallbacks {
   onChunk: (chunk: string) => void;
   onToolCall: (toolCall: ToolCallPart) => void;
   onToolResult: (toolResult: ToolResultPart) => void;
+  // Add callbacks for tool input streaming (AI SDK v5)
+  onToolInputStart?: (toolInputStart: any) => void;
+  onToolInputDelta?: (toolInputDelta: any) => void;
+  onToolInputEnd?: (toolInputEnd: any) => void;
   // Add a callback specifically for reasoning chunks
   onReasoningChunk: (chunk: string) => void;
   // Add callbacks for step events
@@ -95,6 +100,24 @@ export class AIService {
           case "tool-result":
             callbacks.onToolResult(part as any);
             break;
+          case "tool-input-start":
+            // Handle tool input streaming start
+            if (callbacks.onToolInputStart) {
+              callbacks.onToolInputStart(part as any);
+            }
+            break;
+          case "tool-input-delta":
+            // Handle tool input streaming delta
+            if (callbacks.onToolInputDelta) {
+              callbacks.onToolInputDelta(part as any);
+            }
+            break;
+          case "tool-input-end":
+            // Handle tool input streaming end
+            if (callbacks.onToolInputEnd) {
+              callbacks.onToolInputEnd(part as any);
+            }
+            break;
           case "start-step":
             // Handle start-step events - these indicate the start of a processing step
             if (callbacks.onStepStart) {
@@ -148,7 +171,7 @@ export class AIService {
           // Handle other part types
           default:
             // Log unexpected part types but don't spam the console
-            if ((part as any).type && !['source', 'file', 'tool-call-streaming-start', 'tool-call-delta', 'reasoning-part-finish'].includes((part as any).type)) {
+            if ((part as any).type && !['source', 'file', 'tool-call-streaming-start', 'tool-call-delta', 'reasoning-part-finish', 'tool-input-start', 'tool-input-delta', 'tool-input-end'].includes((part as any).type)) {
               console.warn(
                 `[AIService] Received unexpected stream part type: ${(part as any).type} for ${interactionId}`,
                 part,

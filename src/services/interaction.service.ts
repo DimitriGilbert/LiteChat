@@ -39,6 +39,7 @@ import {
   type ProviderMetadata,
   type LanguageModel,
   type ModelMessage,
+  stepCountIs,
 } from "ai";
 import type { fs } from "@zenfs/core";
 import { conversationEvent } from "@/types/litechat/events/conversation.events";
@@ -897,6 +898,13 @@ export const InteractionService = {
         toolsWithExecute &&
         Object.keys(toolsWithExecute).length > 0 && {
           tools: toolsWithExecute,
+          // Enable multi-step calls for all interactions EXCEPT system ones that shouldn't have them
+          ...(interactionType !== "conversation.title_generation" && 
+              interactionType !== "conversation.compact" && 
+              interactionType !== "system.info" && 
+              interactionType !== "system.error" && {
+            stopWhen: stepCountIs(maxSteps || 5),
+          }),
         }),
       ...(finalPrompt.parameters?.providerOptions && {
         providerOptions: finalPrompt.parameters.providerOptions,
