@@ -88,7 +88,7 @@ export default defineConfig({
       protocolImports: true,
     }),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt}'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB limit

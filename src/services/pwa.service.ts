@@ -1,5 +1,13 @@
+import { registerSW } from 'virtual:pwa-register';
+import { emitter } from '@/lib/litechat/event-emitter';
+import { pwaEvent } from '@/types/litechat/events/pwa.events';
+import { toast } from 'sonner';
+
 export class PWAService {
   private static instance: PWAService | null = null;
+  private updateSW: ((reloadPage?: boolean) => Promise<void>) | null = null;
+  private offlineReady = false;
+  private needRefresh = false;
 
   private constructor() {
     // Private constructor for singleton
@@ -24,26 +32,114 @@ export class PWAService {
     }
 
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/'
+      this.updateSW = registerSW({
+        onNeedRefresh: () => {
+          this.needRefresh = true;
+          this.handleUpdateAvailable();
+        },
+        onOfflineReady: () => {
+          this.offlineReady = true;
+          this.handleOfflineReady();
+        },
+        onRegisterError: (error) => {
+          this.handleUpdateError(error, 'Service Worker registration failed');
+        },
       });
-      
-      console.log('Service Worker registered successfully');
-      
-      // Listen for updates
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('Service Worker update available');
-            }
-          });
-        }
-      });
-      
+
+      console.log('PWA Service Worker registered successfully');
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
+      console.error('PWA Service Worker registration failed:', error);
+      this.handleUpdateError(error as Error, 'Service Worker registration failed');
+    }
+  }
+
+  private handleUpdateAvailable(): void {
+    if (!this.updateSW) return;
+
+    emitter.emit(pwaEvent.updateAvailable, {
+      updateSW: this.updateSW,
+      showUpdatePrompt: true,
+    });
+
+    // Show toast notification
+    toast('Update Available', {
+      description: 'A new version of LiteChat is available. Click to update.',
+      action: {
+        label: 'Update Now',
+        onClick: () => this.acceptUpdate(),
+      },
+      duration: 10000,
+    });
+  }
+
+  private handleOfflineReady(): void {
+    emitter.emit(pwaEvent.offlineReady, {
+      timestamp: Date.now(),
+    });
+
+    toast.success('App Ready', {
+      description: 'LiteChat is now ready to work offline.',
+      duration: 5000,
+    });
+  }
+
+  private handleUpdateError(error: Error, context: string): void {
+    emitter.emit(pwaEvent.updateError, {
+      error,
+      context,
+    });
+
+    toast.error('Update Error', {
+      description: `Failed to update the app: ${error.message}`,
+      duration: 8000,
+    });
+  }
+
+  public async acceptUpdate(): Promise<void> {
+    if (!this.updateSW) return;
+
+    try {
+      emitter.emit(pwaEvent.updateAccepted, {
+        updateSW: this.updateSW,
+      });
+
+      await this.updateSW(true);
+
+      emitter.emit(pwaEvent.updateInstalled, {
+        needsRefresh: false,
+      });
+    } catch (error) {
+      this.handleUpdateError(error as Error, 'Update installation failed');
+    }
+  }
+
+  public rejectUpdate(): void {
+    emitter.emit(pwaEvent.updateRejected, {
+      timestamp: Date.now(),
+    });
+
+    toast.info('Update Postponed', {
+      description: 'You can update later by refreshing the page.',
+      duration: 5000,
+    });
+  }
+
+  public isUpdateAvailable(): boolean {
+    return this.needRefresh;
+  }
+
+  public isOfflineReady(): boolean {
+    return this.offlineReady;
+  }
+
+  public async checkForUpdates(): Promise<void> {
+    if (!this.updateSW) return;
+
+    try {
+      // Force check for updates
+      await this.updateSW(false);
+    } catch (error) {
+      this.handleUpdateError(error as Error, 'Manual update check failed');
     }
   }
 } 

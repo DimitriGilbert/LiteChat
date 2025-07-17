@@ -21,6 +21,7 @@ import { McpToolsModule } from "@/controls/modules/McpToolsModule";
 import { ToolSelectorControlModule } from "@/controls/modules/ToolSelectorControlModule";
 import { TextTriggerControlModule } from "@/controls/modules/TextTriggerControlModule";
 import { ProjectSettingsControlModule } from "@/controls/modules/ProjectSettingsControlModule";
+import { PWAControlModule } from "@/controls/modules/PWAControlModule";
 import { GlobalModelSelectorModule } from "@/controls/modules/GlobalModelSelectorModule";
 import { SystemPromptControlModule } from "@/controls/modules/SystemPromptControlModule";
 import { StructuredOutputControlModule } from "@/controls/modules/StructuredOutputControlModule";
@@ -90,6 +91,7 @@ import { WorkflowBlockRendererModule } from "@/controls/modules/WorkflowBlockRen
 // Define the application's specific control module registration order HERE
 const controlModulesToRegister: ControlModuleConstructor[] = [
   UrlParameterControlModule,
+  PWAControlModule,
   GeneralSettingsModule,
   ThemeSettingsControlModule,
   ProviderSettingsModule,
