@@ -28,9 +28,6 @@ const SettingsGeneralComponent: React.FC = () => {
     streamingRenderFPS: z.number().min(3, t('generalSettings.validation.minFps')).max(60, t('generalSettings.validation.maxFps')),
     autoScrollInterval: z.number().min(50, t('generalSettings.validation.minMs')).max(5000, t('generalSettings.validation.maxMs')),
     
-    // Auto Tool Selection Settings
-    autoToolSelectionEnabled: z.boolean(),
-    
     // Text Trigger Settings
     textTriggersEnabled: z.boolean(),
     textTriggerStartDelimiter: z.string().min(1),
@@ -50,9 +47,6 @@ const SettingsGeneralComponent: React.FC = () => {
       setEnableAdvancedSettings: state.setEnableAdvancedSettings,
       resetGeneralSettings: state.resetGeneralSettings,
       
-      // Auto Tool Selection Setters
-      setAutoToolSelectionEnabled: state.setAutoToolSelectionEnabled,
-      
       // Text Trigger Setters
       setTextTriggersEnabled: state.setTextTriggersEnabled,
       setTextTriggerDelimiters: state.setTextTriggerDelimiters,
@@ -68,9 +62,6 @@ const SettingsGeneralComponent: React.FC = () => {
       autoScrollInterval: state.autoScrollInterval,
       enableAutoScrollOnStream: state.enableAutoScrollOnStream,
       enableAdvancedSettings: state.enableAdvancedSettings,
-      
-      // Auto Tool Selection Values
-      autoToolSelectionEnabled: state.autoToolSelectionEnabled,
       
       // Text Trigger Values
       textTriggersEnabled: state.textTriggersEnabled,
@@ -90,9 +81,6 @@ const SettingsGeneralComponent: React.FC = () => {
       enableAutoScrollOnStream: storeValues.enableAutoScrollOnStream ?? true,
       streamingRenderFPS: storeValues.streamingRenderFPS ?? 15,
       autoScrollInterval: storeValues.autoScrollInterval ?? 1000,
-      
-      // Auto Tool Selection Defaults
-      autoToolSelectionEnabled: storeValues.autoToolSelectionEnabled ?? false,
       
       // Text Trigger Defaults
       textTriggersEnabled: storeValues.textTriggersEnabled ?? true,
@@ -116,9 +104,6 @@ const SettingsGeneralComponent: React.FC = () => {
       storeSetters.setStreamingRenderFPS(value.streamingRenderFPS);
       storeSetters.setAutoScrollInterval(value.autoScrollInterval);
       
-      // Auto Tool Selection Settings
-      storeSetters.setAutoToolSelectionEnabled(value.autoToolSelectionEnabled);
-      
       // Text Trigger Settings
       storeSetters.setTextTriggersEnabled(value.textTriggersEnabled);
       storeSetters.setTextTriggerDelimiters(value.textTriggerStartDelimiter, value.textTriggerEndDelimiter);
@@ -137,9 +122,6 @@ const SettingsGeneralComponent: React.FC = () => {
       streamingRenderFPS: storeValues.streamingRenderFPS ?? 15,
       autoScrollInterval: storeValues.autoScrollInterval ?? 1000,
       
-      // Auto Tool Selection Reset Values
-      autoToolSelectionEnabled: storeValues.autoToolSelectionEnabled ?? false,
-      
       // Text Trigger Reset Values
       textTriggersEnabled: storeValues.textTriggersEnabled ?? true,
       textTriggerStartDelimiter: storeValues.textTriggerStartDelimiter ?? "@.",
@@ -153,7 +135,6 @@ const SettingsGeneralComponent: React.FC = () => {
     storeValues.enableAutoScrollOnStream,
     storeValues.streamingRenderFPS,
     storeValues.autoScrollInterval,
-    storeValues.autoToolSelectionEnabled,
     storeValues.textTriggersEnabled,
     storeValues.textTriggerStartDelimiter,
     storeValues.textTriggerEndDelimiter,
@@ -321,27 +302,6 @@ const SettingsGeneralComponent: React.FC = () => {
       <Separator />
 
       <div className="space-y-3">
-        <h3 className="text-lg font-medium">Auto Tool Selection</h3>
-        
-        <SwitchField
-          form={form}
-          name="autoToolSelectionEnabled"
-          label="Enable Automatic Tool Selection"
-          description="Allow AI to automatically select relevant tools based on your prompt content."
-        />
-      </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <h3 className="text-lg font-medium">Text Triggers</h3>
-        
-        <SwitchField
-          form={form}
-          name="textTriggersEnabled"
-          label="Enable Text Triggers"
-          description="Allow inline commands in prompts using trigger syntax (e.g., @.tools.activate websearch;)."
-        />
 
         {storeValues.enableAdvancedSettings && (
           <div className="rounded-lg border p-3 shadow-sm space-y-3">

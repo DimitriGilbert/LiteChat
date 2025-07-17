@@ -10,6 +10,8 @@ import { useShallow } from "zustand/react/shallow";
 import { useForm, type AnyFieldApi } from "@tanstack/react-form";
 import { z } from "zod";
 import { toast } from "sonner";
+import { SwitchField } from "@/components/LiteChat/common/form-fields/SwitchField";
+import { Separator } from "@/components/ui/separator";
 
 const assistantToolsSchema = z.object({
   toolMaxSteps: z
@@ -19,6 +21,7 @@ const assistantToolsSchema = z.object({
     })
     .min(1, "Must be at least 1")
     .max(20, "Cannot exceed 20"),
+  autoToolSelectionEnabled: z.boolean(),
 });
 
 // Utility component for field meta messages (can be shared)
@@ -36,16 +39,19 @@ function FieldMetaMessages({ field }: { field: AnyFieldApi }) {
 
 export const SettingsAssistantTools: React.FC = () => {
   const { t } = useTranslation('assistantSettings');
-  const { toolMaxSteps, setToolMaxSteps } = useSettingsStore(
+  const { toolMaxSteps, setToolMaxSteps, autoToolSelectionEnabled, setAutoToolSelectionEnabled } = useSettingsStore(
     useShallow((state) => ({
       toolMaxSteps: state.toolMaxSteps,
       setToolMaxSteps: state.setToolMaxSteps,
+      autoToolSelectionEnabled: state.autoToolSelectionEnabled,
+      setAutoToolSelectionEnabled: state.setAutoToolSelectionEnabled,
     })),
   );
 
   const form = useForm({
     defaultValues: {
       toolMaxSteps: toolMaxSteps ?? 5,
+      autoToolSelectionEnabled: autoToolSelectionEnabled ?? false,
     },
     validators: {
       onChangeAsync: assistantToolsSchema,
@@ -54,6 +60,7 @@ export const SettingsAssistantTools: React.FC = () => {
     onSubmit: async ({ value }) => {
       try {
         setToolMaxSteps(value.toolMaxSteps);
+        setAutoToolSelectionEnabled(value.autoToolSelectionEnabled);
         toast.success(t('tools.updateSuccess'));
       } catch (error) {
         toast.error(t('tools.updateError'));
@@ -63,10 +70,14 @@ export const SettingsAssistantTools: React.FC = () => {
   });
 
   useEffect(() => {
-    if (form.state.values.toolMaxSteps !== (toolMaxSteps ?? 5)) {
-      form.reset({ toolMaxSteps: toolMaxSteps ?? 5 });
+    if (form.state.values.toolMaxSteps !== (toolMaxSteps ?? 5) || 
+        form.state.values.autoToolSelectionEnabled !== (autoToolSelectionEnabled ?? false)) {
+      form.reset({ 
+        toolMaxSteps: toolMaxSteps ?? 5,
+        autoToolSelectionEnabled: autoToolSelectionEnabled ?? false 
+      });
     }
-  }, [toolMaxSteps, form]);
+  }, [toolMaxSteps, autoToolSelectionEnabled, form]);
 
   return (
     <form
@@ -77,6 +88,15 @@ export const SettingsAssistantTools: React.FC = () => {
       }}
       className="space-y-3"
     >
+      <SwitchField
+        form={form}
+        name="autoToolSelectionEnabled"
+        label="Enable Automatic Tool Selection"
+        description="Allow AI to automatically select relevant tools based on your prompt content."
+      />
+      
+      <Separator />
+      
       <form.Field
         name="toolMaxSteps"
         children={(field) => (
