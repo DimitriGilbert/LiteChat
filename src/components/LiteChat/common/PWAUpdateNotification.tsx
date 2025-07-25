@@ -17,7 +17,7 @@ import { toast } from "sonner";
 
 interface PWAUpdateNotificationProps {
   onClose?: () => void;
-  autoHide?: boolean;
+  // autoHide?: boolean;
   position?: "top-right" | "top-left" | "bottom-right" | "bottom-left";
 }
 
@@ -37,48 +37,46 @@ export const PWAUpdateNotification: React.FC<PWAUpdateNotificationProps> = ({
     // Check initial state
     setIsOfflineReady(pwaService.isOfflineReady());
 
-    // Listen for update events
-    emitter.on(
-      pwaEvent.updateAvailable,
-      (payload) => {
-        setUpdateSW(() => payload.updateSW);
-        setIsVisible(true);
-      }
-    );
+    // Store event handlers for cleanup
+    const handleUpdateAvailable = (payload: any) => {
+      setUpdateSW(() => payload.updateSW);
+      setIsVisible(true);
+    };
 
-    emitter.on(
-      pwaEvent.updateAccepted,
-      () => {
-        setIsUpdating(true);
-      }
-    );
+    const handleUpdateAccepted = () => {
+      setIsUpdating(true);
+    };
 
-    emitter.on(
-      pwaEvent.updateInstalled,
-      () => {
-        setIsUpdating(false);
-        setIsVisible(false);
-        toast.success("Update Installed", {
-          description: "LiteChat has been updated successfully!",
-        });
-      }
-    );
+    const handleUpdateInstalled = () => {
+      setIsUpdating(false);
+      setIsVisible(false);
+      toast.success("Update Installed", {
+        description: "LiteChat has been updated successfully!",
+      });
+    };
 
-    emitter.on(
-      pwaEvent.updateError,
-      (payload) => {
-        setIsUpdating(false);
-        console.error("PWA Update Error:", payload.error);
-      }
-    );
+    const handleUpdateError = (payload: any) => {
+      setIsUpdating(false);
+      console.error("PWA Update Error:", payload.error);
+    };
 
-    emitter.on(pwaEvent.offlineReady, () => {
+    const handleOfflineReady = () => {
       setIsOfflineReady(true);
-    });
+    };
+
+    // Listen for update events
+    emitter.on(pwaEvent.updateAvailable, handleUpdateAvailable);
+    emitter.on(pwaEvent.updateAccepted, handleUpdateAccepted);
+    emitter.on(pwaEvent.updateInstalled, handleUpdateInstalled);
+    emitter.on(pwaEvent.updateError, handleUpdateError);
+    emitter.on(pwaEvent.offlineReady, handleOfflineReady);
 
     return () => {
-      // Note: mitt doesn't return unsubscribe functions, so we'll handle cleanup differently
-      // For now, we'll rely on component unmounting to naturally clean up
+      emitter.off(pwaEvent.updateAvailable, handleUpdateAvailable);
+      emitter.off(pwaEvent.updateAccepted, handleUpdateAccepted);
+      emitter.off(pwaEvent.updateInstalled, handleUpdateInstalled);
+      emitter.off(pwaEvent.updateError, handleUpdateError);
+      emitter.off(pwaEvent.offlineReady, handleOfflineReady);
     };
   }, []);
 

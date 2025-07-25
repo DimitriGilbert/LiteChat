@@ -100,20 +100,26 @@ export class PWAControlModule implements ControlModule {
         setIsUpdateAvailable(pwaService.isUpdateAvailable());
         setIsOfflineReady(pwaService.isOfflineReady());
 
-        // Listen for update events
-        emitter.on(pwaEvent.updateAvailable, () => setIsUpdateAvailable(true));
-
-        emitter.on(pwaEvent.updateAccepted, () => setIsUpdating(true));
-
-        emitter.on(pwaEvent.updateInstalled, () => {
+        // Define handlers
+        const handleUpdateAvailable = () => setIsUpdateAvailable(true);
+        const handleUpdateAccepted = () => setIsUpdating(true);
+        const handleUpdateInstalled = () => {
           setIsUpdating(false);
           setIsUpdateAvailable(false);
-        });
+        };
+        const handleOfflineReady = () => setIsOfflineReady(true);
 
-        emitter.on(pwaEvent.offlineReady, () => setIsOfflineReady(true));
+        // Listen for update events
+        emitter.on(pwaEvent.updateAvailable, handleUpdateAvailable);
+        emitter.on(pwaEvent.updateAccepted, handleUpdateAccepted);
+        emitter.on(pwaEvent.updateInstalled, handleUpdateInstalled);
+        emitter.on(pwaEvent.offlineReady, handleOfflineReady);
 
         return () => {
-          // Note: mitt doesn't return unsubscribe functions, cleanup handled by component unmounting
+          emitter.off(pwaEvent.updateAvailable, handleUpdateAvailable);
+          emitter.off(pwaEvent.updateAccepted, handleUpdateAccepted);
+          emitter.off(pwaEvent.updateInstalled, handleUpdateInstalled);
+          emitter.off(pwaEvent.offlineReady, handleOfflineReady);
         };
       }, []);
 

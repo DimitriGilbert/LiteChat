@@ -56,8 +56,8 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
-  DragStartEvent,
-  DragEndEvent,
+  type DragStartEvent,
+  type DragEndEvent,
   DragOverlay,
 } from "@dnd-kit/core";
 import {
@@ -112,7 +112,7 @@ const WorkflowMetadataForm = React.forwardRef<
       metadataForm.setFieldValue("description", initialData.description);
       mountedRef.current = true;
     }
-  }, []);
+  }, [initialData.name, initialData.description, metadataForm]);
 
   return (
     <div className="space-y-4">
@@ -191,7 +191,7 @@ const TriggerConfigForm = React.forwardRef<
       setCurrentValues(triggerForm.state.values);
     });
     return unsubscribe;
-  }, []);
+  }, [triggerForm]);
   const selectedTemplate =
     currentValues.triggerType === "template" && currentValues.selectedTemplateId
       ? promptTemplates.find((t) => t.id === currentValues.selectedTemplateId)
@@ -271,7 +271,7 @@ const TriggerConfigForm = React.forwardRef<
       );
       mountedRef.current = true;
     }
-  }, []);
+  }, [initialData, triggerForm.setFieldValue]);
 
   const templatesForTrigger =
     currentValues.triggerType === "template" ? promptTemplates : agentTasks;
@@ -448,7 +448,7 @@ const TemplateVariableFormWrapper = React.forwardRef<
           }
         });
     }
-  }, [template.id, template.prompt]); // Re-run when template changes
+  }, [template.id, template.prompt, initialVariables, module.compileTemplate]); // Re-run when template changes
 
   return (
     <div>
@@ -514,7 +514,7 @@ const StepsForm = React.forwardRef<
         setSteps(initialSteps);
         mountedRef.current = true;
       }
-    }, []);
+    }, [initialSteps]);
 
     // Drag and drop sensors - configured for modal usage
     const sensors = useSensors(
@@ -879,11 +879,11 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
     setVisualizerData(null);
 
     // Reset forms with the workflow data after a small delay to ensure components are mounted
-    setTimeout(() => {
-      metadataFormRef.current?.reset(newMetadata);
-      triggerFormRef.current?.reset(newTrigger);
-      stepsFormRef.current?.reset(newSteps);
-    }, 100);
+    // setTimeout(() => {
+    //   metadataFormRef.current?.reset(newMetadata);
+    //   triggerFormRef.current?.reset(newTrigger);
+    //   stepsFormRef.current?.reset(newSteps);
+    // }, 100);
 
     setOpen(true);
   };
@@ -1024,7 +1024,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
               : null;
 
           // Process initial step data for visualizer
-          let initialStepData;
+          let initialStepData: any;
           if (trigger.triggerType === "custom" && trigger.customPrompt) {
             const preview =
               trigger.customPrompt.length > 100
@@ -1183,13 +1183,9 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                     value: "visualizer",
                     label: "Visualizer",
                     content: (
-                      <div
-                        className="w-full border rounded-md overflow-hidden"
-                      >
+                      <div className="w-full border rounded-md overflow-hidden">
                         {visualizerData ? (
-                          <div
-                            className="w-full"
-                          >
+                          <div className="w-full">
                             <WorkflowVisualizer
                               workflow={visualizerData.workflow}
                               initialStepData={visualizerData.initialStepData}
@@ -1198,9 +1194,7 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
                             />
                           </div>
                         ) : (
-                          <div
-                            className="flex items-center justify-center w-full text-muted-foreground"
-                          >
+                          <div className="flex items-center justify-center w-full text-muted-foreground">
                             Loading visualizer...
                           </div>
                         )}
@@ -1283,7 +1277,9 @@ export const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ module }) => {
   const filteredWorkflows = shortcutWorkflows.filter(
     (workflow) =>
       workflow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      workflow.description.toLowerCase().includes(searchTerm.toLowerCase())
+      (workflow.description ?? "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
   );
 
   const checkIfWorkflowNeedsInput = useCallback(
