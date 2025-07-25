@@ -10,6 +10,9 @@ interface RaceResultData {
   runnableCode: string | null;
   fullResponse: string;
   blockType: "runjs" | "runpy" | "text";
+  isPromptRace: boolean;
+  promptVariantLabel?: string;
+  promptContent?: string;
   metadata: {
     responseBytes: number;
     codeBytes: number;
@@ -292,16 +295,25 @@ export class RaceResultExportService {
 
       // Build metadata
       const metadata = interaction.metadata || {};
+      
+      // Check if this is a prompt race by looking for promptVariantLabel
+      const isPromptRace = !!metadata.promptVariantLabel;
+      const promptVariantLabel = metadata.promptVariantLabel as string;
+      const promptContent = interaction.prompt?.content || "";
+      
       results.push({
         modelName,
         runnableCode,
         fullResponse,
         blockType,
+        isPromptRace,
+        promptVariantLabel,
+        promptContent,
         metadata: {
           responseBytes: this.getByteLength(fullResponse),
           codeBytes: this.getByteLength(runnableCode),
-          completionTokens: metadata.outputTokens,
-          promptTokens: metadata.inputTokens,
+          completionTokens: metadata.completionTokens || metadata.outputTokens,
+          promptTokens: metadata.promptTokens || metadata.inputTokens,
           timeToFirstToken: metadata.timeToFirstToken,
           generationTime: metadata.generationTime,
         },
@@ -322,6 +334,20 @@ export class RaceResultExportService {
       ? data.fullResponse.replace(/</g, "&lt;").replace(/>/g, "&gt;")
       : "No response content.";
 
+    // Determine the display name and title based on race type
+    const displayName = data.isPromptRace 
+      ? (data.promptVariantLabel || "Unknown Variant")
+      : data.modelName;
+    
+    const pageTitle = data.isPromptRace 
+      ? `${data.promptVariantLabel} - LiteChat Prompt Race Result`
+      : `${data.modelName} - LiteChat Race Result`;
+
+    // Sanitize prompt content for display
+    const sanitizedPromptContent = data.promptContent
+      ? data.promptContent.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      : "";
+
     // LiteChat API implementation for the exported files (EXACT COPY FROM WORKING get-results.js)
     const litechatApiScript = this.getWorkingLiteChatApiScript();
 
@@ -330,7 +356,7 @@ export class RaceResultExportService {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${data.modelName} - LiteChat Race Result</title>
+    <title>${pageTitle}</title>
     <link rel="stylesheet" href="styles.css">
     <style>
         .tab-content { display: none; }
@@ -350,16 +376,23 @@ export class RaceResultExportService {
     <div class="max-w-7xl mx-auto container bg-card rounded-2xl shadow-lg overflow-hidden border border-border">
         <div class="header bg-card border-b border-border p-6 sm:p-8 text-center">
             <div class="flex justify-between items-center mb-4">
-                <h1 class="text-3xl sm:text-4xl font-bold text-card-foreground">🚀 ${
-                  data.modelName
-                }</h1>
+                <h1 class="text-3xl sm:text-4xl font-bold text-card-foreground">🚀 ${displayName}</h1>
                 <button id="theme-toggle" class="p-2 rounded-md border border-border bg-muted hover:bg-muted/80">
                     <span class="dark:hidden">🌙</span>
                     <span class="hidden dark:inline">☀️</span>
                 </button>
             </div>
-            <p class="text-muted-foreground">LiteChat Race Result (${data.blockType.toUpperCase()})</p>
+            <p class="text-muted-foreground">LiteChat ${data.isPromptRace ? 'Prompt' : 'Model'} Race Result (${data.blockType.toUpperCase()})</p>
         </div>
+        
+        ${data.isPromptRace && sanitizedPromptContent ? `
+        <div class="prompt-section bg-muted/30 border-b border-border p-6">
+            <h2 class="text-xl font-semibold mb-3 text-card-foreground">Prompt Variant</h2>
+            <div class="bg-card border border-border rounded-lg p-4">
+                <pre class="whitespace-pre-wrap text-sm text-card-foreground font-mono">${sanitizedPromptContent}</pre>
+            </div>
+        </div>
+        ` : ''}
         
         <div class="p-4 sm:p-6">
             <div class="border-b border-border mb-4">
@@ -472,12 +505,18 @@ export class RaceResultExportService {
   private static generateResultsList(results: RaceResultData[]): string {
     return results
       .map(
-        (data) => `
+        (data) => {
+          const displayName = data.isPromptRace 
+            ? (data.promptVariantLabel || "Unknown Variant")
+            : data.modelName;
+          const fileName = data.isPromptRace 
+            ? (data.promptVariantLabel || "unknown").replace(/[^a-zA-Z0-9\-_]/g, '_')
+            : data.modelName;
+          
+          return `
         <li class="bg-card rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow border border-border">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-card-foreground">${
-                  data.modelName
-                }</h3>
+                <h3 class="text-lg font-semibold text-card-foreground">${displayName}</h3>
                 <div class="flex items-center gap-2">
                     <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
                       data.blockType === "runjs"
@@ -488,9 +527,7 @@ export class RaceResultExportService {
                     }">
                         ${data.blockType.toUpperCase()}
                     </span>
-                    <a href="./${
-                      data.modelName
-                    }.html" target="_blank" rel="noopener noreferrer" 
+                    <a href="./${fileName}.html" target="_blank" rel="noopener noreferrer" 
                        class="inline-flex items-center px-3 py-2 text-sm font-medium text-primary-foreground bg-primary border border-transparent rounded-md shadow-sm hover:bg-primary/90">
                         View Result
                     </a>
@@ -529,7 +566,8 @@ export class RaceResultExportService {
                 </div>
             </div>
         </li>
-    `
+    `;
+        }
       )
       .join("\n");
   }
@@ -540,16 +578,20 @@ export class RaceResultExportService {
   private static generateResultsTable(results: RaceResultData[]): string {
     return results
       .map(
-        (data) => `
+        (data) => {
+          const displayName = data.isPromptRace 
+            ? (data.promptVariantLabel || "Unknown Variant")
+            : data.modelName;
+          const fileName = data.isPromptRace 
+            ? (data.promptVariantLabel || "unknown").replace(/[^a-zA-Z0-9\-_]/g, '_')
+            : data.modelName;
+          
+          return `
         <tr class="hover:bg-muted/50">
             <td class="px-4 py-3">
                 <div class="flex items-center gap-2">
-                    <a href="./${
-                      data.modelName
-                    }.html" target="_blank" rel="noopener noreferrer" 
-                       class="text-primary hover:underline font-medium">${
-                         data.modelName
-                       }</a>
+                    <a href="./${fileName}.html" target="_blank" rel="noopener noreferrer" 
+                       class="text-primary hover:underline font-medium">${displayName}</a>
                     <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
                       data.blockType === "runjs"
                         ? "bg-green-100 text-green-700"
@@ -580,7 +622,8 @@ export class RaceResultExportService {
               data.metadata.generationTime || 0
             }">${this.formatTime(data.metadata.generationTime)}</td>
         </tr>
-    `
+    `;
+        }
       )
       .join("\n");
   }
@@ -806,7 +849,11 @@ export class RaceResultExportService {
     // Generate individual model HTML files
     for (const result of results) {
       const modelHtml = this.generateModelHtmlPage(result, promptText);
-      zip.file(`${result.modelName}.html`, modelHtml);
+      // Use appropriate filename based on race type
+      const fileName = result.isPromptRace 
+        ? (result.promptVariantLabel || "unknown").replace(/[^a-zA-Z0-9\-_]/g, '_')
+        : result.modelName;
+      zip.file(`${fileName}.html`, modelHtml);
     }
 
     // Generate main index.html
