@@ -154,8 +154,10 @@ export class AIService {
             // SDK provides an error part - handle OpenRouter "text part not found" bug
             const errorMessage = part.error instanceof Error ? part.error.message : String(part.error);
             
-            // Check if this is the OpenRouter "text part not found" bug
-            if (typeof errorMessage === 'string' && errorMessage.includes('text part') && errorMessage.includes('not found')) {
+            // Check if this is the OpenRouter "text part not found" or "reasoning part not found" bug
+            if (typeof errorMessage === 'string' && 
+                ((errorMessage.includes('text part') && errorMessage.includes('not found')) ||
+                 (errorMessage.includes('reasoning part') && errorMessage.includes('not found')))) {
               // console.warn(`[AIService] OpenRouter provider bug detected for ${interactionId}: ${errorMessage}. Continuing stream...`);
               // Don't stop the stream, just continue processing
               break;

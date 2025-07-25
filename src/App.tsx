@@ -57,6 +57,7 @@ import { ModSettingsModule } from "@/controls/modules/ModSettingsModule";
 // Import canvas action control modules
 import { CopyActionControlModule } from "@/controls/modules/canvas/CopyActionControlModule";
 import { RegenerateActionControlModule } from "@/controls/modules/canvas/RegenerateActionControlModule";
+import { RaceResultExportControlModule } from "@/controls/modules/canvas/RaceResultExportControlModule";
 import { RegenerateWithModelActionControlModule } from "@/controls/modules/canvas/RegenerateWithModelActionControlModule";
 import { ForkActionControlModule } from "@/controls/modules/canvas/ForkActionControlModule";
 import { ForkWithModelActionControlModule } from "@/controls/modules/canvas/ForkWithModelActionControlModule";
@@ -149,6 +150,7 @@ const controlModulesToRegister: ControlModuleConstructor[] = [
   TableOfContentsControlModule, // For InteractionCard header
   PromoteInteractionControlModule, // For InteractionCard header
   RegenerateActionControlModule, // For InteractionCard footer
+  RaceResultExportControlModule, // For race interaction footer
   RegenerateWithModelActionControlModule, // For InteractionCard footer
   ForkActionControlModule, // For InteractionCard footer
   ForkWithModelActionControlModule, // For InteractionCard footer

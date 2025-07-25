@@ -10,6 +10,7 @@ export const canvasEvent = {
   forkConversationWithModelRequest: "canvas.interaction.fork.conversation.with.model.request",
   forkConversationCompactRequest: "canvas.interaction.fork.conversation.compact.request",
   raceInteractionRequest: "canvas.interaction.race.request",
+  raceResultExportRequest: "canvas.interaction.race.result.export.request",
   editResponseRequest: "canvas.interaction.edit.response.request",
   explainSelectionRequest: "canvas.selection.explain.request",
   // rateInteractionRequest: "canvas.interaction.rate.request", // Removed
@@ -62,6 +63,10 @@ export interface CanvasEventPayloads {
   [canvasEvent.explainSelectionRequest]: {
     selectedText: string;
     interactionId: string;
+  };
+  [canvasEvent.raceResultExportRequest]: {
+    interactionId: string;
+    conversationId?: string;
   };
   // [canvasEvent.rateInteractionRequest]: { // Removed
   //   interactionId: string;
