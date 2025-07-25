@@ -50,7 +50,7 @@ interface RacePromptControlProps {
       config?: {
         raceType: "models" | "prompts";
         modelIds: string[];
-        promptVariants: Array<{id: string, label: string, content: string}>;
+        promptVariants: Array<{ id: string; label: string; content: string }>;
         staggerMs: number;
         combineEnabled: boolean;
         combineModelId?: string;
@@ -68,7 +68,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   const [open, setOpen] = useState(false);
   const [raceType, setRaceType] = useState<"models" | "prompts">("models");
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
-  const [promptVariants, setPromptVariants] = useState<Array<{id: string, label: string, content: string}>>([]);
+  const [promptVariants, setPromptVariants] = useState<
+    Array<{ id: string; label: string; content: string }>
+  >([]);
   const [staggerMs, setStaggerMs] = useState(250);
   const [raceTimeoutSec, setRaceTimeoutSec] = useState(120);
   const [combineEnabled, setCombineEnabled] = useState(false);
@@ -101,7 +103,6 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       return () => module.setNotifyCallback(null);
     }
   }, [module]);
-
 
   // const filteredModels = useMemo(() => {
   //   let textFiltered = module.globallyEnabledModels;
@@ -163,13 +164,13 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
     const newVariant = {
       id: nanoid(),
       label: `Variant ${promptVariants.length + 1}`,
-      content: ""
+      content: "",
     };
-    setPromptVariants(prev => [...prev, newVariant]);
+    setPromptVariants((prev) => [...prev, newVariant]);
   };
 
   const removePromptVariant = (id: string) => {
-    setPromptVariants(prev => prev.filter(variant => variant.id !== id));
+    setPromptVariants((prev) => prev.filter((variant) => variant.id !== id));
   };
 
   const activeCapabilityFilterCount =
@@ -309,7 +310,8 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
           <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
             <DialogTitle className="p-2">Race Configuration</DialogTitle>
             <DialogDescription>
-              Choose to race multiple models with the same prompt, or race multiple prompt variants with the same model.
+              Choose to race multiple models with the same prompt, or race
+              multiple prompt variants with the same model.
             </DialogDescription>
           </DialogHeader>
 
@@ -336,7 +338,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                         <div className="flex items-center gap-0.5">
                           <Button
                             variant={
-                              capabilityFilters.reasoning ? "secondary" : "ghost"
+                              capabilityFilters.reasoning
+                                ? "secondary"
+                                : "ghost"
                             }
                             size="sm"
                             className={cn(
@@ -351,7 +355,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                           </Button>
                           <Button
                             variant={
-                              capabilityFilters.webSearch ? "secondary" : "ghost"
+                              capabilityFilters.webSearch
+                                ? "secondary"
+                                : "ghost"
                             }
                             size="sm"
                             className={cn(
@@ -365,7 +371,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                             <Globe className="h-4 w-4" />
                           </Button>
                           <Button
-                            variant={capabilityFilters.tools ? "secondary" : "ghost"}
+                            variant={
+                              capabilityFilters.tools ? "secondary" : "ghost"
+                            }
                             size="sm"
                             className={cn(
                               "h-7 w-7 p-0",
@@ -379,7 +387,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                           </Button>
                           <Button
                             variant={
-                              capabilityFilters.multimodal ? "secondary" : "ghost"
+                              capabilityFilters.multimodal
+                                ? "secondary"
+                                : "ghost"
                             }
                             size="sm"
                             className={cn(
@@ -394,14 +404,19 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                           </Button>
                           <Button
                             variant={
-                              capabilityFilters.imageGeneration ? "secondary" : "ghost"
+                              capabilityFilters.imageGeneration
+                                ? "secondary"
+                                : "ghost"
                             }
                             size="sm"
                             className={cn(
                               "h-7 w-7 p-0",
-                              capabilityFilters.imageGeneration && "text-primary"
+                              capabilityFilters.imageGeneration &&
+                                "text-primary"
                             )}
-                            onClick={() => toggleCapabilityFilter("imageGeneration")}
+                            onClick={() =>
+                              toggleCapabilityFilter("imageGeneration")
+                            }
                             title="Filter: Image Generation"
                             aria-label="Filter by image generation capability"
                           >
@@ -419,12 +434,15 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                     {/* Model Selection */}
                     <div className="space-y-2">
                       <Label>
-                        Select Models to Race ({selectedModelIds.length} selected)
+                        Select Models to Race ({selectedModelIds.length}{" "}
+                        selected)
                       </Label>
                       {/* Single ModelSelector for adding models */}
                       <div className="flex items-center gap-2 border rounded-md p-2 bg-muted">
                         <ModelSelector
-                          models={module.globallyEnabledModels.filter((m) => !selectedModelIds.includes(m.id))}
+                          models={module.globallyEnabledModels.filter(
+                            (m) => !selectedModelIds.includes(m.id)
+                          )}
                           value={null}
                           onChange={(newId) => {
                             if (newId && !selectedModelIds.includes(newId)) {
@@ -439,19 +457,32 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                       {/* Selected models list */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
                         {selectedModelIds.map((modelId) => {
-                          const model = module.globallyEnabledModels.find((m) => m.id === modelId);
+                          const model = module.globallyEnabledModels.find(
+                            (m) => m.id === modelId
+                          );
                           if (!model) return null;
                           return (
-                            <div key={modelId} className="flex items-center gap-2 border rounded-md p-2 bg-background">
+                            <div
+                              key={modelId}
+                              className="flex items-center gap-2 border rounded-md p-2 bg-background"
+                            >
                               <div className="flex-1 min-w-0">
-                                <div className="truncate font-medium">{model.name}</div>
-                                <div className="truncate text-xs text-muted-foreground">{model.providerName}</div>
+                                <div className="truncate font-medium">
+                                  {model.name}
+                                </div>
+                                <div className="truncate text-xs text-muted-foreground">
+                                  {model.providerName}
+                                </div>
                               </div>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 aria-label="Remove model"
-                                onClick={() => setSelectedModelIds((prev) => prev.filter((id) => id !== modelId))}
+                                onClick={() =>
+                                  setSelectedModelIds((prev) =>
+                                    prev.filter((id) => id !== modelId)
+                                  )
+                                }
                                 className="ml-1"
                               >
                                 ×
@@ -470,9 +501,10 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                 content: (
                   <div className="space-y-4">
                     <div className="text-sm text-muted-foreground">
-                      Use the currently selected model to test different prompt variations.
+                      Use the currently selected model to test different prompt
+                      variations.
                     </div>
-                    
+
                     {/* Prompt Variants */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -487,24 +519,30 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                           Add Variant
                         </Button>
                       </div>
-                      
+
                       {promptVariants.length === 0 && (
                         <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-md text-center">
-                          No prompt variants configured. Click "Add Variant" to get started.
+                          No prompt variants configured. Click "Add Variant" to
+                          get started.
                         </div>
                       )}
-                      
-                      <div className="space-y-3">
+
+                      <div className="space-y-3 max-h-[50vh] overflow-y-auto">
                         {promptVariants.map((variant, index) => (
-                          <div key={variant.id} className="border rounded-md p-3 space-y-2">
+                          <div
+                            key={variant.id}
+                            className="border rounded-md p-3 space-y-2"
+                          >
                             <div className="flex items-center gap-2">
                               <Input
                                 placeholder={`Variant ${index + 1} label`}
                                 defaultValue={variant.label}
                                 onBlur={(e) => {
-                                  setPromptVariants(prev => 
-                                    prev.map(v => 
-                                      v.id === variant.id ? { ...v, label: e.target.value } : v
+                                  setPromptVariants((prev) =>
+                                    prev.map((v) =>
+                                      v.id === variant.id
+                                        ? { ...v, label: e.target.value }
+                                        : v
                                     )
                                   );
                                 }}
@@ -523,9 +561,11 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                               placeholder="Enter your prompt variation here..."
                               defaultValue={variant.content}
                               onBlur={(e) => {
-                                setPromptVariants(prev => 
-                                  prev.map(v => 
-                                    v.id === variant.id ? { ...v, content: e.target.value } : v
+                                setPromptVariants((prev) =>
+                                  prev.map((v) =>
+                                    v.id === variant.id
+                                      ? { ...v, content: e.target.value }
+                                      : v
                                   )
                                 );
                               }}
@@ -540,7 +580,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
               },
             ]}
             defaultValue="models"
-            onValueChange={(value) => setRaceType(value as "models" | "prompts")}
+            onValueChange={(value) =>
+              setRaceType(value as "models" | "prompts")
+            }
             className="flex-1"
             scrollable
           />

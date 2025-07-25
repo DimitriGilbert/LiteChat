@@ -17,6 +17,8 @@ import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/store/settings.store";
+import { usePromptStateStore } from "@/store/prompt.store";
+import { toast } from "sonner";
 import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
 
 import type { TextTrigger, MethodSuggestion, AutocompleteSuggestion } from '@/types/litechat/text-triggers';
@@ -57,6 +59,7 @@ export const InputArea = memo(
   const [textareaStyles, setTextareaStyles] = useState<CSSStyleDeclaration | null>(null);
   const setPromptInputValue = usePromptInputValueStore((state) => state.setValue);
   const settings = useSettingsStore();
+  const currentModelIdFromPromptStore = usePromptStateStore((state) => state.modelId);
   const { t } = useTranslation('prompt');      if (!placeholder || placeholder === "") {
         placeholder = t('inputAreaPlaceholder');
       }
@@ -304,6 +307,11 @@ export const InputArea = memo(
           const hasFiles =
             useInputStore.getState().attachedFilesMetadata.length > 0;
           if (internalValue.trim().length > 0 || hasFiles) {
+            // Check if a model is selected before submitting
+            if (!currentModelIdFromPromptStore) {
+              toast.error("Please select a model before sending a message");
+              return;
+            }
             onSubmit();
             // @ts-expect-error - ref.current might be null initially
             ref?.current?.clearValue();

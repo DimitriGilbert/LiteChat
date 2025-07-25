@@ -86,6 +86,12 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
     }
     if (isStreaming || isSubmitting) return;
 
+    // Check if a model is selected before proceeding
+    if (!currentModelIdFromPromptStore) {
+      toast.error("Please select a model before sending a message");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let parameters: Record<string, any> = {};
@@ -236,7 +242,8 @@ export const PromptWrapper: React.FC<PromptWrapperProps> = ({
           disabled={
             isStreaming ||
             isSubmitting ||
-            (!hasInputValue && attachedFilesMetadata.length === 0)
+            (!hasInputValue && attachedFilesMetadata.length === 0) ||
+            !currentModelIdFromPromptStore
           }
           className="h-9 w-9 flex-shrink-0"
           aria-label={t('sendMessage')}

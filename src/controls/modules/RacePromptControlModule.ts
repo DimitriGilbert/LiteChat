@@ -463,19 +463,45 @@ export class RacePromptControlModule implements ControlModule {
       const baseParameters = originalPrompt.parameters || {};
       const baseMetadata = { ...originalPrompt.metadata };
 
+      // Extract the original user message content
+      const userMessage = originalPrompt.messages[originalPrompt.messages.length - 1];
+      if (!userMessage || userMessage.role !== "user") {
+        throw new Error("Could not find user message in original prompt");
+      }
+      
+      let originalUserContent = "";
+      if (typeof userMessage.content === "string") {
+        originalUserContent = userMessage.content;
+      } else if (Array.isArray(userMessage.content)) {
+        originalUserContent = userMessage.content
+          .filter(part => part.type === "text")
+          .map(part => (part as any).text)
+          .join("");
+      }
+
+      // Add the original user prompt as the first variant
+      const allPromptVariants = [
+        {
+          id: nanoid(),
+          label: "Original Prompt",
+          content: originalUserContent
+        },
+        ...promptVariants
+      ];
+
       if (combineEnabled) {
         // COMBINE MODE: Manually create main interaction, then start children with different prompts
         
         const mainInteractionId = nanoid();
         const mainTurnData: PromptTurnObject = {
           id: mainInteractionId,
-          content: `Racing ${promptVariants.length} prompt variants with ${currentModelId}`,
+          content: `Racing ${allPromptVariants.length} prompt variants with ${currentModelId}`,
           parameters: baseParameters,
           metadata: {
             ...baseMetadata,
             modelId: combineModelId as string,
             isRaceCombining: true,
-            raceParticipantCount: promptVariants.length,
+            raceParticipantCount: allPromptVariants.length,
             raceConfig: raceConfig,
           },
         };
@@ -497,7 +523,7 @@ export class RacePromptControlModule implements ControlModule {
           metadata: {
             ...mainTurnData.metadata,
             isRaceCombining: true,
-            raceParticipantCount: promptVariants.length,
+            raceParticipantCount: allPromptVariants.length,
             toolCalls: [],
             toolResults: [],
           },
@@ -512,7 +538,7 @@ export class RacePromptControlModule implements ControlModule {
         // Set the initial content in the stream buffer for the UI to render
         interactionStore.setActiveStreamBuffer(
           mainInteraction.id,
-          `🏁 Starting prompt race with ${promptVariants.length} variants...\\n\\n⏳ Collecting responses for combination...`
+          `🏁 Starting prompt race with ${allPromptVariants.length} variants...\\n\\n⏳ Collecting responses for combination...`
         );
         
         await PersistenceService.saveInteraction(mainInteraction);
@@ -525,7 +551,7 @@ export class RacePromptControlModule implements ControlModule {
         });
 
         // Create child interactions for ALL prompt variants using the same model
-        const allChildInteractionPromises = promptVariants.map((variant, index: number) => {
+        const allChildInteractionPromises = allPromptVariants.map((variant, index: number) => {
           return new Promise<{ interaction: Interaction | null, promptLabel: string }>((resolve) => {
             setTimeout(async () => {
               try {
@@ -601,7 +627,7 @@ export class RacePromptControlModule implements ControlModule {
         // NON-COMBINE MODE: Create main interaction with first prompt, then additional children
         
         const mainInteractionId = nanoid();
-        const firstVariant = promptVariants[0];
+        const firstVariant = allPromptVariants[0];
         
         // Create main interaction with first prompt variant
         const mainTurnData: PromptTurnObject = {
@@ -643,7 +669,7 @@ export class RacePromptControlModule implements ControlModule {
         }
 
         // Create additional child interactions for remaining prompt variants
-        const remainingVariants = promptVariants.slice(1);
+        const remainingVariants = allPromptVariants.slice(1);
         const childInteractionPromises = remainingVariants.map((variant, index: number) => {
           return new Promise<{ interaction: Interaction | null, promptLabel: string }>((resolve) => {
             setTimeout(async () => {
@@ -711,7 +737,7 @@ export class RacePromptControlModule implements ControlModule {
         const childResults = await Promise.all(childInteractionPromises);
         const successfulChildren = childResults.filter(r => r.interaction !== null);
 
-        toast.success(`Prompt race started! ${promptVariants.length} prompt variants with ${currentModelId} responding in tabs. ${successfulChildren.length} interactions created successfully.`);
+        toast.success(`Prompt race started! ${allPromptVariants.length} prompt variants with ${currentModelId} responding in tabs. ${successfulChildren.length + 1} interactions created successfully.`);
       }
       
     } catch (error) {
