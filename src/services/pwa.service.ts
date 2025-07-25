@@ -1,7 +1,7 @@
-import { registerSW } from 'virtual:pwa-register';
-import { emitter } from '@/lib/litechat/event-emitter';
-import { pwaEvent } from '@/types/litechat/events/pwa.events';
-import { toast } from 'sonner';
+import { registerSW } from "virtual:pwa-register";
+import { emitter } from "@/lib/litechat/event-emitter";
+import { pwaEvent } from "@/types/litechat/events/pwa.events";
+import { toast } from "sonner";
 
 export class PWAService {
   private static instance: PWAService | null = null;
@@ -26,8 +26,8 @@ export class PWAService {
   }
 
   private async registerServiceWorker(): Promise<void> {
-    if (!('serviceWorker' in navigator)) {
-      console.log('Service Worker not supported');
+    if (!("serviceWorker" in navigator)) {
+      console.log("Service Worker not supported");
       return;
     }
 
@@ -41,15 +41,18 @@ export class PWAService {
           this.offlineReady = true;
           this.handleOfflineReady();
         },
-        onRegisterError: (error) => {
-          this.handleUpdateError(error, 'Service Worker registration failed');
+        onRegisterError: (error: Error) => {
+          this.handleUpdateError(error, "Service Worker registration failed");
         },
       });
 
-      console.log('PWA Service Worker registered successfully');
+      console.log("PWA Service Worker registered successfully");
     } catch (error) {
-      console.error('PWA Service Worker registration failed:', error);
-      this.handleUpdateError(error as Error, 'Service Worker registration failed');
+      console.error("PWA Service Worker registration failed:", error);
+      this.handleUpdateError(
+        error as Error,
+        "Service Worker registration failed"
+      );
     }
   }
 
@@ -62,23 +65,24 @@ export class PWAService {
     });
 
     // Show toast notification
-    toast('Update Available', {
-      description: 'A new version of LiteChat is available. Click to update.',
+    toast("Update Available", {
+      description: "A new version of LiteChat is available. Click to update.",
       action: {
-        label: 'Update Now',
+        label: "Update Now",
         onClick: () => this.acceptUpdate(),
       },
       duration: 10000,
     });
   }
 
+
   private handleOfflineReady(): void {
     emitter.emit(pwaEvent.offlineReady, {
       timestamp: Date.now(),
     });
 
-    toast.success('App Ready', {
-      description: 'LiteChat is now ready to work offline.',
+    toast.success("App Ready", {
+      description: "LiteChat is now ready to work offline.",
       duration: 5000,
     });
   }
@@ -89,7 +93,7 @@ export class PWAService {
       context,
     });
 
-    toast.error('Update Error', {
+    toast.error("Update Error", {
       description: `Failed to update the app: ${error.message}`,
       duration: 8000,
     });
@@ -109,7 +113,7 @@ export class PWAService {
         needsRefresh: false,
       });
     } catch (error) {
-      this.handleUpdateError(error as Error, 'Update installation failed');
+      this.handleUpdateError(error as Error, "Update installation failed");
     }
   }
 
@@ -118,8 +122,8 @@ export class PWAService {
       timestamp: Date.now(),
     });
 
-    toast.info('Update Postponed', {
-      description: 'You can update later by refreshing the page.',
+    toast.info("Update Postponed", {
+      description: "You can update later by refreshing the page.",
       duration: 5000,
     });
   }
@@ -133,13 +137,22 @@ export class PWAService {
   }
 
   public async checkForUpdates(): Promise<void> {
-    if (!this.updateSW) return;
+    if (!this.updateSW) {
+      console.log("No update service worker available");
+      return;
+    }
 
     try {
-      // Force check for updates
-      await this.updateSW(false);
+      // Force check for updates by calling the service worker update function
+      // This will trigger the onNeedRefresh callback if an update is available
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        await registration.update();
+        console.log("Manual update check completed");
+      }
     } catch (error) {
-      this.handleUpdateError(error as Error, 'Manual update check failed');
+      console.error("Manual update check failed:", error);
+      this.handleUpdateError(error as Error, "Manual update check failed");
     }
   }
-} 
+}
