@@ -29,14 +29,18 @@ export class RacePromptControlModule implements ControlModule {
   // Race state
   private isRaceMode = false;
   private raceConfig: {
+    raceType: "models" | "prompts";
     modelIds: string[];
+    promptVariants: Array<{id: string, label: string, content: string}>;
     staggerMs: number;
     raceTimeoutSec: number;
     combineEnabled: boolean;
     combineModelId?: string;
     combinePrompt?: string;
   } = {
+    raceType: "models",
     modelIds: [],
+    promptVariants: [],
     staggerMs: 250,
     raceTimeoutSec: 120,
     combineEnabled: false,
@@ -84,9 +88,14 @@ export class RacePromptControlModule implements ControlModule {
           // Immediately disable race mode to prevent multiple triggers
           this.setRaceMode(false);
           
-          // Run the race setup in the background (fire-and-forget)
-          // DO NOT await this, as it would block the UI thread.
-          this.handleRaceConversion(payload.prompt, payload.conversationId, currentRaceConfig);
+          // Route to appropriate race handler based on type
+          if (currentRaceConfig.raceType === "models") {
+            // Run the existing model race setup in the background (fire-and-forget)
+            this.handleRaceConversion(payload.prompt, payload.conversationId, currentRaceConfig);
+          } else {
+            // Run the new prompt race setup in the background (fire-and-forget)
+            this.handlePromptRaceConversion(payload.prompt, payload.conversationId, currentRaceConfig);
+          }
           
           // Return false to cancel the original interaction immediately
           return false;
@@ -114,7 +123,9 @@ export class RacePromptControlModule implements ControlModule {
   }
 
   setRaceMode(active: boolean, config?: {
+    raceType: "models" | "prompts";
     modelIds: string[];
+    promptVariants: Array<{id: string, label: string, content: string}>;
     staggerMs: number;
     raceTimeoutSec?: number;
     combineEnabled: boolean;
@@ -127,7 +138,9 @@ export class RacePromptControlModule implements ControlModule {
       this.raceConfig = { ...config, raceTimeoutSec: config.raceTimeoutSec || 120 };
     } else {
       this.raceConfig = {
+        raceType: "models",
         modelIds: [],
+        promptVariants: [],
         staggerMs: 250,
         raceTimeoutSec: 120,
         combineEnabled: false,
@@ -141,7 +154,7 @@ export class RacePromptControlModule implements ControlModule {
     return this.isRaceMode;
   }
 
-  // New approach: Create race setup from scratch since we cancelled the original interaction
+  // Model racing: Create race setup from scratch since we cancelled the original interaction
   private async handleRaceConversion(prompt: PromptObject, conversationId: string, raceConfig: typeof this.raceConfig): Promise<void> {
     try {
       const { modelIds: raceModelIds, staggerMs, combineEnabled, combineModelId } = raceConfig;
@@ -422,6 +435,288 @@ export class RacePromptControlModule implements ControlModule {
     } catch (error) {
       toast.error(`Race conversion failed: ${String(error)}`);
       console.error(`[RacePromptControlModule] Error during race conversion:`, error);
+    }
+  }
+
+  // Prompt racing: Create race setup with different prompts but same model
+  private async handlePromptRaceConversion(originalPrompt: PromptObject, conversationId: string, raceConfig: typeof this.raceConfig): Promise<void> {
+    try {
+      const { promptVariants, staggerMs, combineEnabled, combineModelId } = raceConfig;
+      
+      if (promptVariants.length === 0) {
+        throw new Error("No prompt variants configured for race");
+      }
+
+      if (combineEnabled && !combineModelId) {
+        throw new Error("Combine model not selected");
+      }
+
+      const interactionStore = useInteractionStore.getState();
+      
+      // Use the currently selected model from the original prompt
+      const currentModelId = originalPrompt.metadata?.modelId;
+      if (!currentModelId) {
+        throw new Error("No model ID available in prompt metadata");
+      }
+
+      // Extract the base parameters and metadata from original prompt
+      const baseParameters = originalPrompt.parameters || {};
+      const baseMetadata = { ...originalPrompt.metadata };
+
+      if (combineEnabled) {
+        // COMBINE MODE: Manually create main interaction, then start children with different prompts
+        
+        const mainInteractionId = nanoid();
+        const mainTurnData: PromptTurnObject = {
+          id: mainInteractionId,
+          content: `Racing ${promptVariants.length} prompt variants with ${currentModelId}`,
+          parameters: baseParameters,
+          metadata: {
+            ...baseMetadata,
+            modelId: combineModelId as string,
+            isRaceCombining: true,
+            raceParticipantCount: promptVariants.length,
+            raceConfig: raceConfig,
+          },
+        };
+        
+        const conversationInteractions = interactionStore.interactions.filter(
+          (i) => i.conversationId === conversationId
+        );
+        const newIndex = conversationInteractions.reduce((max, i) => Math.max(max, i.index), -1) + 1;
+
+        const mainInteraction: Interaction = {
+          id: mainInteractionId,
+          conversationId: conversationId,
+          type: "message.user_assistant",
+          prompt: { ...mainTurnData },
+          response: null,
+          status: "STREAMING",
+          startedAt: new Date(),
+          endedAt: null,
+          metadata: {
+            ...mainTurnData.metadata,
+            isRaceCombining: true,
+            raceParticipantCount: promptVariants.length,
+            toolCalls: [],
+            toolResults: [],
+          },
+          index: newIndex,
+          parentId: null,
+        };
+
+        // Add to state and persistence WITHOUT starting an AI call for it
+        interactionStore._addInteractionToState(mainInteraction);
+        interactionStore._addStreamingId(mainInteraction.id);
+        
+        // Set the initial content in the stream buffer for the UI to render
+        interactionStore.setActiveStreamBuffer(
+          mainInteraction.id,
+          `🏁 Starting prompt race with ${promptVariants.length} variants...\\n\\n⏳ Collecting responses for combination...`
+        );
+        
+        await PersistenceService.saveInteraction(mainInteraction);
+        
+        emitter.emit(interactionEvent.added, { interaction: mainInteraction });
+        emitter.emit(interactionEvent.started, {
+          interactionId: mainInteraction.id,
+          conversationId: mainInteraction.conversationId,
+          type: mainInteraction.type,
+        });
+
+        // Create child interactions for ALL prompt variants using the same model
+        const allChildInteractionPromises = promptVariants.map((variant, index: number) => {
+          return new Promise<{ interaction: Interaction | null, promptLabel: string }>((resolve) => {
+            setTimeout(async () => {
+              try {
+                const childInteractionId = nanoid();
+                
+                const childTurnData: PromptTurnObject = {
+                  id: childInteractionId,
+                  content: variant.content,
+                  parameters: baseParameters,
+                  metadata: {
+                    ...baseMetadata,
+                    modelId: currentModelId,
+                    raceTab: true,
+                    raceParticipantIndex: index + 1,
+                    raceMainInteractionId: mainInteraction.id,
+                    promptVariantLabel: variant.label,
+                  }
+                };
+
+                // Create prompt for this variant using the same model
+                const childPrompt: PromptObject = {
+                  ...originalPrompt,
+                  messages: [
+                    ...originalPrompt.messages.slice(0, -1), // Keep all but last message
+                    { role: "user", content: variant.content } // Replace user message with variant
+                  ],
+                  metadata: {
+                    ...originalPrompt.metadata,
+                    modelId: currentModelId,
+                  },
+                };
+
+                const childInteraction = await InteractionService.startInteraction(
+                  childPrompt,
+                  conversationId,
+                  childTurnData,
+                  "message.assistant_regen"
+                );
+
+                // Make this a child of the main interaction
+                if (childInteraction) {
+                  const updates: Partial<Omit<Interaction, "id">> = {
+                    parentId: mainInteraction.id,
+                    index: index + 1,
+                  };
+
+                  interactionStore._updateInteractionInState(childInteraction.id, updates);
+                  await PersistenceService.saveInteraction({
+                    ...childInteraction,
+                    ...updates,
+                  } as Interaction);
+                }
+                
+                resolve({ interaction: childInteraction, promptLabel: variant.label });
+              } catch (error) {
+                console.error(`[RacePromptControlModule] Error creating child interaction for prompt "${variant.label}":`, error);
+                resolve({ interaction: null, promptLabel: variant.label });
+              }
+            }, index * staggerMs);
+          });
+        });
+
+        // Wait for all children to be created
+        const allChildResults = await Promise.all(allChildInteractionPromises);
+        const successfulChildren = allChildResults.filter(r => r.interaction !== null);
+        
+        const allChildIds = successfulChildren.map(r => r.interaction!.id);
+
+        // Wait for all children to complete and then combine
+        await this.waitForRaceCompletion(mainInteraction.id, allChildIds, raceConfig.raceTimeoutSec);
+        
+      } else {
+        // NON-COMBINE MODE: Create main interaction with first prompt, then additional children
+        
+        const mainInteractionId = nanoid();
+        const firstVariant = promptVariants[0];
+        
+        // Create main interaction with first prompt variant
+        const mainTurnData: PromptTurnObject = {
+          id: mainInteractionId,
+          content: firstVariant.content,
+          parameters: baseParameters,
+          metadata: {
+            ...baseMetadata,
+            modelId: currentModelId,
+            raceTab: true,
+            raceParticipantIndex: 1,
+            raceMainInteractionId: mainInteractionId,
+            promptVariantLabel: firstVariant.label,
+          },
+        };
+
+        // Create prompt for first variant
+        const mainPrompt: PromptObject = {
+          ...originalPrompt,
+          messages: [
+            ...originalPrompt.messages.slice(0, -1),
+            { role: "user", content: firstVariant.content }
+          ],
+          metadata: {
+            ...originalPrompt.metadata,
+            modelId: currentModelId,
+          },
+        };
+
+        const mainInteraction = await InteractionService.startInteraction(
+          mainPrompt,
+          conversationId,
+          mainTurnData,
+          "message.user_assistant"
+        );
+
+        if (!mainInteraction) {
+          throw new Error("Could not create main prompt race interaction");
+        }
+
+        // Create additional child interactions for remaining prompt variants
+        const remainingVariants = promptVariants.slice(1);
+        const childInteractionPromises = remainingVariants.map((variant, index: number) => {
+          return new Promise<{ interaction: Interaction | null, promptLabel: string }>((resolve) => {
+            setTimeout(async () => {
+              try {
+                const childInteractionId = nanoid();
+                
+                const childTurnData: PromptTurnObject = {
+                  id: childInteractionId,
+                  content: variant.content,
+                  parameters: baseParameters,
+                  metadata: {
+                    ...baseMetadata,
+                    modelId: currentModelId,
+                    raceTab: true,
+                    raceParticipantIndex: index + 2,
+                    raceMainInteractionId: mainInteraction.id,
+                    promptVariantLabel: variant.label,
+                  }
+                };
+
+                // Create prompt for this variant
+                const childPrompt: PromptObject = {
+                  ...originalPrompt,
+                  messages: [
+                    ...originalPrompt.messages.slice(0, -1),
+                    { role: "user", content: variant.content }
+                  ],
+                  metadata: {
+                    ...originalPrompt.metadata,
+                    modelId: currentModelId,
+                  },
+                };
+
+                const childInteraction = await InteractionService.startInteraction(
+                  childPrompt,
+                  conversationId,
+                  childTurnData,
+                  "message.assistant_regen"
+                );
+
+                // Make this a child of the main interaction
+                if (childInteraction) {
+                  const updates: Partial<Omit<Interaction, "id">> = {
+                    parentId: mainInteraction.id,
+                    index: index + 1,
+                  };
+
+                  interactionStore._updateInteractionInState(childInteraction.id, updates);
+                  await PersistenceService.saveInteraction({
+                    ...childInteraction,
+                    ...updates,
+                  } as Interaction);
+                }
+                
+                resolve({ interaction: childInteraction, promptLabel: variant.label });
+              } catch (error) {
+                console.error(`[RacePromptControlModule] Error creating child interaction for prompt "${variant.label}":`, error);
+                resolve({ interaction: null, promptLabel: variant.label });
+              }
+            }, index * staggerMs);
+          });
+        });
+
+        // Wait for all child interactions to be created
+        const childResults = await Promise.all(childInteractionPromises);
+        const successfulChildren = childResults.filter(r => r.interaction !== null);
+
+        toast.success(`Prompt race started! ${promptVariants.length} prompt variants with ${currentModelId} responding in tabs. ${successfulChildren.length} interactions created successfully.`);
+      }
+      
+    } catch (error) {
+      toast.error(`Prompt race conversion failed: ${String(error)}`);
+      console.error(`[RacePromptControlModule] Error during prompt race conversion:`, error);
     }
   }
 

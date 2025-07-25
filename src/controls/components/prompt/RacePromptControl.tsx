@@ -30,6 +30,8 @@ import type { ModelListItem } from "@/types/litechat/provider";
 import { useInteractionStore } from "@/store/interaction.store";
 import { useShallow } from "zustand/react/shallow";
 import { ModelSelector } from "@/controls/components/global-model-selector/ModelSelector";
+import { TabbedLayout } from "@/components/LiteChat/common/TabbedLayout";
+import { nanoid } from "nanoid";
 
 type CapabilityFilter =
   | "reasoning"
@@ -46,7 +48,9 @@ interface RacePromptControlProps {
     setRaceMode: (
       active: boolean,
       config?: {
+        raceType: "models" | "prompts";
         modelIds: string[];
+        promptVariants: Array<{id: string, label: string, content: string}>;
         staggerMs: number;
         combineEnabled: boolean;
         combineModelId?: string;
@@ -62,7 +66,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   module,
 }) => {
   const [open, setOpen] = useState(false);
+  const [raceType, setRaceType] = useState<"models" | "prompts">("models");
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+  const [promptVariants, setPromptVariants] = useState<Array<{id: string, label: string, content: string}>>([]);
   const [staggerMs, setStaggerMs] = useState(250);
   const [raceTimeoutSec, setRaceTimeoutSec] = useState(120);
   const [combineEnabled, setCombineEnabled] = useState(false);
@@ -95,6 +101,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       return () => module.setNotifyCallback(null);
     }
   }, [module]);
+
 
   // const filteredModels = useMemo(() => {
   //   let textFiltered = module.globallyEnabledModels;
@@ -152,6 +159,19 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
     }));
   };
 
+  const addPromptVariant = () => {
+    const newVariant = {
+      id: nanoid(),
+      label: `Variant ${promptVariants.length + 1}`,
+      content: ""
+    };
+    setPromptVariants(prev => [...prev, newVariant]);
+  };
+
+  const removePromptVariant = (id: string) => {
+    setPromptVariants(prev => prev.filter(variant => variant.id !== id));
+  };
+
   const activeCapabilityFilterCount =
     Object.values(capabilityFilters).filter(Boolean).length;
   const totalActiveFilters = activeCapabilityFilterCount;
@@ -163,9 +183,16 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   // };
 
   const handleStartRace = () => {
-    if (selectedModelIds.length < 1) {
-      toast.error("Please select at least 1 model to race");
-      return;
+    if (raceType === "models") {
+      if (selectedModelIds.length < 1) {
+        toast.error("Please select at least 1 model to race");
+        return;
+      }
+    } else {
+      if (promptVariants.length < 1) {
+        toast.error("Please add at least 1 prompt variant to race");
+        return;
+      }
     }
 
     if (combineEnabled && !combineModelId) {
@@ -175,7 +202,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
 
     // Enable race mode in the module
     module.setRaceMode(true, {
+      raceType: raceType,
       modelIds: selectedModelIds,
+      promptVariants: promptVariants,
       staggerMs: staggerMs,
       raceTimeoutSec: raceTimeoutSec,
       combineEnabled: combineEnabled,
@@ -185,12 +214,20 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
 
     setOpen(false);
 
-    toast.info(
-      `Race mode enabled! Send your prompt to race ${selectedModelIds.length} models.`
-    );
+    if (raceType === "models") {
+      toast.info(
+        `Model race mode enabled! Send your prompt to race ${selectedModelIds.length} models.`
+      );
+    } else {
+      toast.info(
+        `Prompt race mode enabled! Send any message to race ${promptVariants.length} prompt variants.`
+      );
+    }
 
     // Reset selections for next use
+    setRaceType("models");
     setSelectedModelIds([]);
+    setPromptVariants([]);
     setStaggerMs(250);
     setRaceTimeoutSec(120);
     setFilterText("");
@@ -227,8 +264,8 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       return;
     }
 
-    if (module.globallyEnabledModels.length < 2) {
-      toast.info("Need at least 2 models enabled to race");
+    if (module.globallyEnabledModels.length < 1) {
+      toast.info("Need at least 1 model enabled to race");
       return;
     }
 
@@ -238,20 +275,20 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
   // Check if racing is available
   const canRace =
     interactionStatus !== "streaming" &&
-    module.globallyEnabledModels.length >= 2;
+    module.globallyEnabledModels.length >= 1;
 
   // Dynamic tooltip based on state
   const getTooltipText = () => {
     if (module.isRaceModeActive) {
-      return "Race mode active - click to cancel, or send your prompt to race models";
+      return "Race mode active - click to cancel, or send your prompt to race";
     }
     if (interactionStatus === "streaming") {
       return "Cannot race while streaming";
     }
-    if (module.globallyEnabledModels.length < 2) {
-      return `Need at least 2 models enabled to race (currently have ${module.globallyEnabledModels.length})`;
+    if (module.globallyEnabledModels.length < 1) {
+      return `Need at least 1 model enabled to race (currently have ${module.globallyEnabledModels.length})`;
     }
-    return "Race multiple models with your prompt";
+    return "Race multiple models or prompt variants";
   };
 
   return (
@@ -270,157 +307,246 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="min-w-[95vw] max min-h-[95vh] flex flex-col p-4">
           <DialogHeader className="p-2 md:p-3 pb-1 md:pb-2 flex-shrink-0">
-            <DialogTitle className="p-2">Race Models</DialogTitle>
+            <DialogTitle className="p-2">Race Configuration</DialogTitle>
             <DialogDescription>
-              Select multiple models to race against each other. After clicking
-              "Enable Race Mode", send your prompt and all selected models will
-              respond.
+              Choose to race multiple models with the same prompt, or race multiple prompt variants with the same model.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Search and Filter Controls */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-grow">
-                  <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search models..."
-                    value={filterText}
-                    onChange={(e) => setFilterText(e.target.value)}
-                    className="pl-8 h-9"
-                  />
-                </div>
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant={
-                      capabilityFilters.reasoning ? "secondary" : "ghost"
-                    }
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0",
-                      capabilityFilters.reasoning && "text-primary"
-                    )}
-                    onClick={() => toggleCapabilityFilter("reasoning")}
-                    title="Filter: Reasoning"
-                    aria-label="Filter by reasoning capability"
-                  >
-                    <Brain className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={
-                      capabilityFilters.webSearch ? "secondary" : "ghost"
-                    }
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0",
-                      capabilityFilters.webSearch && "text-primary"
-                    )}
-                    onClick={() => toggleCapabilityFilter("webSearch")}
-                    title="Filter: Web Search"
-                    aria-label="Filter by web search capability"
-                  >
-                    <Globe className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={capabilityFilters.tools ? "secondary" : "ghost"}
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0",
-                      capabilityFilters.tools && "text-primary"
-                    )}
-                    onClick={() => toggleCapabilityFilter("tools")}
-                    title="Filter: Tools"
-                    aria-label="Filter by tool usage capability"
-                  >
-                    <Wrench className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={
-                      capabilityFilters.multimodal ? "secondary" : "ghost"
-                    }
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0",
-                      capabilityFilters.multimodal && "text-primary"
-                    )}
-                    onClick={() => toggleCapabilityFilter("multimodal")}
-                    title="Filter: Multimodal"
-                    aria-label="Filter by multimodal capability"
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={
-                      capabilityFilters.imageGeneration ? "secondary" : "ghost"
-                    }
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0",
-                      capabilityFilters.imageGeneration && "text-primary"
-                    )}
-                    onClick={() => toggleCapabilityFilter("imageGeneration")}
-                    title="Filter: Image Generation"
-                    aria-label="Filter by image generation capability"
-                  >
-                    <Palette className="h-4 w-4" />
-                  </Button>
-                </div>
-                {totalActiveFilters > 0 && (
-                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
-                    {totalActiveFilters}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Model Selection */}
-            <div className="space-y-2">
-              <Label>
-                Select Models to Race ({selectedModelIds.length} selected)
-              </Label>
-              {/* Single ModelSelector for adding models */}
-              <div className="flex items-center gap-2 border rounded-md p-2 bg-muted">
-                <ModelSelector
-                  models={module.globallyEnabledModels.filter((m) => !selectedModelIds.includes(m.id))}
-                  value={null}
-                  onChange={(newId) => {
-                    if (newId && !selectedModelIds.includes(newId)) {
-                      setSelectedModelIds((prev) => [...prev, newId]);
-                    }
-                  }}
-                  isLoading={module.isLoadingProviders}
-                  className="flex-1"
-                />
-                <span className="ml-1 text-muted-foreground">Add</span>
-              </div>
-              {/* Selected models list */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
-                {selectedModelIds.map((modelId) => {
-                  const model = module.globallyEnabledModels.find((m) => m.id === modelId);
-                  if (!model) return null;
-                  return (
-                    <div key={modelId} className="flex items-center gap-2 border rounded-md p-2 bg-background">
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate font-medium">{model.name}</div>
-                        <div className="truncate text-xs text-muted-foreground">{model.providerName}</div>
+          <TabbedLayout
+            tabs={[
+              {
+                value: "models",
+                label: "Race Models",
+                content: (
+                  <div className="space-y-4">
+                    {/* Search and Filter Controls */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-grow">
+                          <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="search"
+                            placeholder="Search models..."
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            className="pl-8 h-9"
+                          />
+                        </div>
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            variant={
+                              capabilityFilters.reasoning ? "secondary" : "ghost"
+                            }
+                            size="sm"
+                            className={cn(
+                              "h-7 w-7 p-0",
+                              capabilityFilters.reasoning && "text-primary"
+                            )}
+                            onClick={() => toggleCapabilityFilter("reasoning")}
+                            title="Filter: Reasoning"
+                            aria-label="Filter by reasoning capability"
+                          >
+                            <Brain className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant={
+                              capabilityFilters.webSearch ? "secondary" : "ghost"
+                            }
+                            size="sm"
+                            className={cn(
+                              "h-7 w-7 p-0",
+                              capabilityFilters.webSearch && "text-primary"
+                            )}
+                            onClick={() => toggleCapabilityFilter("webSearch")}
+                            title="Filter: Web Search"
+                            aria-label="Filter by web search capability"
+                          >
+                            <Globe className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant={capabilityFilters.tools ? "secondary" : "ghost"}
+                            size="sm"
+                            className={cn(
+                              "h-7 w-7 p-0",
+                              capabilityFilters.tools && "text-primary"
+                            )}
+                            onClick={() => toggleCapabilityFilter("tools")}
+                            title="Filter: Tools"
+                            aria-label="Filter by tool usage capability"
+                          >
+                            <Wrench className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant={
+                              capabilityFilters.multimodal ? "secondary" : "ghost"
+                            }
+                            size="sm"
+                            className={cn(
+                              "h-7 w-7 p-0",
+                              capabilityFilters.multimodal && "text-primary"
+                            )}
+                            onClick={() => toggleCapabilityFilter("multimodal")}
+                            title="Filter: Multimodal"
+                            aria-label="Filter by multimodal capability"
+                          >
+                            <ImageIcon className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant={
+                              capabilityFilters.imageGeneration ? "secondary" : "ghost"
+                            }
+                            size="sm"
+                            className={cn(
+                              "h-7 w-7 p-0",
+                              capabilityFilters.imageGeneration && "text-primary"
+                            )}
+                            onClick={() => toggleCapabilityFilter("imageGeneration")}
+                            title="Filter: Image Generation"
+                            aria-label="Filter by image generation capability"
+                          >
+                            <Palette className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {totalActiveFilters > 0 && (
+                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-primary rounded-full">
+                            {totalActiveFilters}
+                          </span>
+                        )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Remove model"
-                        onClick={() => setSelectedModelIds((prev) => prev.filter((id) => id !== modelId))}
-                        className="ml-1"
-                      >
-                        ×
-                      </Button>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
 
+                    {/* Model Selection */}
+                    <div className="space-y-2">
+                      <Label>
+                        Select Models to Race ({selectedModelIds.length} selected)
+                      </Label>
+                      {/* Single ModelSelector for adding models */}
+                      <div className="flex items-center gap-2 border rounded-md p-2 bg-muted">
+                        <ModelSelector
+                          models={module.globallyEnabledModels.filter((m) => !selectedModelIds.includes(m.id))}
+                          value={null}
+                          onChange={(newId) => {
+                            if (newId && !selectedModelIds.includes(newId)) {
+                              setSelectedModelIds((prev) => [...prev, newId]);
+                            }
+                          }}
+                          isLoading={module.isLoadingProviders}
+                          className="flex-1"
+                        />
+                        <span className="ml-1 text-muted-foreground">Add</span>
+                      </div>
+                      {/* Selected models list */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                        {selectedModelIds.map((modelId) => {
+                          const model = module.globallyEnabledModels.find((m) => m.id === modelId);
+                          if (!model) return null;
+                          return (
+                            <div key={modelId} className="flex items-center gap-2 border rounded-md p-2 bg-background">
+                              <div className="flex-1 min-w-0">
+                                <div className="truncate font-medium">{model.name}</div>
+                                <div className="truncate text-xs text-muted-foreground">{model.providerName}</div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Remove model"
+                                onClick={() => setSelectedModelIds((prev) => prev.filter((id) => id !== modelId))}
+                                className="ml-1"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                value: "prompts",
+                label: "Race Prompts",
+                content: (
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      Use the currently selected model to test different prompt variations.
+                    </div>
+                    
+                    {/* Prompt Variants */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>
+                          Prompt Variants ({promptVariants.length} configured)
+                        </Label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={addPromptVariant}
+                        >
+                          Add Variant
+                        </Button>
+                      </div>
+                      
+                      {promptVariants.length === 0 && (
+                        <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-md text-center">
+                          No prompt variants configured. Click "Add Variant" to get started.
+                        </div>
+                      )}
+                      
+                      <div className="space-y-3">
+                        {promptVariants.map((variant, index) => (
+                          <div key={variant.id} className="border rounded-md p-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                placeholder={`Variant ${index + 1} label`}
+                                defaultValue={variant.label}
+                                onBlur={(e) => {
+                                  setPromptVariants(prev => 
+                                    prev.map(v => 
+                                      v.id === variant.id ? { ...v, label: e.target.value } : v
+                                    )
+                                  );
+                                }}
+                                className="flex-1"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removePromptVariant(variant.id)}
+                                aria-label="Remove variant"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                            <Textarea
+                              placeholder="Enter your prompt variation here..."
+                              defaultValue={variant.content}
+                              onBlur={(e) => {
+                                setPromptVariants(prev => 
+                                  prev.map(v => 
+                                    v.id === variant.id ? { ...v, content: e.target.value } : v
+                                  )
+                                );
+                              }}
+                              className="min-h-[80px]"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ),
+              },
+            ]}
+            defaultValue="models"
+            onValueChange={(value) => setRaceType(value as "models" | "prompts")}
+            className="flex-1"
+            scrollable
+          />
+
+          {/* Shared Configuration */}
+          <div className="space-y-4 mt-4">
             {/* Stagger Timing Input */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -449,7 +575,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
 
             {/* Combine Switch */}
             <div className="space-y-2">
-              <Label htmlFor="combine-switch">Combine Models</Label>
+              <Label htmlFor="combine-switch">Combine Results</Label>
               <Switch
                 id="combine-switch"
                 checked={combineEnabled}
@@ -480,7 +606,7 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
                   id="combine-prompt"
                   value={combinePrompt}
                   onChange={(e) => setCombinePrompt(e.target.value)}
-                  placeholder="Enter a prompt to combine models"
+                  placeholder="Enter a prompt to combine responses"
                   className="w-full"
                 />
               </div>
@@ -494,7 +620,9 @@ export const RacePromptControl: React.FC<RacePromptControlProps> = ({
             <Button
               onClick={handleStartRace}
               disabled={
-                selectedModelIds.length < 1 || module.isLoadingProviders
+                module.isLoadingProviders ||
+                (raceType === "models" && selectedModelIds.length < 1) ||
+                (raceType === "prompts" && promptVariants.length < 1)
               }
             >
               Enable Race Mode
