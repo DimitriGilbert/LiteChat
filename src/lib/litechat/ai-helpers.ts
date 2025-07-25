@@ -19,8 +19,9 @@ import type {
   ModelMessage,
   ImagePart,
   TextPart,
+  ToolCallPart,
+  ToolResultPart,
 } from "ai";
-import { convertToModelMessages } from "ai";
 import { usePromptInputValueStore } from "@/store/prompt-input-value.store";
 import { nanoid } from "nanoid";
 import { useInputStore } from "@/store/input.store";
