@@ -41,7 +41,7 @@ export class WebSearchToolsModule implements ControlModule {
 
   register(modApi: LiteChatModApi): void {
     // Web Search Tool
-    const webSearchTool: Tool<any> = {
+    const webSearchTool: Tool = {
       description: "Search the web for information using a search query",
       inputSchema: webSearchSchema,
     };
@@ -75,7 +75,7 @@ export class WebSearchToolsModule implements ControlModule {
     );
 
     // Multiple Web Search Tool
-    const webSearchMultipleTool: Tool<any> = {
+    const webSearchMultipleTool: Tool = {
       description: "Execute multiple web searches simultaneously",
       inputSchema: webSearchMultipleSchema,
     };
@@ -115,7 +115,7 @@ export class WebSearchToolsModule implements ControlModule {
     );
 
     // Web Content Extraction Tool
-    const webExtractContentTool: Tool<any> = {
+    const webExtractContentTool: Tool = {
       description: "Extract content from web pages given their URLs",
       inputSchema: webExtractContentSchema,
     };
@@ -158,7 +158,7 @@ export class WebSearchToolsModule implements ControlModule {
     );
 
     // Deep Search Avenues Tool
-    const webSearchAvenuesTool: Tool<any> = {
+    const webSearchAvenuesTool: Tool = {
       description: "Execute searches for multiple research avenues with multiple queries each",
       inputSchema: webSearchAvenuesSchema,
     };

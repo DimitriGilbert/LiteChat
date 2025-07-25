@@ -2,7 +2,7 @@ import { type ControlModule } from "@/types/litechat/control";
 import { type LiteChatModApi } from "@/types/litechat/modding";
 import { TextTriggerParserService } from "@/services/text-trigger-parser.service";
 import { useSettingsStore } from "@/store/settings.store";
-import { useControlRegistryStore } from "@/store/control.store";
+// import { useControlRegistryStore } from "@/store/control.store";
 import { controlRegistryEvent } from "@/types/litechat/events/control.registry.events";
 import { promptEvent } from "@/types/litechat/events/prompt.events";
 
@@ -72,13 +72,13 @@ export class TextTriggerControlModule implements ControlModule {
     if (!this.parserService) return;
 
     // Get registered trigger namespaces from the control registry store
-    const registeredNamespaces = useControlRegistryStore.getState().getTextTriggerNamespaces();
+    // const registeredNamespaces = useControlRegistryStore.getState().getTextTriggerNamespaces();
     
-    console.log('[TextTriggerControlModule] DEBUG: Registered namespaces:', Object.keys(registeredNamespaces));
+    // console.log('[TextTriggerControlModule] DEBUG: Registered namespaces:', Object.keys(registeredNamespaces));
     
-    // Namespaces are now managed directly by the control registry store
-    // The parser service will fetch them directly when needed
-    console.log('[TextTriggerControlModule] DEBUG: Found registered namespaces:', Object.keys(registeredNamespaces));
+    // // Namespaces are now managed directly by the control registry store
+    // // The parser service will fetch them directly when needed
+    // console.log('[TextTriggerControlModule] DEBUG: Found registered namespaces:', Object.keys(registeredNamespaces));
   }
 
 
