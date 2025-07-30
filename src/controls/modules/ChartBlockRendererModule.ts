@@ -11,8 +11,10 @@ const CHART_CONTROL_PROMPT = `You can generate rich, interactive charts for data
 - Based on Recharts and shadcn/ui.
 - Interactive tooltips and legends.
 - On-the-fly chart type switching.
-- **Bar/Line/Area/Radar/Scatter:** Use ShadCN CSS variables (e.g. \`var(--color-desktop)\`) for series colors, auto-generated from \`chartConfig\` or by the parser for simple arrays.
-- **Pie:** Each slice can have its own \`color\` property, or will use theme colors if not provided.
+- **Smart Color Attribution:** The parser automatically assigns consistent colors to data series. Same labels get consistent colors across datasets, while different values with the same labels get color variations to distinguish them.
+- **Bar/Line/Area/Radar/Scatter:** Colors are auto-generated from \`chartConfig\` or by the smart parser for simple arrays.
+- **Pie:** Each slice can have its own \`color\` property, or will use smart color attribution if not provided.
+- **Duplicate Prevention:** Adjacent data points with the same labels are intelligently handled to avoid visual confusion.
 - Unsupported types will display an error message.
 
 **Full Format Example:**
@@ -72,12 +74,36 @@ const CHART_CONTROL_PROMPT = `You can generate rich, interactive charts for data
 }
 \`\`\`
 
-**Simple Array Format:**
-The parser can also accept a simple array of objects. It will auto-generate a basic configuration.
+**Smart Color Attribution Examples:**
+
+**Same Labels, Different Values (gets color variations):**
+\`\`\`chart
+[
+  { "category": "Sales", "value": 100, "region": "North" },
+  { "category": "Sales", "value": 150, "region": "South" },
+  { "category": "Marketing", "value": 80, "region": "North" },
+  { "category": "Marketing", "value": 120, "region": "South" }
+]
+\`\`\`
+
+**Simple Array Format (auto-generated smart colors):**
+The parser can also accept a simple array of objects. It will auto-generate smart color configuration.
 \`\`\`chart
 [
   { "name": "Product A", "sales": 4000 },
   { "name": "Product B", "sales": 3000 }
+]
+\`\`\`
+
+**Pie Chart with Smart Colors:**
+\`\`\`chart
+[
+  { "name": "Cars", "proportion": 70 },
+  { "name": "SUVs", "proportion": 15 },
+  { "name": "Trucks", "proportion": 10 },
+  { "name": "Motorcycles", "proportion": 3 },
+  { "name": "Buses", "proportion": 1.5 },
+  { "name": "Other", "proportion": 0.5 }
 ]
 \`\`\`
 `;

@@ -386,7 +386,7 @@ const ChartContent = React.forwardRef<
             <Tooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
             <ChartLegend />
             {Object.keys(chartData.chartConfig).map(key => (
-              <Bar key={key} dataKey={key} fill={`var(--color-${key})`} radius={4} />
+              <Bar key={key} dataKey={key} fill={chartData.chartConfig[key].color || `var(--chart-${(Object.keys(chartData.chartConfig).indexOf(key) % 5) + 1})`} radius={4} />
             ))}
           </BarChart>
         );
@@ -411,7 +411,7 @@ const ChartContent = React.forwardRef<
             <Tooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
             <ChartLegend />
             {Object.keys(chartData.chartConfig).map(key => (
-              <Line key={key} dataKey={key} stroke={`var(--color-${key})`} strokeWidth={2} dot={false} type="monotone" />
+              <Line key={key} dataKey={key} stroke={chartData.chartConfig[key].color || `var(--chart-${(Object.keys(chartData.chartConfig).indexOf(key) % 5) + 1})`} strokeWidth={2} dot={false} type="monotone" />
             ))}
           </LineChart>
         );
@@ -436,7 +436,7 @@ const ChartContent = React.forwardRef<
             <Tooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
             <ChartLegend />
             {Object.keys(chartData.chartConfig).map(key => (
-              <Area key={key} dataKey={key} type="monotone" fill={`var(--color-${key})`} fillOpacity={0.4} stroke={`var(--color-${key})`} stackId="a" />
+              <Area key={key} dataKey={key} type="monotone" fill={chartData.chartConfig[key].color || `var(--chart-${(Object.keys(chartData.chartConfig).indexOf(key) % 5) + 1})`} fillOpacity={0.4} stroke={chartData.chartConfig[key].color || `var(--chart-${(Object.keys(chartData.chartConfig).indexOf(key) % 5) + 1})`} stackId="a" />
             ))}
           </AreaChart>
         );
