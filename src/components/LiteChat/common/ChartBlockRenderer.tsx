@@ -367,8 +367,8 @@ const ChartContent = React.forwardRef<
           return (
             <BarChart data={chartData.chartData}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="var(--muted-foreground)" fontSize={12} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={12} />
               <Tooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
               <Bar dataKey={pieDataKey} radius={4}>
                 {chartData.chartData.map((entry, index) => (
@@ -381,8 +381,8 @@ const ChartContent = React.forwardRef<
         return (
           <BarChart data={chartData.chartData}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="var(--muted-foreground)" fontSize={12} />
+            <YAxis stroke="var(--muted-foreground)" fontSize={12} />
             <Tooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
             <ChartLegend />
             {Object.keys(chartData.chartConfig).map(key => (
@@ -396,8 +396,8 @@ const ChartContent = React.forwardRef<
           return (
             <LineChart data={chartData.chartData}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="var(--muted-foreground)" fontSize={12} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={12} />
               <Tooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
               <Line dataKey={pieDataKey} stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 4 }} type="monotone" />
             </LineChart>
@@ -406,8 +406,8 @@ const ChartContent = React.forwardRef<
         return (
           <LineChart data={chartData.chartData}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="var(--muted-foreground)" fontSize={12} />
+            <YAxis stroke="var(--muted-foreground)" fontSize={12} />
             <Tooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
             <ChartLegend />
             {Object.keys(chartData.chartConfig).map(key => (
@@ -421,8 +421,8 @@ const ChartContent = React.forwardRef<
           return (
             <AreaChart data={chartData.chartData}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="var(--muted-foreground)" fontSize={12} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={12} />
               <Tooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
               <Area dataKey={pieDataKey} type="monotone" fill="var(--chart-1)" fillOpacity={0.4} stroke="var(--chart-1)" />
             </AreaChart>
@@ -431,8 +431,8 @@ const ChartContent = React.forwardRef<
         return (
           <AreaChart data={chartData.chartData}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="var(--muted-foreground)" fontSize={12} />
+            <YAxis stroke="var(--muted-foreground)" fontSize={12} />
             <Tooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
             <ChartLegend />
             {Object.keys(chartData.chartConfig).map(key => (
@@ -492,8 +492,8 @@ const ChartContent = React.forwardRef<
           return (
             <ScatterChart data={chartData.chartData}>
               <CartesianGrid />
-              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="var(--muted-foreground)" fontSize={12} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={12} />
               <ZAxis range={[60, 400]} />
               <Tooltip cursor={false} content={<ChartTooltipContent />} />
               <Scatter dataKey={pieDataKey} fill="var(--chart-1)" />
@@ -503,8 +503,8 @@ const ChartContent = React.forwardRef<
         return (
           <ScatterChart data={chartData.chartData}>
             <CartesianGrid />
-            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <XAxis dataKey={axisKey} tickLine={false} axisLine={false} tickMargin={8} stroke="var(--muted-foreground)" fontSize={12} />
+            <YAxis stroke="var(--muted-foreground)" fontSize={12} />
             <ZAxis range={[60, 400]} />
             <Tooltip cursor={false} content={<ChartTooltipContent />} />
             <ChartLegend />
