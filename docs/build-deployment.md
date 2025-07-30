@@ -446,7 +446,7 @@ LiteChat uses a minimal Docker setup based on [lipanski/docker-static-website](h
 FROM lipanski/docker-static-website:latest
 
 # Copy the built application files
-COPY build/ .
+COPY dist/ .
 
 # Create httpd.conf for SPA routing and any needed configuration
 COPY docker/httpd.conf .
@@ -604,7 +604,7 @@ bin/builder --release v1.0.0 --docker-repo myuser/litechat
 # Manual language-specific build (example for French)
 cat > dockerfile.fr << EOF
 FROM lipanski/docker-static-website:latest
-COPY build/fr/ .
+COPY dist/fr/ .
 COPY docker/httpd.conf .
 EOF
 

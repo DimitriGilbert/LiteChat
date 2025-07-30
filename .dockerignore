@@ -5,7 +5,6 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build artifacts (except the build directory we want to copy)
-dist/
 coverage/
 
 # Development files
@@ -71,4 +70,4 @@ pnpm-lock.yaml
 dockerfile
 dockerfile.tmp.*
 docker-compose.yml
-.dockerignore 
+.dockerignore

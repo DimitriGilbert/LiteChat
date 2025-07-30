@@ -1,7 +1,7 @@
 FROM lipanski/docker-static-website:latest
 
 # Copy the built application files
-COPY build/ .
+COPY dist/ .
 
 # Create httpd.conf for SPA routing and any needed configuration
 COPY docker/httpd.conf .
