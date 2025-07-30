@@ -106,7 +106,7 @@ bin/builder --release v1.0.0 --docker-repo myuser/litechat
 # Example: Build French version manually
 cat > dockerfile.fr << EOF
 FROM lipanski/docker-static-website:latest
-COPY build/fr/ .
+COPY dist/fr/ .
 COPY docker/httpd.conf .
 EOF
 
@@ -243,7 +243,7 @@ COPY . .
 RUN npm run build
 
 FROM lipanski/docker-static-website:latest
-COPY --from=builder /app/build/ .
+COPY --from=builder /app/dist/ .
 COPY docker/httpd.conf .
 ```
 
