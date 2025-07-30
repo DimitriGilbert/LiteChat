@@ -47,6 +47,31 @@ const ALL_THEME_COLOR_KEYS: (keyof CustomThemeColors)[] = [
   "sidebarRing",
 ];
 
+// Theme to CSS class mapping
+const THEME_CLASS_MAP: Record<string, string> = {
+  light: "light",
+  dark: "dark",
+  TijuLight: "TijuLight",
+  TijuDark: "TijuDark",
+  bubblegum: "bubblegum",
+  bubblegumDark: "bubblegumDark",
+  candyland: "candyland",
+  candylandDark: "candylandDark",
+  doom64: "doom64",
+  doom64Dark: "doom64Dark",
+  luxury: "luxury",
+  luxuryDark: "luxuryDark",
+  northernLights: "northernLights",
+  northernLightsDark: "northernLightsDark",
+  retroArcade: "retroArcade",
+  retroArcadeDark: "retroArcadeDark",
+  staryNight: "staryNight",
+  staryNightDark: "staryNightDark",
+  tangerine: "tangerine",
+  tangerineDark: "tangerineDark",
+  custom: "custom",
+};
+
 export const ThemeManager: React.FC = () => {
   const { theme, customFontFamily, customFontSize, customThemeColors } =
     useSettingsStore(
@@ -74,56 +99,7 @@ export const ThemeManager: React.FC = () => {
     root.style.removeProperty("--custom-font-size");
 
     // --- Apply Selected Theme ---
-    if (theme === "light") {
-      body.classList.add("light");
-    } else if (theme === "dark") {
-      body.classList.add("dark");
-    } else if (theme === "TijuLight") {
-      body.classList.add("TijuLight");
-    } else if (theme === "TijuDark") {
-      body.classList.add("TijuDark");
-    } else if (theme === "custom") {
-      body.classList.add("custom");
-
-      // Apply custom styles only if theme is 'custom' by setting CSS variables on :root
-      // Font Family
-      if (customFontFamily) {
-        root.style.setProperty("--custom-font-family", customFontFamily);
-      } else {
-        // Explicitly remove if null/empty to revert to base CSS
-        root.style.removeProperty("--custom-font-family");
-      }
-      // Font Size
-      if (customFontSize) {
-        root.style.setProperty("--custom-font-size", `${customFontSize}px`);
-      } else {
-        // Explicitly remove if null/empty
-        root.style.removeProperty("--custom-font-size");
-      }
-      // Custom Colors (as CSS Variables)
-      if (customThemeColors) {
-        Object.entries(customThemeColors).forEach(([key, value]) => {
-          // Ensure the key is one we expect to manage
-          if (
-            value &&
-            ALL_THEME_COLOR_KEYS.includes(key as keyof CustomThemeColors)
-          ) {
-            const cssVarName = `--${camelToKebab(key)}`;
-            // Set the variable on the root element's inline style
-            root.style.setProperty(cssVarName, value);
-          } else if (
-            ALL_THEME_COLOR_KEYS.includes(key as keyof CustomThemeColors)
-          ) {
-            // Explicitly remove if value is null/empty for a known key
-            const cssVarName = `--${camelToKebab(key)}`;
-            root.style.removeProperty(cssVarName);
-          }
-        });
-      }
-      // For 'custom' theme, CSS variables set here will override the defaults
-      // defined in index.css :root because inline styles have higher specificity.
-      // If a custom variable is *not* set, the default from index.css will apply.
-    } else {
+    if (theme === "system") {
       // System theme (default)
       const systemPrefersDark = window.matchMedia(
         "(prefers-color-scheme: dark)",
@@ -133,8 +109,53 @@ export const ThemeManager: React.FC = () => {
       } else {
         body.classList.add("light");
       }
-      // Ensure custom styles are reset for system theme as well
-      // (Already handled by the reset logic at the start of the effect)
+    } else {
+      // Apply theme class from mapping
+      const themeClass = THEME_CLASS_MAP[theme];
+      if (themeClass) {
+        body.classList.add(themeClass);
+      }
+
+      // Apply custom styles only if theme is 'custom'
+      if (theme === "custom") {
+        // Font Family
+        if (customFontFamily) {
+          root.style.setProperty("--custom-font-family", customFontFamily);
+        } else {
+          // Explicitly remove if null/empty to revert to base CSS
+          root.style.removeProperty("--custom-font-family");
+        }
+        // Font Size
+        if (customFontSize) {
+          root.style.setProperty("--custom-font-size", `${customFontSize}px`);
+        } else {
+          // Explicitly remove if null/empty
+          root.style.removeProperty("--custom-font-size");
+        }
+        // Custom Colors (as CSS Variables)
+        if (customThemeColors) {
+          Object.entries(customThemeColors).forEach(([key, value]) => {
+            // Ensure the key is one we expect to manage
+            if (
+              value &&
+              ALL_THEME_COLOR_KEYS.includes(key as keyof CustomThemeColors)
+            ) {
+              const cssVarName = `--${camelToKebab(key)}`;
+              // Set the variable on the root element's inline style
+              root.style.setProperty(cssVarName, value);
+            } else if (
+              ALL_THEME_COLOR_KEYS.includes(key as keyof CustomThemeColors)
+            ) {
+              // Explicitly remove if value is null/empty for a known key
+              const cssVarName = `--${camelToKebab(key)}`;
+              root.style.removeProperty(cssVarName);
+            }
+          });
+        }
+        // For 'custom' theme, CSS variables set here will override the defaults
+        // defined in index.css :root because inline styles have higher specificity.
+        // If a custom variable is *not* set, the default from index.css will apply.
+      }
     }
   }, [theme, customFontFamily, customFontSize, customThemeColors]);
 
