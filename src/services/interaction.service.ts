@@ -913,6 +913,8 @@ export const InteractionService = {
       ...(modelSupportsTools && finalPrompt.toolChoice && {
         toolChoice: finalPrompt.toolChoice,
       }),
+      // Add image generation support
+      imageGenerationEnabled: finalPrompt.metadata?.imageGenerationEnabled === true,
     };
 
     // Define callbacks within startInteraction to capture interactionId and interactionType in scope

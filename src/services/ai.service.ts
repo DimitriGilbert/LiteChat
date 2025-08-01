@@ -1,7 +1,7 @@
 // src/services/ai.service.ts
 // FULL FILE
 
-import { streamText, generateText, StreamTextResult, LanguageModel } from "ai";
+import { streamText, generateText, StreamTextResult, LanguageModel, experimental_generateImage as generateImage } from "ai";
 import type {
   Tool,
   ToolCallPart,
@@ -11,6 +11,7 @@ import type {
   ProviderMetadata,
   ModelMessage,
 } from "ai";
+import { useInteractionStore } from "@/store/interaction.store";
 
 export interface AIServiceCallOptions {
   model: LanguageModel;
@@ -33,6 +34,8 @@ export interface AIServiceCallOptions {
   stopWhen?: any; // AI SDK stopWhen condition
   // Add providerOptions for specific provider features
   providerOptions?: Record<string, any>;
+  // Add image generation support
+  imageGenerationEnabled?: boolean;
 }
 
 export interface AIServiceCallbacks {
@@ -59,12 +62,17 @@ export interface AIServiceCallbacks {
 }
 
 export class AIService {
-  // Executes the AI interaction using the AI SDK's streamText.
+  // Executes the AI interaction using the AI SDK's streamText or generateImage.
   static async executeInteraction(
     interactionId: string,
     options: AIServiceCallOptions,
     callbacks: AIServiceCallbacks,
   ): Promise<void> {
+    // Check if this is an image generation request
+    if (options.imageGenerationEnabled) {
+      return await this.executeImageGeneration(interactionId, options, callbacks);
+    }
+
     let streamResult: StreamTextResult<any, any> | undefined;
     let receivedFinishPart = false;
     let finalFinishReason: FinishReason | null = null;
@@ -221,6 +229,79 @@ export class AIService {
       console.log(
         `[AIService] Stream processing finished for ${interactionId}.`,
       );
+    }
+  }
+
+  // Executes image generation using experimental_generateImage
+  static async executeImageGeneration(
+    interactionId: string,
+    options: AIServiceCallOptions,
+    callbacks: AIServiceCallbacks,
+  ): Promise<void> {
+    try {
+      console.log(`[AIService] Starting image generation for ${interactionId}`);
+      
+      // Extract the prompt from the last user message
+      const lastMessage = options.messages[options.messages.length - 1];
+      const prompt = typeof lastMessage.content === 'string' 
+        ? lastMessage.content 
+        : Array.isArray(lastMessage.content) 
+          ? lastMessage.content.find(part => part.type === 'text')?.text || ''
+          : '';
+
+      if (!prompt) {
+        throw new Error('No prompt found for image generation');
+      }
+
+      // Check for abort signal before starting
+      if (options.abortSignal.aborted) {
+        console.log(`[AIService] Image generation ${interactionId} aborted by signal.`);
+        return;
+      }
+
+      // Prepare generation options
+      const generateOptions: any = {
+        model: options.model,
+        prompt,
+        ...(options.providerOptions && {
+          providerOptions: options.providerOptions,
+        }),
+      };
+
+      const result = await generateImage(generateOptions);
+
+      // Check for abort after generation
+      if (options.abortSignal.aborted) {
+        console.log(`[AIService] Image generation ${interactionId} aborted after completion.`);
+        return;
+      }
+
+      // Convert the image result to base64 and create a markdown response
+      const imageBase64 = result.image.base64;
+      const imageMarkdown = `![Generated Image](data:${result.image.mediaType};base64,${imageBase64})
+
+*Image generated successfully*`;
+      
+      console.log(`[AIService] Sending image markdown, length: ${imageMarkdown.length}`);
+      // Send the image as a complete content (not streaming chunks)
+      const interactionStore = useInteractionStore.getState();
+      interactionStore.setActiveStreamBuffer(interactionId, imageMarkdown);
+
+      // Call finish callback
+      callbacks.onFinish({
+        finishReason: "stop",
+        usage: undefined, // Image generation doesn't provide usage stats in the same format
+        providerMetadata: result.providerMetadata as ProviderMetadata,
+      });
+
+      console.log(`[AIService] Image generation completed for ${interactionId}`);
+    } catch (error: unknown) {
+      console.error(`[AIService] Error during image generation for ${interactionId}:`, error);
+      if (!(error instanceof Error && error.name === "AbortError")) {
+        callbacks.onError(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
     }
   }
 

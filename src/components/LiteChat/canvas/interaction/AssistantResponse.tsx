@@ -20,6 +20,7 @@ import { useControlRegistryStore } from "@/store/control.store";
 import { useShallow } from "zustand/react/shallow";
 import type { CanvasControl, CanvasControlRenderContext } from "@/types/litechat/canvas/control";
 import { useTranslation } from "react-i18next";
+import { ImageBlockRenderer } from "@/components/LiteChat/common/ImageBlockRenderer";
 
 const StaticContentView: React.FC<{ markdownContent: string | null, interactionId: string }> = ({
   markdownContent,
@@ -39,6 +40,66 @@ const StaticContentView: React.FC<{ markdownContent: string | null, interactionI
       <div className="overflow-wrap-anywhere">
         {parsedContent.map((item, index) => {
           if (typeof item === "string") {
+            // Check if this HTML contains generated images (base64 data URLs)
+            const imgRegex = /<img([^>]*src="data:image\/[^"]*"[^>]*)>/gi;
+            const imgMatches = Array.from(item.matchAll(imgRegex));
+            
+            if (imgMatches.length > 0) {
+              // Process each image and replace with ImageBlockRenderer
+              let processedContent = item;
+              const imageComponents: React.ReactNode[] = [];
+              
+              imgMatches.forEach((match, imgIndex) => {
+                const imgTag = match[0];
+                const imgAttributes = match[1];
+                
+                // Extract src and alt attributes
+                const srcMatch = imgAttributes.match(/src="([^"]*)"/);
+                const altMatch = imgAttributes.match(/alt="([^"]*)"/);
+                
+                const src = srcMatch?.[1] || '';
+                const alt = altMatch?.[1] || 'Generated Image';
+                
+                // Create a placeholder to replace with React component
+                const placeholder = `__IMAGE_COMPONENT_${imgIndex}__`;
+                processedContent = processedContent.replace(imgTag, placeholder);
+                
+                imageComponents.push(
+                  <ImageBlockRenderer
+                    key={`image-${index}-${imgIndex}`}
+                    src={src}
+                    alt={alt}
+                  />
+                );
+              });
+              
+              // Split by placeholders and intersperse with image components
+              const parts = processedContent.split(/__IMAGE_COMPONENT_(\d+)__/);
+              const renderedParts: React.ReactNode[] = [];
+              
+              for (let i = 0; i < parts.length; i++) {
+                if (parts[i] && parts[i].trim()) {
+                  // Check if this is an image index
+                  const imageIndex = parseInt(parts[i]);
+                  if (!isNaN(imageIndex) && imageComponents[imageIndex]) {
+                    renderedParts.push(imageComponents[imageIndex]);
+                  } else {
+                    // Regular HTML content
+                    renderedParts.push(
+                      <div
+                        key={`html-${index}-${i}`}
+                        className="markdown-content"
+                        dangerouslySetInnerHTML={{ __html: parts[i] }}
+                      />
+                    );
+                  }
+                }
+              }
+              
+              return <div key={`content-${index}`}>{renderedParts}</div>;
+            }
+            
+            // No images, render normally
             return (
               <div
                 key={`html-${index}`}
@@ -157,6 +218,12 @@ export const AssistantResponse: React.FC<AssistantResponseProps> = ({
   const hasResponseContent =
     response && (typeof response !== "string" || response.trim().length > 0);
   const hasToolCalls = parsedToolSteps && parsedToolSteps.length > 0;
+  
+  // Debug logging for image generation
+  if (typeof response === "string" && response.includes("![Generated Image]")) {
+    console.log("[AssistantResponse] Image response detected:", response.substring(0, 100));
+    console.log("[AssistantResponse] hasResponseContent:", hasResponseContent);
+  }
 
   if (isFolded) {
     return (

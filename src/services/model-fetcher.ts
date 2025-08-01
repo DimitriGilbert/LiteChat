@@ -177,6 +177,18 @@ const mapToOpenRouterModel = (
     if (model.architecture) {
       model.architecture.tokenizer = "xAI";
     }
+  } else if (providerType === "fal" || providerType === "replicate" || providerType === "luma" || providerType === "deepinfra" || providerType === "fireworks") {
+    // Image/Video generation providers - no text context length needed
+    model.context_length = null;
+    if (model.top_provider) {
+      model.top_provider.context_length = null;
+    }
+    if (model.architecture) {
+      model.architecture.tokenizer = providerType;
+      model.architecture.modality = "text->image";
+      model.architecture.input_modalities = ["text"];
+      model.architecture.output_modalities = providerType === "luma" ? ["video"] : ["image"];
+    }
   }
 
   return model;
@@ -260,6 +272,28 @@ export async function fetchModelsForProvider(
           url = "https://generativelanguage.googleapis.com/v1beta/models";
           headers["Authorization"] = `Bearer ${apiKey}`;
           break;
+        case "fal":
+          if (!apiKey) throw new Error("API Key required for fal.ai");
+          url = "https://fal.run/fal-ai/models";
+          break;
+        case "replicate":
+          if (!apiKey) throw new Error("API Key required for Replicate");
+          url = "https://api.replicate.com/v1/models";
+          break;
+        case "deepinfra":
+          if (!apiKey) throw new Error("API Key required for DeepInfra");
+          url = "https://api.deepinfra.com/v1/models";
+          break;
+        case "fireworks":
+          if (!apiKey) throw new Error("API Key required for Fireworks AI");
+          url = "https://api.fireworks.ai/inference/v1/models";
+          break;
+        case "luma":
+          // Luma doesn't have a public models API, return default models
+          console.log(
+            `[ModelFetcher] Using default models for Luma AI - no public API available.`,
+          );
+          return [];
         default:
           console.log(
             `[ModelFetcher] Model fetching not supported via API for type: ${config.type}. Returning empty list.`,

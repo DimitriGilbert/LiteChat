@@ -69,7 +69,12 @@ export type DbProviderType =
   | "openai-compatible"
   | "mistral"
   | "anthropic"
-  | "xai";
+  | "xai"
+  | "fal"
+  | "replicate"
+  | "luma"
+  | "deepinfra"
+  | "fireworks";
 
 // Stored in DB for API Keys
 export interface DbApiKey extends DbBase {

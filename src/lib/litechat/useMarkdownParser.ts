@@ -13,9 +13,10 @@ export type ParsedContent = (string | UniversalBlockData)[];
 
 // Create a MarkdownIt parser instance with desired options
 const md = new MarkdownIt({
-  html: false,
+  html: true,
   linkify: true,
   breaks: true,
+  typographer: false,
 });
 
 export function useMarkdownParser(

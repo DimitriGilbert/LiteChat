@@ -41,7 +41,10 @@ export const PrismThemeLoader: React.FC = () => {
   // Determine the current theme mode (dark or light)
   const currentThemeMode = useMemo(() => {
     const effectiveTheme = appTheme === "system" ? systemTheme : appTheme;
-    return effectiveTheme === "dark" || effectiveTheme === "TijuDark"
+    // Check if theme is dark: either "dark", "TijuDark", or any theme ending with "Dark"
+    return effectiveTheme === "dark" || 
+           effectiveTheme === "TijuDark" || 
+           (typeof effectiveTheme === "string" && effectiveTheme.endsWith("Dark"))
       ? "dark"
       : "light";
   }, [appTheme, systemTheme]);

@@ -14,6 +14,11 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createMistral } from "@ai-sdk/mistral";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createXai } from "@ai-sdk/xai";
+import { createFal } from "@ai-sdk/fal";
+import { createReplicate } from "@ai-sdk/replicate";
+import { createLuma } from "@ai-sdk/luma";
+import { createDeepInfra } from "@ai-sdk/deepinfra";
+import { createFireworks } from "@ai-sdk/fireworks";
 import { useProviderStore } from "@/store/provider.store";
 
 // --- Helper Functions (Moved and Exported) ---
@@ -48,7 +53,7 @@ export const splitModelId = (
 // --- Provider Type Helpers ---
 
 export const requiresApiKey = (type: DbProviderType | null): boolean => {
-  return type === "openai" || type === "openrouter" || type === "google" || type === "mistral" || type === "anthropic" || type === "xai";
+  return type === "openai" || type === "openrouter" || type === "google" || type === "mistral" || type === "anthropic" || type === "xai" || type === "fal" || type === "replicate" || type === "luma" || type === "deepinfra" || type === "fireworks";
 };
 
 export const optionalApiKey = (type: DbProviderType | null): boolean => {
@@ -68,7 +73,11 @@ export const supportsModelFetching = (type: DbProviderType | null): boolean => {
     type === "mistral" ||
     type === "anthropic" ||
     type === "xai" ||
-    type === "google"
+    type === "google" ||
+    type === "fal" ||
+    type === "replicate" ||
+    type === "deepinfra" ||
+    type === "fireworks"
   );
 };
 
@@ -79,6 +88,11 @@ export const PROVIDER_TYPES: { value: DbProviderType; label: string }[] = [
   { value: "google", label: "Google Gemini" },
   { value: "mistral", label: "Mistral AI" },
   { value: "xai", label: "xAI Grok" },
+  { value: "fal", label: "fal.ai (Image Generation)" },
+  { value: "replicate", label: "Replicate (Image Generation)" },
+  { value: "luma", label: "Luma AI (Video Generation)" },
+  { value: "deepinfra", label: "DeepInfra" },
+  { value: "fireworks", label: "Fireworks AI" },
   { value: "ollama", label: "Ollama" },
   { value: "openai-compatible", label: "OpenAI-Compatible (LMStudio, etc.)" },
 ];
@@ -93,6 +107,11 @@ export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
   "mistral",
   "anthropic",
   "xai",
+  "fal",
+  "replicate",
+  "luma",
+  "deepinfra",
+  "fireworks",
 ];
 
 export const OPTIONAL_API_KEY_TYPES: DbProviderType[] = [
@@ -155,6 +174,32 @@ export const DEFAULT_MODELS: Record<
     { id: "grok-3-mini-fast", name: "Grok 3 Mini Fast" },
     { id: "grok-2-1212", name: "Grok 2" },
     { id: "grok-2-vision-1212", name: "Grok 2 Vision" },
+  ],
+  fal: [
+    { id: "fal-ai/flux-pro", name: "FLUX Pro" },
+    { id: "fal-ai/flux-dev", name: "FLUX Dev" },
+    { id: "fal-ai/flux-schnell", name: "FLUX Schnell" },
+    { id: "fal-ai/stable-diffusion-v3-medium", name: "Stable Diffusion v3 Medium" },
+    { id: "fal-ai/recraft-v3", name: "Recraft v3" },
+  ],
+  replicate: [
+    { id: "black-forest-labs/flux-schnell", name: "FLUX Schnell" },
+    { id: "black-forest-labs/flux-dev", name: "FLUX Dev" },
+    { id: "stability-ai/stable-diffusion-3", name: "Stable Diffusion 3" },
+    { id: "stability-ai/sdxl", name: "SDXL" },
+  ],
+  luma: [
+    { id: "dream-machine-v1", name: "Dream Machine v1" },
+    { id: "photon-1", name: "Photon 1" },
+  ],
+  deepinfra: [
+    { id: "black-forest-labs/FLUX.1-schnell", name: "FLUX.1 Schnell" },
+    { id: "black-forest-labs/FLUX.1-dev", name: "FLUX.1 Dev" },
+    { id: "stabilityai/stable-diffusion-3-medium", name: "Stable Diffusion 3 Medium" },
+  ],
+  fireworks: [
+    { id: "stable-diffusion-xl-1024-v1-0", name: "Stable Diffusion XL" },
+    { id: "playground-v2-1024", name: "Playground v2" },
   ],
   openrouter: [],
   ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
@@ -223,6 +268,16 @@ export function instantiateModelInstance(
         return createAnthropic({ apiKey })(modelId);
       case "xai":
         return createXai({ apiKey })(modelId);
+      case "fal":
+        return createFal({ apiKey }).image(modelId);
+      case "replicate":
+        return createReplicate({ apiToken: apiKey }).image(modelId);
+      case "luma":
+        return createLuma({ apiKey }).image(modelId);
+      case "deepinfra":
+        return createDeepInfra({ apiKey }).image(modelId);
+      case "fireworks":
+        return createFireworks({ apiKey }).image(modelId);
       default:
         console.warn(`Unsupported provider type: ${config.type}`);
         return null;
@@ -327,6 +382,43 @@ export const DEFAULT_SUPPORTED_PARAMS: Record<string, string[]> = {
     "tool_choice",
     "seed",
     "response_format",
+  ],
+  fal: [
+    "width",
+    "height",
+    "steps",
+    "guidance_scale",
+    "seed",
+    "scheduler",
+  ],
+  replicate: [
+    "width",
+    "height",
+    "steps",
+    "guidance_scale",
+    "seed",
+    "scheduler",
+  ],
+  luma: [
+    "width",
+    "height",
+    "duration",
+    "aspect_ratio",
+    "loop",
+  ],
+  deepinfra: [
+    "width",
+    "height",
+    "steps",
+    "guidance_scale",
+    "seed",
+  ],
+  fireworks: [
+    "width",
+    "height",
+    "steps",
+    "guidance_scale",
+    "seed",
   ],
   ollama: [
     "max_tokens",
