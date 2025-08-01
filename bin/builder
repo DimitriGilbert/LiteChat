@@ -278,7 +278,7 @@ build_project() {
     if [[ -n "$RELEASE_NAME" ]]; then
       log_info "Creating release zip: $RELEASE_DIR/$RELEASE_NAME.zip"
       # Create zip from dist directory, not build directory to avoid including previous zips
-      (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" . -x "*.zip" "*.tar.gz" "*.tar")
+      (cd "$DIST_DIR" && zip -q -r "../$RELEASE_DIR/$RELEASE_NAME.zip" . -x "*.zip" "*.tar.gz" "*.tar")
     fi
     log_success "Single build completed."
   else
@@ -310,7 +310,7 @@ build_project() {
     # Create default release zip
     if [[ -n "$RELEASE_NAME" ]]; then
       log_info "Creating default release zip: $RELEASE_DIR/$RELEASE_NAME.zip"
-      (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" . -x "*.zip" "*.tar.gz" "*.tar")
+      (cd "$DIST_DIR" && zip -q -r "../$RELEASE_DIR/$RELEASE_NAME.zip" . -x "*.zip" "*.tar.gz" "*.tar")
     fi
     log_success "Default language $DEFAULT_LANG build completed"
     
@@ -353,10 +353,10 @@ build_project() {
       # Exclude the release directory to prevent zipping previous zips
       find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -name "release" -exec cp -r {} "$BUILD_DIR/docker-$lang/" \;
 
-      # Create language-specific release zip (using GitHub Pages build)
+      # Create language-specific release zip (using Docker build with / base)
       if [[ -n "$RELEASE_NAME" ]]; then
         log_info "Creating language-specific release zip: $RELEASE_DIR/$RELEASE_NAME.$lang.zip"
-        (cd "$BUILD_DIR/$lang" && zip -r "../../$RELEASE_DIR/$RELEASE_NAME.$lang.zip" . -x "*.zip" "*.tar.gz" "*.tar")
+        (cd "$BUILD_DIR/docker-$lang" && zip -q -r "../../$RELEASE_DIR/$RELEASE_NAME.$lang.zip" . -x "*.zip" "*.tar.gz" "*.tar")
       fi
       log_success "Language $lang builds completed (GitHub Pages + Docker)"
     done
