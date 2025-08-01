@@ -94,7 +94,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt}'],
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB limit
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB limit
         navigateFallback: `${base}index.html`,
         navigateFallbackDenylist: [/^\/__.*$/],
         // Fix: Add modifyURLPrefix to ensure assets use correct base path

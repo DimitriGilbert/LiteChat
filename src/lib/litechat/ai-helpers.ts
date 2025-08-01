@@ -212,112 +212,116 @@ export function processFileMetaToUserContent(
 export function buildHistoryMessages(
   historyInteractions: Interaction[]
 ): ModelMessage[] {
-  // Filter to include only parent interactions (parentId === null) for history
-  // This ensures that for regen/race/explain, only the parent is included, not the children
   const parentInteractions = historyInteractions.filter(i => i.parentId === null);
   
-  return parentInteractions.flatMap((i): ModelMessage[] => {
-    const msgs: ModelMessage[] = [];
-    const userPrompt = i.prompt;
-    if (userPrompt) {
+  return parentInteractions.flatMap((interaction): ModelMessage[] => {
+    const messages: ModelMessage[] = [];
+
+    // 1. Handle User Message
+    const userPrompt = interaction.prompt;
+    if (userPrompt?.content) {
       const userMessageContentParts: (TextPart | ImagePart)[] = [];
-      if (userPrompt.content) {
-        userMessageContentParts.push({
-          type: "text",
-          text: userPrompt.content,
-        });
+      if (typeof userPrompt.content === 'string') {
+          userMessageContentParts.push({ type: 'text', text: userPrompt.content });
       }
-      if (
-        userPrompt.metadata?.attachedFiles &&
-        userPrompt.metadata.attachedFiles.length > 0
-      ) {
-        userPrompt.metadata.attachedFiles.forEach((f) => {
-          userMessageContentParts.push({
-            type: "text",
-            text: `[User attached file: ${f.name}]`,
+      if (userPrompt.metadata?.attachedFiles?.length) {
+          userPrompt.metadata.attachedFiles.forEach(f => {
+              userMessageContentParts.push({ type: 'text', text: `[User attached file: ${f.name}]` });
           });
-        });
       }
       if (userMessageContentParts.length > 0) {
-        msgs.push({ role: "user", content: userMessageContentParts });
+          const userMessage: ModelMessage = {
+            role: 'user',
+            content: userMessageContentParts.length === 1 && userMessageContentParts[0].type === 'text' 
+              ? userMessageContentParts[0].text 
+              : userMessageContentParts
+          };
+          messages.push(userMessage);
       }
     }
 
-    if (i.response && typeof i.response === "string") {
-      msgs.push({ role: "assistant", content: i.response });
+    // 2. Handle Assistant Message (Text + Tool Calls)
+    const assistantContentParts: Array<TextPart | ToolCallPart> = [];
+    
+    if (interaction.response && typeof interaction.response === 'string' && interaction.response.trim() !== '') {
+      assistantContentParts.push({
+        type: 'text',
+        text: interaction.response,
+      });
     }
 
-    if (i.metadata?.toolCalls && Array.isArray(i.metadata.toolCalls)) {
-      const validToolCalls: ToolCallPart[] = [];
-      i.metadata.toolCalls.forEach((callStr) => {
+    if (interaction.metadata?.toolCalls && Array.isArray(interaction.metadata.toolCalls)) {
+      interaction.metadata.toolCalls.forEach((callStr) => {
         try {
           const parsedCall = JSON.parse(callStr);
           if (
-            parsedCall &&
-            parsedCall.type === "tool-call" &&
+            parsedCall?.type === 'tool-call' &&
             parsedCall.toolCallId &&
             parsedCall.toolName &&
-            parsedCall.args !== undefined
+            (parsedCall.input !== undefined || parsedCall.args !== undefined)
           ) {
-            validToolCalls.push(parsedCall as ToolCallPart);
-          } else {
-            console.warn(
-              "[AIService] buildHistory: Invalid tool call structure after parsing:",
-              callStr
-            );
+            const toolCallPart: ToolCallPart = {
+              type: 'tool-call',
+              toolCallId: parsedCall.toolCallId,
+              toolName: parsedCall.toolName,
+              input: parsedCall.input ?? parsedCall.args,
+            };
+            assistantContentParts.push(toolCallPart);
           }
         } catch (e) {
-          console.error(
-            "[AIService] buildHistory: Failed to parse tool call string:",
-            callStr,
-            e
-          );
+          console.error('[AIService] buildHistory: Failed to parse tool call string:', callStr, e);
         }
       });
-      if (validToolCalls.length > 0) {
-        msgs.push({
-          role: "assistant",
-          content: validToolCalls,
-        });
-      }
     }
 
-    if (i.metadata?.toolResults && Array.isArray(i.metadata.toolResults)) {
+    if (assistantContentParts.length > 0) {
+      const assistantMessage: ModelMessage = {
+        role: 'assistant',
+        content: assistantContentParts.length === 1 && assistantContentParts[0].type === 'text'
+          ? assistantContentParts[0].text
+          : assistantContentParts,
+      };
+      messages.push(assistantMessage);
+    }
+
+    // 3. Handle Tool Result Message
+    if (interaction.metadata?.toolResults && Array.isArray(interaction.metadata.toolResults)) {
       const validToolResults: ToolResultPart[] = [];
-      i.metadata.toolResults.forEach((resultStr) => {
+      interaction.metadata.toolResults.forEach((resultStr) => {
         try {
           const parsedResult = JSON.parse(resultStr);
           if (
-            parsedResult &&
-            parsedResult.type === "tool-result" &&
+            parsedResult?.type === 'tool-result' &&
             parsedResult.toolCallId &&
             parsedResult.toolName &&
-            parsedResult.result !== undefined
+            (parsedResult.output !== undefined || parsedResult.result !== undefined)
           ) {
-            validToolResults.push(parsedResult as ToolResultPart);
-          } else {
-            console.warn(
-              "[AIService] buildHistory: Invalid tool result structure after parsing:",
-              resultStr
-            );
+            const toolResultPart: ToolResultPart = {
+              type: 'tool-result',
+              toolCallId: parsedResult.toolCallId,
+              toolName: parsedResult.toolName,
+              output: {
+                type: 'json',
+                value: parsedResult.output ?? parsedResult.result,
+              },
+            };
+            validToolResults.push(toolResultPart);
           }
         } catch (e) {
-          console.error(
-            "[AIService] buildHistory: Failed to parse tool result string:",
-            resultStr,
-            e
-          );
+          console.error('[AIService] buildHistory: Failed to parse tool result string:', resultStr, e);
         }
       });
+
       if (validToolResults.length > 0) {
-        msgs.push({
-          role: "tool",
+        const toolMessage: ModelMessage = {
+          role: 'tool',
           content: validToolResults,
-        });
+        };
+        messages.push(toolMessage);
       }
     }
 
-    return msgs;
+    return messages;
   });
 }
 

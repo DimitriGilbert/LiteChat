@@ -109,15 +109,16 @@ export class PromptCompilationService {
       turnsForHistoryBuilder
     );
 
-    let userContent = turnData.content;
-    const userMessageContentParts: (TextPart | ImagePart)[] = [];
+    // V5 Migration Fix: Correctly handle the current user message.
+    // The user's current input (text and files) must be compiled into a single
+    // 'user' message object and added to the history.
+    const currentUserMessageContent: (TextPart | ImagePart)[] = [];
 
+    // 1. Process main text content, including rules.
+    let userContent = turnData.content;
     const effectiveRulesContent: ResolvedRuleContent[] =
       turnData.metadata?.effectiveRulesContent ?? [];
 
-    const systemRulesContent = effectiveRulesContent
-      .filter((r) => r.type === "system" || r.type === "control")
-      .map((r) => r.content);
     const beforeRulesContent = effectiveRulesContent
       .filter((r) => r.type === "before")
       .map((r) => r.content);
@@ -138,22 +139,28 @@ ${userContent}`;
 `)}`;
     }
 
-    if (userContent) {
-      userMessageContentParts.push({ type: "text", text: userContent });
+    // Add text content to the parts array if it exists.
+    if (userContent && userContent.trim()) {
+      currentUserMessageContent.push({ type: "text", text: userContent });
     }
 
-    // Process attached files
+    // 2. Process attached files first.
     const attachedFilesMeta = turnData.metadata?.attachedFiles ?? [];
     if (attachedFilesMeta.length > 0) {
       const fileContentParts = await this._processFilesForPrompt(
         attachedFilesMeta,
         conversationId
       );
-      userMessageContentParts.unshift(...fileContentParts);
+      // Add file parts to the beginning of the content array
+      currentUserMessageContent.unshift(...fileContentParts);
     }
 
-    if (userMessageContentParts.length > 0) {
-      historyMessages.push({ role: "user", content: userMessageContentParts });
+    // 3. Add the fully compiled current user message to the history.
+    if (currentUserMessageContent.length > 0) {
+      historyMessages.push({
+        role: "user",
+        content: currentUserMessageContent,
+      });
     }
 
     // Build system prompt - merge with control metadata
@@ -161,6 +168,9 @@ ${userContent}`;
     const turnSystemPrompt = combinedMetadata?.turnSystemPrompt as
       | string
       | undefined;
+    const systemRulesContent = effectiveRulesContent
+      .filter((r) => r.type === "system" || r.type === "control")
+      .map((r) => r.content);
     let baseSystemPrompt =
       turnSystemPrompt ?? effectiveSettings.systemPrompt ?? undefined;
 
