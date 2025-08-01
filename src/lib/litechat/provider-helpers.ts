@@ -11,6 +11,9 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createOllama } from "ollama-ai-provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createMistral } from "@ai-sdk/mistral";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createXai } from "@ai-sdk/xai";
 import { useProviderStore } from "@/store/provider.store";
 
 // --- Helper Functions (Moved and Exported) ---
@@ -45,7 +48,7 @@ export const splitModelId = (
 // --- Provider Type Helpers ---
 
 export const requiresApiKey = (type: DbProviderType | null): boolean => {
-  return type === "openai" || type === "openrouter" || type === "google";
+  return type === "openai" || type === "openrouter" || type === "google" || type === "mistral" || type === "anthropic" || type === "xai";
 };
 
 export const optionalApiKey = (type: DbProviderType | null): boolean => {
@@ -61,22 +64,35 @@ export const supportsModelFetching = (type: DbProviderType | null): boolean => {
     type === "openai" ||
     type === "openrouter" ||
     type === "ollama" ||
-    type === "openai-compatible"
+    type === "openai-compatible" ||
+    type === "mistral" ||
+    type === "anthropic" ||
+    type === "xai" ||
+    type === "google"
   );
 };
 
 export const PROVIDER_TYPES: { value: DbProviderType; label: string }[] = [
   { value: "openrouter", label: "OpenRouter" },
   { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic Claude" },
+  { value: "google", label: "Google Gemini" },
+  { value: "mistral", label: "Mistral AI" },
+  { value: "xai", label: "xAI Grok" },
   { value: "ollama", label: "Ollama" },
   { value: "openai-compatible", label: "OpenAI-Compatible (LMStudio, etc.)" },
-  { value: "google", label: "Google Gemini" },
 ];
+
+// Default provider type for new provider forms
+export const DEFAULT_PROVIDER_TYPE: DbProviderType = "openrouter";
 
 export const REQUIRES_API_KEY_TYPES: DbProviderType[] = [
   "openai",
   "openrouter",
   "google",
+  "mistral",
+  "anthropic",
+  "xai",
 ];
 
 export const OPTIONAL_API_KEY_TYPES: DbProviderType[] = [
@@ -109,6 +125,36 @@ export const DEFAULT_MODELS: Record<
     { id: "gemini-2.5-flash-preview-05-20:thinking", name: "Gemini 2.5 Flash Preview (Thinking)" },
     { id: "gemini-2.5-flash-preview", name: "Gemini 2.5 Flash Preview" },
     { id: "gemini-2.0-flash-001", name: "Gemini 2.0 Flash" },
+  ],
+  mistral: [
+    { id: "mistral-small-latest", name: "Mistral Small (Latest)" },
+    { id: "mistral-medium-3", name: "Mistral Medium 3" },
+    { id: "mistral-large-latest", name: "Mistral Large (Latest)" },
+    { id: "ministral-3b-latest", name: "Ministral 3B (Latest)" },
+    { id: "ministral-8b-latest", name: "Ministral 8B (Latest)" },
+    { id: "pixtral-large-latest", name: "Pixtral Large (Latest)" },
+    { id: "codestral-latest", name: "Codestral (Latest)" },
+    { id: "codestral-2501", name: "Codestral 2501" },
+    { id: "magistral-small", name: "Magistral Small (Reasoning)" },
+    { id: "magistral-medium", name: "Magistral Medium (Reasoning)" },
+  ],
+  anthropic: [
+    { id: "claude-opus-4-20250514", name: "Claude Opus 4 (Latest)" },
+    { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4 (Latest)" },
+    { id: "claude-3-7-sonnet-20250219", name: "Claude 3.7 Sonnet (Reasoning)" },
+    { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet" },
+    { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku" },
+    { id: "claude-3-opus-20240229", name: "Claude 3 Opus" },
+  ],
+  xai: [
+    { id: "grok-4", name: "Grok 4 (Latest)" },
+    { id: "grok-4-heavy", name: "Grok 4 Heavy" },
+    { id: "grok-3", name: "Grok 3" },
+    { id: "grok-3-fast", name: "Grok 3 Fast" },
+    { id: "grok-3-mini", name: "Grok 3 Mini" },
+    { id: "grok-3-mini-fast", name: "Grok 3 Mini Fast" },
+    { id: "grok-2-1212", name: "Grok 2" },
+    { id: "grok-2-vision-1212", name: "Grok 2 Vision" },
   ],
   openrouter: [],
   ollama: [{ id: "llama3", name: "Llama 3 (Ollama)" }],
@@ -171,6 +217,12 @@ export function instantiateModelInstance(
           // Provide a default name if config.name is missing
           name: config.name || "Custom API",
         })(modelId);
+      case "mistral":
+        return createMistral({ apiKey })(modelId);
+      case "anthropic":
+        return createAnthropic({ apiKey })(modelId);
+      case "xai":
+        return createXai({ apiKey })(modelId);
       default:
         console.warn(`Unsupported provider type: ${config.type}`);
         return null;
@@ -246,6 +298,35 @@ export const DEFAULT_SUPPORTED_PARAMS: Record<string, string[]> = {
     "stop",
     "tools",
     "tool_choice",
+  ],
+  mistral: [
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "stop",
+    "tools",
+    "tool_choice",
+    "seed",
+    "response_format",
+  ],
+  anthropic: [
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "top_k",
+    "stop",
+    "tools",
+    "tool_choice",
+  ],
+  xai: [
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "stop",
+    "tools",
+    "tool_choice",
+    "seed",
+    "response_format",
   ],
   ollama: [
     "max_tokens",

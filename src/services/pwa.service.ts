@@ -31,6 +31,12 @@ export class PWAService {
       return;
     }
 
+    // Skip registration in development mode
+    if (import.meta.env.DEV) {
+      console.log("PWA Service Worker skipped in development mode");
+      return;
+    }
+
     try {
       this.updateSW = registerSW({
         onNeedRefresh: () => {

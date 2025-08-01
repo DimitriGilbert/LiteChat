@@ -127,6 +127,56 @@ const mapToOpenRouterModel = (
     if (model.architecture) {
       model.architecture.tokenizer = "Compatible";
     }
+  } else if (providerType === "mistral") {
+    // Mistral context lengths (approximate)
+    if (modelId.includes("ministral-3b")) model.context_length = 32768;
+    else if (modelId.includes("ministral-8b")) model.context_length = 32768;
+    else if (modelId.includes("mistral-small")) model.context_length = 32768;
+    else if (modelId.includes("mistral-medium-3")) model.context_length = 128000;
+    else if (modelId.includes("mistral-large")) model.context_length = 128000;
+    else if (modelId.includes("pixtral")) model.context_length = 128000;
+    else if (modelId.includes("codestral")) model.context_length = 32768;
+    else if (modelId.includes("magistral")) model.context_length = 128000;
+    else model.context_length = model.context_length ?? 32768;
+    // Fix: Add null check before accessing properties
+    if (model.top_provider) {
+      model.top_provider.context_length = model.context_length;
+    }
+    if (model.architecture) {
+      model.architecture.tokenizer = "Mistral";
+    }
+  } else if (providerType === "anthropic") {
+    // Anthropic context lengths (approximate)
+    if (modelId.includes("claude-opus-4")) model.context_length = 200000;
+    else if (modelId.includes("claude-sonnet-4")) model.context_length = 200000;
+    else if (modelId.includes("claude-3-7-sonnet")) model.context_length = 200000;
+    else if (modelId.includes("claude-3-5-sonnet")) model.context_length = 200000;
+    else if (modelId.includes("claude-3-5-haiku")) model.context_length = 200000;
+    else if (modelId.includes("claude-3-opus")) model.context_length = 200000;
+    else if (modelId.includes("claude-3-sonnet")) model.context_length = 200000;
+    else if (modelId.includes("claude-3-haiku")) model.context_length = 200000;
+    else model.context_length = model.context_length ?? 200000;
+    // Fix: Add null check before accessing properties
+    if (model.top_provider) {
+      model.top_provider.context_length = model.context_length;
+    }
+    if (model.architecture) {
+      model.architecture.tokenizer = "Anthropic";
+    }
+  } else if (providerType === "xai") {
+    // xAI context lengths (approximate)
+    if (modelId.includes("grok-4")) model.context_length = 128000;
+    else if (modelId.includes("grok-3")) model.context_length = 128000;
+    else if (modelId.includes("grok-2")) model.context_length = 131072;
+    else if (modelId.includes("grok-beta")) model.context_length = 131072;
+    else model.context_length = model.context_length ?? 128000;
+    // Fix: Add null check before accessing properties
+    if (model.top_provider) {
+      model.top_provider.context_length = model.context_length;
+    }
+    if (model.architecture) {
+      model.architecture.tokenizer = "xAI";
+    }
   }
 
   return model;
@@ -192,7 +242,24 @@ export async function fetchModelsForProvider(
             baseUrlWithV1.endsWith("/") ? baseUrlWithV1 : baseUrlWithV1 + "/",
           ).toString();
           break;
+        case "mistral":
+          if (!apiKey) throw new Error("API Key required for Mistral AI");
+          url = "https://api.mistral.ai/v1/models";
+          break;
+        case "anthropic":
+          if (!apiKey) throw new Error("API Key required for Anthropic");
+          url = "https://api.anthropic.com/v1/models";
+          headers["anthropic-version"] = "2023-06-01";
+          break;
+        case "xai":
+          if (!apiKey) throw new Error("API Key required for xAI");
+          url = "https://api.x.ai/v1/models";
+          break;
         case "google":
+          if (!apiKey) throw new Error("API Key required for Google");
+          url = "https://generativelanguage.googleapis.com/v1beta/models";
+          headers["Authorization"] = `Bearer ${apiKey}`;
+          break;
         default:
           console.log(
             `[ModelFetcher] Model fetching not supported via API for type: ${config.type}. Returning empty list.`,

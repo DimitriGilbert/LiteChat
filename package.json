@@ -21,10 +21,12 @@
     "update": "git pull ${LITECHAT_ORIGIN:=origin} ${LITECHAT_BRANCH:=main} && npm install && npm run serve"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.0",
     "@ai-sdk/google": "^2.0.0-beta.19",
     "@ai-sdk/mistral": "^2.0.0-beta.11",
     "@ai-sdk/openai": "^2.0.0-beta.16",
     "@ai-sdk/openai-compatible": "^1.0.0-beta.13",
+    "@ai-sdk/xai": "^2.0.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -90,7 +92,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.3.4",
     "zod": "^3.25.49",
-    "zustand": "^5.0.3"
+    "zustand": "5.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
@@ -117,5 +119,8 @@
     "vite-plugin-node-polyfills": "^0.23.0",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^3.1.1"
+  },
+  "overrides": {
+    "zustand": "5.0.3"
   }
 }

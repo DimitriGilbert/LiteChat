@@ -3,10 +3,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import { VitePWA } from "vite-plugin-pwa";
 import { readFileSync, existsSync } from "fs";
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 // import { analyzer } from 'vite-bundle-analyzer';
+import { VitePWA } from "vite-plugin-pwa";
 
 // Custom plugin to read system prompt and user configuration files at build time
 function buildTimeConfigPlugin() {
@@ -89,6 +89,9 @@ export default defineConfig({
     }),
     VitePWA({
       registerType: 'prompt',
+      devOptions: {
+        enabled: false // Disable in development to avoid React 19.1 conflicts
+      },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt}'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6MB limit

@@ -86,11 +86,11 @@ export class AIService {
 
         // Process the stream part based on its type
         switch (part.type) {
-          case "text":
+          case "text-delta":
             // AI SDK v5: text parts now use 'text' property directly
             callbacks.onChunk(part.text);
             break;
-          case "reasoning":
+          case "reasoning-delta":
             // AI SDK v5: reasoning parts now use 'text' property directly
             callbacks.onReasoningChunk(part.text);
             break;
@@ -146,7 +146,7 @@ export class AIService {
             // Store finish details but don't call onFinish yet
             receivedFinishPart = true;
             finalFinishReason = part.finishReason;
-            // AI SDK v5: finish parts now use 'totalUsage' instead of 'usage'
+            // AI SDK v5: finish parts use 'totalUsage'
             finalUsage = part.totalUsage;
             finalProviderMetadata = (part as any).providerMetadata;
             break;
@@ -173,7 +173,7 @@ export class AIService {
           // Handle other part types
           default:
             // Log unexpected part types but don't spam the console
-            if ((part as any).type && !['source', 'file', 'tool-call-streaming-start', 'tool-call-delta', 'reasoning-part-finish', 'tool-input-start', 'tool-input-delta', 'tool-input-end'].includes((part as any).type)) {
+            if ((part as any).type && !['text-start', 'text-delta', 'text-end', 'reasoning-start', 'reasoning-delta', 'reasoning-end', 'source', 'file', 'tool-call', 'tool-call-streaming-start', 'tool-call-delta', 'tool-call-streaming-end', 'tool-result', 'tool-error', 'start-step', 'finish-step', 'finish', 'error', 'abort', 'raw'].includes((part as any).type)) {
               console.warn(
                 `[AIService] Received unexpected stream part type: ${(part as any).type} for ${interactionId}`,
                 part,

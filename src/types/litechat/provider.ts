@@ -66,7 +66,10 @@ export type DbProviderType =
   | "google"
   | "openrouter"
   | "ollama"
-  | "openai-compatible";
+  | "openai-compatible"
+  | "mistral"
+  | "anthropic"
+  | "xai";
 
 // Stored in DB for API Keys
 export interface DbApiKey extends DbBase {

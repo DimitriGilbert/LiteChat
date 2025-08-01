@@ -11,6 +11,7 @@ import {
   supportsModelFetching,
   PROVIDER_TYPES,
   requiresApiKey,
+  DEFAULT_PROVIDER_TYPE,
 } from "@/lib/litechat/provider-helpers";
 import { ProviderConfigForm, ProviderFormData } from "./ProviderConfigForm"; // Import the shared form
 
@@ -29,7 +30,7 @@ export const AddProviderForm: React.FC<AddProviderFormProps> = ({
   apiKeys,
   onAddProvider,
   onCancel,
-  initialType = "openai",
+  initialType = DEFAULT_PROVIDER_TYPE,
   initialName = "",
   initialApiKeyId = null,
 }) => {

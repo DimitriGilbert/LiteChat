@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useSettingsStore } from "@/store/settings.store";
-import { useShallow } from "zustand/react/shallow";
 import type { CustomThemeColors } from "@/store/settings.store";
 import { THEME_OPTIONS } from "@/types/litechat/common";
 
@@ -73,15 +72,10 @@ const THEME_CLASS_MAP: Record<string, string> = {
 };
 
 export const ThemeManager: React.FC = () => {
-  const { theme, customFontFamily, customFontSize, customThemeColors } =
-    useSettingsStore(
-      useShallow((state) => ({
-        theme: state.theme,
-        customFontFamily: state.customFontFamily,
-        customFontSize: state.customFontSize,
-        customThemeColors: state.customThemeColors,
-      })),
-    );
+  const theme = useSettingsStore((state) => state.theme);
+  const customFontFamily = useSettingsStore((state) => state.customFontFamily);
+  const customFontSize = useSettingsStore((state) => state.customFontSize);
+  const customThemeColors = useSettingsStore((state) => state.customThemeColors);
 
   useEffect(() => {
     const body = document.body;
