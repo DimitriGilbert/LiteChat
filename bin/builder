@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # LiteChat Build & Release Script
-# Usage: bin/builder [--release <name>] [--no-publish]
+# Usage: bin/builder [--release <name>] [--dry-run] [--no-publish]
 
 set -e
 
@@ -10,6 +10,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
@@ -18,6 +20,7 @@ DEFAULT_LANG=""
 BUILD_DIR="build"
 RELEASE_DIR="release"
 DIST_DIR="dist"
+TEMP_DIR=".builder-temp"
 
 # Parse command line arguments
 RELEASE_NAME=""
@@ -29,12 +32,22 @@ SKIP_GITHUB=false
 BUILD_DOCKER=false
 GH_PAGES_DIR=""
 VERSION_BUMP_LEVEL=""
+DRY_RUN=false
+CLEAN_ONLY=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --release)
       RELEASE_NAME="$2"
       shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    --clean-only)
+      CLEAN_ONLY=true
+      shift
       ;;
     --no-publish)
       NO_PUBLISH=true
@@ -73,6 +86,8 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Options:"
       echo "  --release <name>     Create a release with the specified name"
+      echo "  --dry-run            Show what would be built without actually building"
+      echo "  --clean-only         Only clean build directories and exit"
       echo "  --no-publish         Create release files but don't publish to GitHub"
       echo "  --docker-repo <repo> Docker repository for image (e.g., 'myuser/litechat')"
       echo "  --skip-build         Skip the application build step"
@@ -84,14 +99,16 @@ while [[ $# -gt 0 ]]; do
       echo "  -h, --help           Show this help message"
       echo ""
       echo "Examples:"
-      echo "  $0                                                # Build only"
-      echo "  $0 --release v1.0.0                              # Build and create GitHub release"
+      echo "  $0 --dry-run                                    # Show what would be built"
+      echo "  $0 --clean-only                                 # Clean build directories"
+      echo "  $0                                              # Build only"
+      echo "  $0 --release v1.0.0                            # Build and create GitHub release"
       echo "  $0 --release v1.0.0 --docker-repo myuser/litechat # Build, release, and push Docker image"
-      echo "  $0 --version-bump patch --build-docker           # Bump patch version, build, and create Docker image"
-      echo "  $0 --release v1.0.0 --build-docker               # Build, release, and create Docker images with default repo"
-      echo "  $0 --skip-build --build-docker --release v1.0.0  # Skip build, create Docker images from existing build"
+      echo "  $0 --version-bump patch --build-docker         # Bump patch version, build, and create Docker image"
+      echo "  $0 --release v1.0.0 --build-docker             # Build, release, and create Docker images with default repo"
+      echo "  $0 --skip-build --build-docker --release v1.0.0 # Skip build, create Docker images from existing build"
       echo "  $0 --release v1.0.0 --gh-pages-dir ../litechat.dev # Build and deploy to GitHub pages"
-      echo "  $0 --skip-build --skip-github --build-docker     # Only create Docker images"
+      echo "  $0 --skip-build --skip-github --build-docker   # Only create Docker images"
       exit 0
       ;;
     *)
@@ -117,6 +134,14 @@ log_warning() {
 
 log_error() {
   echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_dry_run() {
+  echo -e "${PURPLE}[DRY-RUN]${NC} $1"
+}
+
+log_cleanup() {
+  echo -e "${CYAN}[CLEANUP]${NC} $1"
 }
 
 detect_languages() {
@@ -147,22 +172,47 @@ detect_languages() {
 }
 
 cleanup_dirs() {
-  log_info "Cleaning up previous builds..."
+  log_cleanup "Cleaning up previous builds and temporary files..."
+  
+  # Clean build directories
   rm -rf "$BUILD_DIR"
+  rm -rf "$TEMP_DIR"
+  
+  # Clean release directory if specified
   if [[ -n "$RELEASE_NAME" ]]; then
     rm -rf "$RELEASE_DIR"
   fi
   
-  if [ ${#LANGUAGES[@]} -gt 0 ]; then
-    for lang in "${LANGUAGES[@]}"; do
-      mkdir -p "$BUILD_DIR/$lang"
-    done
-  fi
+  # Clean any leftover temporary files
+  rm -f dockerfile.tmp.*
+  
+  # Clean dist directory
+  rm -rf "$DIST_DIR"
+  
+  log_success "Cleanup completed"
 }
 
 create_directories() {
+  if [[ "$DRY_RUN" == true ]]; then
+    log_dry_run "Would create directories:"
+    log_dry_run "  - $BUILD_DIR/"
+    if [[ -n "$RELEASE_NAME" ]]; then
+      log_dry_run "  - $RELEASE_DIR/"
+    fi
+    if [ ${#LANGUAGES[@]} -gt 0 ]; then
+      for lang in "${LANGUAGES[@]}"; do
+        log_dry_run "  - $BUILD_DIR/$lang/"
+        if [[ "$lang" != "$DEFAULT_LANG" ]]; then
+          log_dry_run "  - $BUILD_DIR/docker-$lang/"
+        fi
+      done
+    fi
+    return
+  fi
+  
   log_info "Creating build directories..."
   mkdir -p "$BUILD_DIR"
+  mkdir -p "$TEMP_DIR"
   
   if [[ -n "$RELEASE_NAME" ]]; then
     mkdir -p "$RELEASE_DIR"
@@ -184,25 +234,51 @@ build_project() {
     return
   fi
   
+  if [[ "$DRY_RUN" == true ]]; then
+    log_dry_run "Would build project:"
+    if [ ${#LANGUAGES[@]} -eq 0 ]; then
+      log_dry_run "  - Single language-agnostic build"
+      log_dry_run "  - Copy to $BUILD_DIR/"
+      if [[ -n "$RELEASE_NAME" ]]; then
+        log_dry_run "  - Create $RELEASE_DIR/$RELEASE_NAME.zip"
+      fi
+    else
+      log_dry_run "  - Multi-language builds for: ${LANGUAGES[*]}"
+      log_dry_run "  - Default language ($DEFAULT_LANG) at root"
+      for lang in "${LANGUAGES[@]}"; do
+        if [[ "$lang" != "$DEFAULT_LANG" ]]; then
+          log_dry_run "  - $lang: GitHub Pages build + Docker build"
+          if [[ -n "$RELEASE_NAME" ]]; then
+            log_dry_run "  - Create $RELEASE_DIR/$RELEASE_NAME.$lang.zip"
+          fi
+        fi
+      done
+    fi
+    return
+  fi
+  
   if [ ${#LANGUAGES[@]} -eq 0 ]; then
     # Single build mode
     log_info "Performing single, language-agnostic build..."
     rm -rf "$DIST_DIR"
-    npm run build # Build without language env var
+    npm run build
     if [[ ! -d "$DIST_DIR" ]]; then
       log_error "Build failed - dist directory not found"
       exit 1
     fi
-    log_info "Copying build to $BUILD_DIR/"
-    cp -r "$DIST_DIR"/* "$BUILD_DIR/"
+    
+    # Copy only the built files, not any previous artifacts
+    log_info "Copying build artifacts to $BUILD_DIR/"
+    # Exclude the release directory to prevent zipping previous zips
+    find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -name "release" -exec cp -r {} "$BUILD_DIR/" \;
     
     # Add .nojekyll file to disable Jekyll processing on GitHub Pages
-    log_info "Adding .nojekyll file to disable Jekyll processing"
     touch "$BUILD_DIR/.nojekyll"
     
     if [[ -n "$RELEASE_NAME" ]]; then
       log_info "Creating release zip: $RELEASE_DIR/$RELEASE_NAME.zip"
-      (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" .)
+      # Create zip from dist directory, not build directory to avoid including previous zips
+      (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" . -x "*.zip" "*.tar.gz" "*.tar")
     fi
     log_success "Single build completed."
   else
@@ -222,19 +298,19 @@ build_project() {
     
     # Copy default language to build root
     log_info "Copying default language build ($DEFAULT_LANG) to $BUILD_DIR/ root"
-    cp -r "$DIST_DIR"/* "$BUILD_DIR/"
+    # Exclude the release directory to prevent zipping previous zips
+    find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -name "release" -exec cp -r {} "$BUILD_DIR/" \;
     # Also copy to language-specific directory for consistency
     mkdir -p "$BUILD_DIR/$DEFAULT_LANG"
-    cp -r "$DIST_DIR"/* "$BUILD_DIR/$DEFAULT_LANG/"
+    find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -name "release" -exec cp -r {} "$BUILD_DIR/$DEFAULT_LANG/" \;
     
     # Add .nojekyll file to disable Jekyll processing on GitHub Pages
-    log_info "Adding .nojekyll file to disable Jekyll processing"
     touch "$BUILD_DIR/.nojekyll"
     
     # Create default release zip
     if [[ -n "$RELEASE_NAME" ]]; then
       log_info "Creating default release zip: $RELEASE_DIR/$RELEASE_NAME.zip"
-      (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" .)
+      (cd "$DIST_DIR" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.zip" . -x "*.zip" "*.tar.gz" "*.tar")
     fi
     log_success "Default language $DEFAULT_LANG build completed"
     
@@ -257,7 +333,8 @@ build_project() {
 
       # Copy GitHub Pages build to language-specific directory
       log_info "Copying $lang GitHub Pages build to $BUILD_DIR/$lang/"
-      cp -r "$DIST_DIR"/* "$BUILD_DIR/$lang/"
+      # Exclude the release directory to prevent zipping previous zips
+      find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -name "release" -exec cp -r {} "$BUILD_DIR/$lang/" \;
 
       # Build for Docker (with root base path)
       log_info "Building language: $lang for Docker (with / base)"
@@ -273,12 +350,13 @@ build_project() {
       # Copy Docker build to docker-specific directory
       mkdir -p "$BUILD_DIR/docker-$lang"
       log_info "Copying $lang Docker build to $BUILD_DIR/docker-$lang/"
-      cp -r "$DIST_DIR"/* "$BUILD_DIR/docker-$lang/"
+      # Exclude the release directory to prevent zipping previous zips
+      find "$DIST_DIR" -mindepth 1 -maxdepth 1 ! -name "release" -exec cp -r {} "$BUILD_DIR/docker-$lang/" \;
 
       # Create language-specific release zip (using GitHub Pages build)
       if [[ -n "$RELEASE_NAME" ]]; then
         log_info "Creating language-specific release zip: $RELEASE_DIR/$RELEASE_NAME.$lang.zip"
-        (cd "$BUILD_DIR/$lang" && zip -r "../$RELEASE_DIR/$RELEASE_NAME.$lang.zip" .)
+        (cd "$BUILD_DIR/$lang" && zip -r "../../$RELEASE_DIR/$RELEASE_NAME.$lang.zip" . -x "*.zip" "*.tar.gz" "*.tar")
       fi
       log_success "Language $lang builds completed (GitHub Pages + Docker)"
     done
@@ -287,13 +365,15 @@ build_project() {
 
 create_language_specific_dockerfile() {
   local lang="$1"
-  local temp_dockerfile="dockerfile.tmp.$lang"
+  local temp_dockerfile="$TEMP_DIR/dockerfile.$lang"
   
   cat > "$temp_dockerfile" << EOF
 FROM lipanski/docker-static-website:latest
 
-# Copy the built application files for specific language (Docker build with / base)
+# Copy only the built application files for specific language (Docker build with / base)
+# Exclude release directory to prevent including old zip files
 COPY build/docker-$lang/ .
+
 
 # Copy httpd.conf for SPA routing and any needed configuration
 COPY docker/httpd.conf .
@@ -325,6 +405,28 @@ create_docker_image() {
   if [[ -z "$RELEASE_NAME" ]]; then
     log_error "Release name is required for Docker image creation"
     return 1
+  fi
+  
+  if [[ "$DRY_RUN" == true ]]; then
+    log_dry_run "Would create Docker images:"
+    if [ ${#LANGUAGES[@]} -eq 0 ]; then
+      log_dry_run "  - $DOCKER_REPO:$RELEASE_NAME"
+      log_dry_run "  - $DOCKER_REPO:latest"
+    else
+      log_dry_run "  - $DOCKER_REPO:$RELEASE_NAME (default: $DEFAULT_LANG)"
+      log_dry_run "  - $DOCKER_REPO:latest"
+      for lang in "${LANGUAGES[@]}"; do
+        if [[ "$lang" != "$DEFAULT_LANG" ]]; then
+          log_dry_run "  - $DOCKER_REPO:$RELEASE_NAME-$lang ($lang version)"
+        fi
+      done
+    fi
+    if [[ "$NO_PUBLISH" != true ]]; then
+      log_dry_run "  - Would push all images to registry"
+    else
+      log_dry_run "  - Would NOT push images (--no-publish)"
+    fi
+    return
   fi
   
   # Check if Docker is available
@@ -451,6 +553,16 @@ deploy_gh_pages() {
     return
   fi
 
+  if [[ "$DRY_RUN" == true ]]; then
+    log_dry_run "Would deploy to GitHub Pages:"
+    log_dry_run "  - Source: $BUILD_DIR/"
+    log_dry_run "  - Target: $GH_PAGES_DIR"
+    if [[ "$NO_PUBLISH" == true ]]; then
+      log_dry_run "  - Would NOT actually deploy (--no-publish)"
+    fi
+    return
+  fi
+
   if [[ "$NO_PUBLISH" == true ]]; then
     log_warning "Skipping GitHub Pages deployment (--no-publish flag used)"
     return
@@ -503,7 +615,6 @@ deploy_gh_pages() {
     echo "$CNAME_CONTENT" > ./CNAME
   fi
 
-
   log_info "Committing and pushing to GitHub Pages..."
   git add .
   
@@ -526,9 +637,15 @@ deploy_gh_pages() {
   popd > /dev/null
 }
 
-
 handle_version_bump() {
   if [[ -z "$VERSION_BUMP_LEVEL" ]]; then
+    return
+  fi
+
+  if [[ "$DRY_RUN" == true ]]; then
+    log_dry_run "Would perform version bump: $VERSION_BUMP_LEVEL"
+    log_dry_run "  - Would run: npm version $VERSION_BUMP_LEVEL"
+    log_dry_run "  - Would push commit and tags to origin"
     return
   fi
 
@@ -575,6 +692,18 @@ create_github_release() {
   fi
   
   if [[ -z "$RELEASE_NAME" ]]; then
+    return
+  fi
+  
+  if [[ "$DRY_RUN" == true ]]; then
+    log_dry_run "Would create GitHub release:"
+    log_dry_run "  - Release name: $RELEASE_NAME"
+    log_dry_run "  - Assets from: $RELEASE_DIR/"
+    if [[ "$NO_PUBLISH" == true ]]; then
+      log_dry_run "  - Would NOT actually publish (--no-publish)"
+    else
+      log_dry_run "  - Would publish to GitHub with generated notes"
+    fi
     return
   fi
   
@@ -629,6 +758,41 @@ create_github_release() {
 }
 
 show_summary() {
+  if [[ "$DRY_RUN" == true ]]; then
+    echo ""
+    log_success "Dry run completed! 🎉"
+    echo ""
+    echo "📋 What would be built:"
+    if [ ${#LANGUAGES[@]} -eq 0 ]; then
+      echo "  • Single language-agnostic build"
+    else
+      echo "  • Multi-language builds for: ${LANGUAGES[*]}"
+      echo "  • Default language: $DEFAULT_LANG"
+    fi
+    
+    if [[ -n "$RELEASE_NAME" ]]; then
+      echo "  • Release: $RELEASE_NAME"
+      if [ ${#LANGUAGES[@]} -eq 0 ]; then
+        echo "  • Release zip: $RELEASE_NAME.zip"
+      else
+        echo "  • Release zips: $RELEASE_NAME.zip + language-specific zips"
+      fi
+    fi
+    
+    if [[ "$BUILD_DOCKER" == true || -n "$DOCKER_REPO" ]]; then
+      echo "  • Docker images with repo: $DOCKER_REPO"
+    fi
+    
+    if [[ -n "$GH_PAGES_DIR" ]]; then
+      echo "  • GitHub Pages deployment to: $GH_PAGES_DIR"
+    fi
+    
+    if [[ "$NO_PUBLISH" == true ]]; then
+      echo "  • Local build only (no publishing)"
+    fi
+    return
+  fi
+  
   echo ""
   log_success "Build completed successfully!"
   echo ""
@@ -652,7 +816,9 @@ show_summary() {
     echo "│   ├── $RELEASE_NAME.zip"
     if [ ${#LANGUAGES[@]} -gt 0 ]; then
       for lang in "${LANGUAGES[@]}"; do
-        echo "│   └── $RELEASE_NAME.$lang.zip"
+        if [[ "$lang" != "$DEFAULT_LANG" ]]; then
+          echo "│   └── $RELEASE_NAME.$lang.zip"
+        fi
       done
     fi
   fi
@@ -697,6 +863,12 @@ main() {
   if [[ -n "$RELEASE_NAME" && -n "$VERSION_BUMP_LEVEL" ]]; then
     log_error "Cannot use --release and --version-bump at the same time. Choose one."
     exit 1
+  fi
+
+  if [[ "$CLEAN_ONLY" == true ]]; then
+    cleanup_dirs
+    log_success "Cleanup completed. Exiting."
+    exit 0
   fi
 
   handle_version_bump
@@ -747,6 +919,13 @@ main() {
   create_docker_image
   create_github_release
   show_summary
+  
+  # Final cleanup
+  if [[ "$DRY_RUN" != true ]]; then
+    log_cleanup "Cleaning up temporary files..."
+    rm -rf "$TEMP_DIR"
+    rm -f dockerfile.tmp.*
+  fi
   
   log_success "All done! 🎉"
 }
