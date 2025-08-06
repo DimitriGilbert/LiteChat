@@ -1,7 +1,7 @@
 {
   "name": "litechat",
   "private": true,
-  "version": "0.2.8-beta",
+  "version": "0.2.9-beta",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
