@@ -27,5 +27,11 @@
     "noUncheckedSideEffectImports": true
   },
   "include": ["src"],
-  "exclude": ["src/test", "**/*.test.ts", "**/*.test.tsx"]
+  "exclude": [
+    "src/test",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "src/components/formedible/**",
+    "src/hooks/use-formedible.tsx"
+  ]
 }

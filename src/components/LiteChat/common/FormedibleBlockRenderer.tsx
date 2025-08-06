@@ -30,7 +30,9 @@ interface FormedibleBlockRendererProps {
 class FormedibleParser {
   private static readonly ALLOWED_FIELD_TYPES = [
     'text', 'email', 'password', 'url', 'tel', 'textarea', 'select', 
-    'checkbox', 'switch', 'number', 'date', 'slider', 'file'
+    'checkbox', 'switch', 'number', 'date', 'slider', 'file', 'rating',
+    'phone', 'colorPicker', 'location', 'duration', 'multiSelect',
+    'autocomplete', 'masked', 'object', 'array', 'radio'
   ];
 
   private static readonly ALLOWED_KEYS = [
@@ -40,7 +42,11 @@ class FormedibleParser {
 
   private static readonly ALLOWED_FIELD_KEYS = [
     'name', 'type', 'label', 'placeholder', 'description', 'options', 
-    'min', 'max', 'step', 'accept', 'multiple', 'page', 'conditional'
+    'min', 'max', 'step', 'accept', 'multiple', 'page', 'conditional',
+    'section', 'ratingConfig', 'phoneConfig', 'colorConfig', 'locationConfig',
+    'durationConfig', 'multiSelectConfig', 'sliderConfig', 'numberConfig',
+    'dateConfig', 'fileConfig', 'textareaConfig', 'passwordConfig', 'emailConfig',
+    'autocompleteConfig', 'maskedInputConfig', 'objectConfig', 'arrayConfig'
   ];
 
   private static readonly ALLOWED_PAGE_KEYS = [
@@ -280,6 +286,33 @@ class FormedibleParser {
             }
             break;
           case 'multiple':
+            if (typeof value === 'boolean') {
+              sanitizedField[key] = value;
+            }
+            break;
+          case 'section':
+          case 'ratingConfig':
+          case 'phoneConfig':
+          case 'colorConfig':
+          case 'locationConfig':
+          case 'durationConfig':
+          case 'multiSelectConfig':
+          case 'sliderConfig':
+          case 'numberConfig':
+          case 'dateConfig':
+          case 'fileConfig':
+          case 'textareaConfig':
+          case 'passwordConfig':
+          case 'emailConfig':
+          case 'autocompleteConfig':
+          case 'maskedInputConfig':
+          case 'objectConfig':
+          case 'arrayConfig':
+            if (typeof value === 'object' && value !== null) {
+              sanitizedField[key] = value;
+            }
+            break;
+          case 'conditional':
             if (typeof value === 'boolean') {
               sanitizedField[key] = value;
             }
@@ -539,6 +572,48 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
         case 'file':
           schemaObj[field.name] = z.any();
           break;
+        case 'rating':
+          schemaObj[field.name] = z.number().min(1).max(5);
+          break;
+        case 'phone':
+          schemaObj[field.name] = z.string();
+          break;
+        case 'colorPicker':
+          schemaObj[field.name] = z.string();
+          break;
+        case 'location':
+          schemaObj[field.name] = z.object({
+            lat: z.number(),
+            lng: z.number(),
+            address: z.string().optional(),
+            city: z.string().optional(),
+            country: z.string().optional(),
+          }).optional();
+          break;
+        case 'duration':
+          schemaObj[field.name] = z.object({
+            hours: z.number().min(0),
+            minutes: z.number().min(0),
+          }).optional();
+          break;
+        case 'multiSelect':
+          schemaObj[field.name] = z.array(z.string());
+          break;
+        case 'autocomplete':
+          schemaObj[field.name] = z.string();
+          break;
+        case 'masked':
+          schemaObj[field.name] = z.string();
+          break;
+        case 'object':
+          schemaObj[field.name] = z.any();
+          break;
+        case 'array':
+          schemaObj[field.name] = z.array(z.any());
+          break;
+        case 'radio':
+          schemaObj[field.name] = z.string();
+          break;
         default:
           schemaObj[field.name] = z.string();
       }
@@ -582,6 +657,44 @@ const FormedibleBlockRendererComponent: React.FC<FormedibleBlockRendererProps> =
           break;
         case 'file':
           defaults[field.name] = null;
+          break;
+        case 'rating':
+          defaults[field.name] = 1;
+          break;
+        case 'phone':
+          defaults[field.name] = "";
+          break;
+        case 'colorPicker':
+          defaults[field.name] = "#000000";
+          break;
+        case 'location':
+          defaults[field.name] = undefined;
+          break;
+        case 'duration':
+          defaults[field.name] = { hours: 0, minutes: 0 };
+          break;
+        case 'multiSelect':
+          defaults[field.name] = [];
+          break;
+        case 'autocomplete':
+          defaults[field.name] = "";
+          break;
+        case 'masked':
+          defaults[field.name] = "";
+          break;
+        case 'object':
+          defaults[field.name] = {};
+          break;
+        case 'array':
+          defaults[field.name] = [];
+          break;
+        case 'radio':
+          if (field.options && field.options.length > 0) {
+            const firstOption = field.options[0];
+            defaults[field.name] = typeof firstOption === 'string' ? firstOption : firstOption.value;
+          } else {
+            defaults[field.name] = "";
+          }
           break;
         default:
           defaults[field.name] = "";

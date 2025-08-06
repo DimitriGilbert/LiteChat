@@ -12,6 +12,7 @@ import type {
 } from '../types/litechat/websearch';
 import { load } from 'cheerio';
 import { useSettingsStore } from '@/store/settings.store';
+import { toast } from 'sonner';
 
 export class WebSearchService {
   private static readonly DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
@@ -114,22 +115,44 @@ export class WebSearchService {
    */
   static async extractPageContent(url: string): Promise<string> {
     try {
+      const headers: Record<string, string> = {
+        'User-Agent': this.DEFAULT_USER_AGENT,
+      };
+
+      // Only add auth header in development mode
+      if (import.meta.env.MODE === 'development') {
+        headers['X-LiteChat-Auth'] = 'LiteChat is G.O.A.T.';
+      }
+
       const response = await fetch(`${this.getMarkdownServiceUrl()}?url=${encodeURIComponent(url)}`, {
         method: 'GET',
-        headers: {
-          'User-Agent': this.DEFAULT_USER_AGENT,
-        },
+        headers,
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        toast.error(`Failed to extract content from URL`, {
+          description: `${url}: ${errorMessage}`,
+          duration: 5000,
+        });
+        throw new Error(errorMessage);
       }
 
       const content = await response.text();
       return content || `Failed to extract content from ${url}`;
     } catch (error) {
       console.error(`Content extraction failed for ${url}:`, error);
-      throw new Error(`Content extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Only show toast if we haven't already shown one for HTTP errors
+      if (!(error instanceof Error && error.message.startsWith('HTTP'))) {
+        toast.error(`Content extraction failed`, {
+          description: `${url}: ${errorMessage}`,
+          duration: 5000,
+        });
+      }
+      
+      throw new Error(`Content extraction failed: ${errorMessage}`);
     }
   }
 

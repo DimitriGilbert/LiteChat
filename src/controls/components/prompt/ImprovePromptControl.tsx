@@ -21,7 +21,7 @@ import { promptEvent } from "@/types/litechat/events/prompt.events";
 import { useFormedible } from "@/hooks/use-formedible";
 import { z } from "zod";
 
-interface ImprovePromptFormData {
+interface ImprovePromptFormData extends Record<string, unknown> {
   selectedModelId: string;
   originalPrompt: string;
   customSystemPrompt?: string;
