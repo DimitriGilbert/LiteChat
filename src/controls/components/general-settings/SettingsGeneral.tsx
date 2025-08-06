@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { SwitchField } from "@/components/LiteChat/common/form-fields/SwitchField";
 import { SliderField } from "@/components/LiteChat/common/form-fields/SliderField";
 import { NumberField } from "@/components/LiteChat/common/form-fields/NumberField";
+import { TextField } from "@/components/LiteChat/common/form-fields/TextField";
 
 const SettingsGeneralComponent: React.FC = () => {
   const { t } = useTranslation('settings');
@@ -32,6 +33,10 @@ const SettingsGeneralComponent: React.FC = () => {
     textTriggersEnabled: z.boolean(),
     textTriggerStartDelimiter: z.string().min(1),
     textTriggerEndDelimiter: z.string().min(1),
+    
+    // Service URLs
+    corsProxyUrl: z.string().url(t('generalSettings.validation.invalidUrl', 'Please enter a valid URL')),
+    markdownServiceUrl: z.string().url(t('generalSettings.validation.invalidUrl', 'Please enter a valid URL')),
   });
 
   const storeSetters = useSettingsStore(
@@ -50,6 +55,10 @@ const SettingsGeneralComponent: React.FC = () => {
       // Text Trigger Setters
       setTextTriggersEnabled: state.setTextTriggersEnabled,
       setTextTriggerDelimiters: state.setTextTriggerDelimiters,
+      
+      // Service URL Setters
+      setCorsProxyUrl: state.setCorsProxyUrl,
+      setMarkdownServiceUrl: state.setMarkdownServiceUrl,
     }))
   );
   const storeValues = useSettingsStore(
@@ -67,6 +76,10 @@ const SettingsGeneralComponent: React.FC = () => {
       textTriggersEnabled: state.textTriggersEnabled,
       textTriggerStartDelimiter: state.textTriggerStartDelimiter,
       textTriggerEndDelimiter: state.textTriggerEndDelimiter,
+      
+      // Service URLs
+      corsProxyUrl: state.corsProxyUrl,
+      markdownServiceUrl: state.markdownServiceUrl,
     }))
   );
 
@@ -86,6 +99,10 @@ const SettingsGeneralComponent: React.FC = () => {
       textTriggersEnabled: storeValues.textTriggersEnabled ?? true,
       textTriggerStartDelimiter: storeValues.textTriggerStartDelimiter ?? "@.",
       textTriggerEndDelimiter: storeValues.textTriggerEndDelimiter ?? ";",
+      
+      // Service URL Defaults
+      corsProxyUrl: storeValues.corsProxyUrl ?? "https://cors.litechat.dev/",
+      markdownServiceUrl: storeValues.markdownServiceUrl ?? "https://markdown.litechat.dev/",
     },
     validators: {
       onChangeAsync: settingsSchema,
@@ -107,6 +124,10 @@ const SettingsGeneralComponent: React.FC = () => {
       // Text Trigger Settings
       storeSetters.setTextTriggersEnabled(value.textTriggersEnabled);
       storeSetters.setTextTriggerDelimiters(value.textTriggerStartDelimiter, value.textTriggerEndDelimiter);
+      
+      // Service URL Settings
+      storeSetters.setCorsProxyUrl(value.corsProxyUrl);
+      storeSetters.setMarkdownServiceUrl(value.markdownServiceUrl);
     },
   });
 
@@ -126,6 +147,10 @@ const SettingsGeneralComponent: React.FC = () => {
       textTriggersEnabled: storeValues.textTriggersEnabled ?? true,
       textTriggerStartDelimiter: storeValues.textTriggerStartDelimiter ?? "@.",
       textTriggerEndDelimiter: storeValues.textTriggerEndDelimiter ?? ";",
+      
+      // Service URL Reset Values
+      corsProxyUrl: storeValues.corsProxyUrl ?? "https://cors.litechat.dev/",
+      markdownServiceUrl: storeValues.markdownServiceUrl ?? "https://markdown.litechat.dev/",
     });
   }, [
     storeValues.enableStreamingMarkdown,
@@ -138,6 +163,8 @@ const SettingsGeneralComponent: React.FC = () => {
     storeValues.textTriggersEnabled,
     storeValues.textTriggerStartDelimiter,
     storeValues.textTriggerEndDelimiter,
+    storeValues.corsProxyUrl,
+    storeValues.markdownServiceUrl,
     form,
   ]);
 
@@ -343,6 +370,32 @@ const SettingsGeneralComponent: React.FC = () => {
             
             <p className="text-sm text-muted-foreground">
               Customize the delimiters used for text triggers. Default: @.namespace.method args;
+            </p>
+          </div>
+        )}
+        
+        {storeValues.enableAdvancedSettings && (
+          <div className="rounded-lg border p-3 shadow-sm space-y-3">
+            <h4 className="text-sm font-medium">Service URLs</h4>
+            
+            <TextField
+              form={form}
+              name="corsProxyUrl"
+              label="CORS Proxy URL"
+              type="url"
+              placeholder="https://cors.litechat.dev/"
+            />
+            
+            <TextField
+              form={form}
+              name="markdownServiceUrl"
+              label="Markdown Service URL"
+              type="url"
+              placeholder="https://markdown.litechat.dev/"
+            />
+            
+            <p className="text-sm text-muted-foreground">
+              Configure proxy services for cross-origin requests and markdown parsing.
             </p>
           </div>
         )}

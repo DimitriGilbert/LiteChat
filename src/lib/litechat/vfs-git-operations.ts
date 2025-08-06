@@ -12,8 +12,10 @@ import git from "isomorphic-git";
 import http from "isomorphic-git/http/web";
 import { useSettingsStore } from "@/store/settings.store";
 
-// --- Constants ---
-const CORS_PROXY = "https://cors.isomorphic-git.org";
+// --- Helper Functions ---
+function getCorsProxyUrl(): string {
+  return useSettingsStore.getState().corsProxyUrl;
+}
 
 // --- Session Credentials Store ---
 const sessionCredentials = new Map<
@@ -252,7 +254,7 @@ export const gitCloneOp = async (
             fs: fsToUse,
             http,
             dir,
-            corsProxy: CORS_PROXY,
+            corsProxy: getCorsProxyUrl(),
             url,
             ref: defaultBranch,
             singleBranch: true,
@@ -299,7 +301,7 @@ export const gitCloneOp = async (
         fs: fsToUse,
         http,
         dir,
-        corsProxy: CORS_PROXY,
+        corsProxy: getCorsProxyUrl(),
         url,
         ref: branchToCheckout,
         singleBranch: true,
@@ -471,7 +473,7 @@ export const gitPullOp = async (
               fs: fsToUse,
               http,
               dir,
-              corsProxy: CORS_PROXY,
+              corsProxy: getCorsProxyUrl(),
               remote: "origin",
               ref: branch,
               depth: 1,
@@ -525,7 +527,7 @@ export const gitPullOp = async (
         name: useSettingsStore.getState().gitUserName!,
         email: useSettingsStore.getState().gitUserEmail!,
       },
-      corsProxy: CORS_PROXY,
+      corsProxy: getCorsProxyUrl(),
       onAuth: (authUrl) => onAuth(authUrl, credentials),
       onAuthFailure,
       onAuthSuccess,
@@ -573,7 +575,7 @@ export const gitPushOp = async (
       fs: fsToUse,
       http,
       dir,
-      corsProxy: CORS_PROXY,
+      corsProxy: getCorsProxyUrl(),
       ref: branch,
       remote: "origin",
       remoteRef: `refs/heads/${branch}`,

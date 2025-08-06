@@ -11,10 +11,18 @@ import type {
   SearchQualityMetrics
 } from '../types/litechat/websearch';
 import { load } from 'cheerio';
+import { useSettingsStore } from '@/store/settings.store';
 
 export class WebSearchService {
-  private static readonly URL_TO_MARKDOWN_SERVICE = 'https://urltomarkdown.herokuapp.com/';
   private static readonly DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+  
+  private static getCorsProxyUrl(): string {
+    return useSettingsStore.getState().corsProxyUrl;
+  }
+  
+  private static getMarkdownServiceUrl(): string {
+    return useSettingsStore.getState().markdownServiceUrl;
+  }
   
   private static cache = new Map<string, CachedSearchResult>();
   private static readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes
@@ -106,7 +114,7 @@ export class WebSearchService {
    */
   static async extractPageContent(url: string): Promise<string> {
     try {
-      const response = await fetch(`${this.URL_TO_MARKDOWN_SERVICE}?url=${encodeURIComponent(url)}`, {
+      const response = await fetch(`${this.getMarkdownServiceUrl()}?url=${encodeURIComponent(url)}`, {
         method: 'GET',
         headers: {
           'User-Agent': this.DEFAULT_USER_AGENT,
@@ -229,7 +237,7 @@ export class WebSearchService {
 
   private static async performDuckDuckGoSearch(query: string, options: WebSearchOptions): Promise<SearchResult[]> {
     const params = new URLSearchParams({ q: query });
-    const corsProxy = 'https://api.cors.lol/?url=';
+    const corsProxy = this.getCorsProxyUrl();
     const targetUrl = `https://duckduckgo.com/html?${params}`;
     const response = await fetch(`${corsProxy}${encodeURIComponent(targetUrl)}`, {
       headers: {
@@ -248,7 +256,7 @@ export class WebSearchService {
   private static async performDuckDuckGoImageSearch(query: string, options: ImageSearchOptions): Promise<SearchResult[]> {
     // First get HTML page to extract vqd token
     const params = new URLSearchParams({ q: query });
-    const corsProxy = 'https://api.cors.lol/?url=';
+    const corsProxy = this.getCorsProxyUrl();
     const targetUrl = `https://duckduckgo.com/html?${params}`;
     const html = await fetch(`${corsProxy}${encodeURIComponent(targetUrl)}`, {
       headers: {

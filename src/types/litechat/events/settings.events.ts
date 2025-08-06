@@ -77,6 +77,10 @@ export const settingsEvent = {
   configSyncLastSyncedAtChanged: "settings.config.sync.last.synced.at.changed",
   configSyncIntervalChanged: "settings.config.sync.interval.changed",
 
+  // Service URL Events
+  corsProxyUrlChanged: "settings.cors.proxy.url.changed",
+  markdownServiceUrlChanged: "settings.markdown.service.url.changed",
+
   // Action Request Events
   setThemeRequest: "settings.set.theme.request",
   setGlobalSystemPromptRequest: "settings.set.global.system.prompt.request",
@@ -155,6 +159,10 @@ export const settingsEvent = {
   setConfigSyncIncludeWorkflowsRequest: "settings.set.config.sync.include.workflows.request",
   setConfigSyncIncludeMcpServersRequest: "settings.set.config.sync.include.mcp.servers.request",
   setConfigSyncLastSyncedAtRequest: "settings.set.config.sync.last.synced.at.request",
+
+  // Service URL Request Events
+  setCorsProxyUrlRequest: "settings.set.cors.proxy.url.request",
+  setMarkdownServiceUrlRequest: "settings.set.markdown.service.url.request",
 
   loadSettingsRequest: "settings.load.settings.request",
   resetGeneralSettingsRequest: "settings.reset.general.settings.request",
@@ -283,6 +291,10 @@ export interface SettingsEventPayloads {
   [settingsEvent.configSyncLastSyncedAtChanged]: { timestamp: SettingsState["configSyncLastSyncedAt"] };
   [settingsEvent.configSyncIntervalChanged]: { interval: SettingsState["configSyncInterval"] };
 
+  // Service URL Event Payloads
+  [settingsEvent.corsProxyUrlChanged]: { url: SettingsState["corsProxyUrl"] };
+  [settingsEvent.markdownServiceUrlChanged]: { url: SettingsState["markdownServiceUrl"] };
+
   [settingsEvent.setThemeRequest]: { theme: SettingsState["theme"] };
   [settingsEvent.setGlobalSystemPromptRequest]: {
     prompt: SettingsState["globalSystemPrompt"];
@@ -410,6 +422,10 @@ export interface SettingsEventPayloads {
   [settingsEvent.setConfigSyncIncludeWorkflowsRequest]: { include: SettingsState["configSyncIncludeWorkflows"] };
   [settingsEvent.setConfigSyncIncludeMcpServersRequest]: { include: SettingsState["configSyncIncludeMcpServers"] };
   [settingsEvent.setConfigSyncLastSyncedAtRequest]: { timestamp: SettingsState["configSyncLastSyncedAt"] };
+
+  // Service URL Request Payloads
+  [settingsEvent.setCorsProxyUrlRequest]: { url: SettingsState["corsProxyUrl"] };
+  [settingsEvent.setMarkdownServiceUrlRequest]: { url: SettingsState["markdownServiceUrl"] };
 
   [settingsEvent.loadSettingsRequest]: undefined;
   [settingsEvent.resetGeneralSettingsRequest]: undefined;

@@ -119,6 +119,10 @@ export interface SettingsState {
   configSyncIncludeMcpServers: boolean;
   configSyncLastSyncedAt: string | null;
   configSyncInterval: number;
+  
+  // Service URLs
+  corsProxyUrl: string;
+  markdownServiceUrl: string;
 }
 
 interface SettingsActions {
@@ -191,6 +195,10 @@ interface SettingsActions {
   setConfigSyncIncludeMcpServers: (include: boolean) => void;
   setConfigSyncLastSyncedAt: (timestamp: string | null) => void;
   setConfigSyncInterval: (interval: number) => void;
+  
+  // Service URL Actions
+  setCorsProxyUrl: (url: string) => void;
+  setMarkdownServiceUrl: (url: string) => void;
   
   loadSettings: () => Promise<void>;
   resetGeneralSettings: () => Promise<void>;
@@ -270,6 +278,10 @@ const DEFAULT_CONFIG_SYNC_INCLUDE_MCP_SERVERS = true;
 const DEFAULT_CONFIG_SYNC_LAST_SYNCED_AT = null;
 const DEFAULT_CONFIG_SYNC_INTERVAL = 3600000; // 1 hour
 
+// Service URLs
+const DEFAULT_CORS_PROXY_URL = "https://cors.litechat.dev/";
+const DEFAULT_MARKDOWN_SERVICE_URL = "https://markdown.litechat.dev/";
+
 // Add a static array of all SettingsState keys for robust, type-safe enumeration
 export const SETTINGS_KEYS: (keyof SettingsState)[] = [
   "theme",
@@ -332,6 +344,8 @@ export const SETTINGS_KEYS: (keyof SettingsState)[] = [
   "configSyncIncludeMcpServers",
   "configSyncLastSyncedAt",
   "configSyncInterval",
+  "corsProxyUrl",
+  "markdownServiceUrl",
 ];
 
 const persistSetting = async <K extends keyof SettingsState>(
@@ -411,6 +425,10 @@ export const useSettingsStore = create(
     configSyncIncludeMcpServers: DEFAULT_CONFIG_SYNC_INCLUDE_MCP_SERVERS,
     configSyncLastSyncedAt: DEFAULT_CONFIG_SYNC_LAST_SYNCED_AT,
     configSyncInterval: DEFAULT_CONFIG_SYNC_INTERVAL,
+    
+    // Service URLs
+    corsProxyUrl: DEFAULT_CORS_PROXY_URL,
+    markdownServiceUrl: DEFAULT_MARKDOWN_SERVICE_URL,
 
     setTheme: (theme) => {
       set({ theme: theme });
@@ -753,6 +771,20 @@ export const useSettingsStore = create(
       set({ configSyncInterval: interval });
       persistSetting("configSyncInterval", interval);
       emitter.emit(settingsEvent.configSyncIntervalChanged, { interval });
+    },
+    
+    // Service URL Actions
+    setCorsProxyUrl: (url: string) => {
+      const trimmed = url.trim();
+      set({ corsProxyUrl: trimmed });
+      persistSetting("corsProxyUrl", trimmed);
+      emitter.emit(settingsEvent.corsProxyUrlChanged, { url: trimmed });
+    },
+    setMarkdownServiceUrl: (url: string) => {
+      const trimmed = url.trim();
+      set({ markdownServiceUrl: trimmed });
+      persistSetting("markdownServiceUrl", trimmed);
+      emitter.emit(settingsEvent.markdownServiceUrlChanged, { url: trimmed });
     },
 
     loadSettings: async () => {
@@ -1169,6 +1201,18 @@ export const useSettingsStore = create(
           eventName: settingsEvent.setConfigSyncIntervalRequest,
           handler: (p: SettingsEventPayloads[typeof settingsEvent.setConfigSyncIntervalRequest]) =>
             actions.setConfigSyncInterval(p.interval),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setCorsProxyUrlRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setCorsProxyUrlRequest]) =>
+            actions.setCorsProxyUrl(p.url),
+          storeId,
+        },
+        {
+          eventName: settingsEvent.setMarkdownServiceUrlRequest,
+          handler: (p: SettingsEventPayloads[typeof settingsEvent.setMarkdownServiceUrlRequest]) =>
+            actions.setMarkdownServiceUrl(p.url),
           storeId,
         },
       ];
